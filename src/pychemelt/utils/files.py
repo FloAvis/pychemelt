@@ -311,7 +311,7 @@ def load_csv_file(file):
 
         if len(conditions_330nm) > 0:
             signal_330 = signal_data[:, [i for i, cond in enumerate(conditions) if cond in conditions_330nm]]
-            signal_data_as_list = signal_350.transpose().tolist()
+            signal_data_as_list = signal_330.transpose().tolist()
             signal_data_dic["330nm"] = signal_data_as_list
             temp_data_dic["330nm"] = expand_temperature_list([temperature_data],signal_data_as_list)
             signals.append("330nm")
