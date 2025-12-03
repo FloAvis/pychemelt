@@ -25,14 +25,18 @@ from ..utils.processing import *
 
 def get_sheet_names_of_xlsx(filepath):
     """
-
     Get the sheet names of a xls or xlsx file without loading it.
     The open_workbook function is used so we can handle the error "openpyxl does not support the old .xls file format"
 
-    Args:
-        filepath (str): Path to the xls or xlsx file
-    Returns:
-        list: List of sheet names
+    Parameters
+    ----------
+    filepath : str
+        Path to the xls or xlsx file
+
+    Returns
+    -------
+    list
+        List of sheet names
     """
 
     try:
@@ -51,10 +55,16 @@ def file_is_of_type_uncle(xlsx_file):
 
     """
     Check if the file is an uncle file
-    Args:
-        xlsx_file (str): Path to the xlsx file
-    Returns:
-        bool: True if the file is an uncle file, False otherwise
+
+    Parameters
+    ----------
+    xlsx_file : str
+        Path to the xlsx file
+
+    Returns
+    -------
+    bool
+        True if the file is an uncle file, False otherwise
     """
 
     try:
@@ -83,10 +93,16 @@ def detect_file_type(file):
 
     """
     Detect the type of file based on its extension and content.
-    Args:
-        file (str): Path to the file
-    Returns:
-        str: Type of file
+
+    Parameters
+    ----------
+    file : str
+        Path to the file
+
+    Returns
+    -------
+    str or None
+        Type of file (e.g., 'supr', 'csv', 'prometheus', 'panta', 'uncle', 'mx3005p', 'quantstudio', etc.) or None if unknown
     """
 
     file_extension = file.split('.')[-1]
@@ -130,10 +146,16 @@ def detect_encoding(file_path):
 
     """
     Detect the encoding of a file by trying common encodings.
-    Args:
-        file_path (str): Path to the file
-    Returns:
-        str: Detected encoding or 'Unknown encoding'
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the file
+
+    Returns
+    -------
+    str
+        Detected encoding or the string 'Unknown encoding'
     """
 
     encodings = ["utf-8", "latin1", "iso-8859-1", "cp1252"]
@@ -149,13 +171,20 @@ def detect_encoding(file_path):
 def find_indexes_of_non_signal_conditions(signal_data,conditions):
 
     """
-    Given the signal data and the conditions, find the indexes of the conditions that are not signal data
-    We assume that conditions with the word 'derivative' or 'S.D.' in it are not signal data
-    Args:
-        signal_data (np.ndarray): 2D array with the signal data
-        conditions (list): list of conditions
-    Returns:
-        idx_to_remove (list): list of indexes to remove
+    Given the signal data and the conditions, find the indexes of the conditions that are not signal data.
+    We assume that conditions with the word 'derivative' or 'S.D.' in it are not signal data.
+
+    Parameters
+    ----------
+    signal_data : numpy.ndarray
+        2D array with the signal data (shape: temperature x conditions)
+    conditions : list
+        List of condition names
+
+    Returns
+    -------
+    list
+        List of indexes to remove
     """
 
     # Find the indexes of conditions with derivative in it, or 'S.D.' in it
@@ -178,12 +207,17 @@ def find_indexes_of_non_signal_conditions(signal_data,conditions):
 def find_repeated_words(string_lst):
 
     """
-    Given a list of strings, find the repeated words in the list
+    Given a list of strings, find the repeated words in the list.
 
-    Args:
-        string_lst (lst): list of strings
-    Returns:
-        repeated_words (lst): list of repeated words
+    Parameters
+    ----------
+    string_lst : list of str
+        List of strings to analyze
+
+    Returns
+    -------
+    list
+        List of repeated words
     """
 
     # Repeated words
@@ -200,12 +234,19 @@ def find_repeated_words(string_lst):
 def remove_words_in_string(input_string,word_list):
 
     """
-    Given a string and a list of words, remove the words from the string
-    Args:
-        input_string (str): String to be processed
-        word_list (lst): list of words to remove
-    Returns:
-        str : Processed string
+    Given a string and a list of words, remove the words from the string.
+
+    Parameters
+    ----------
+    input_string : str
+        String to be processed
+    word_list : list of str
+        List of words to remove
+
+    Returns
+    -------
+    str
+        Processed string
     """
 
     # Split the string into words
@@ -222,13 +263,23 @@ def remove_words_in_string(input_string,word_list):
 def load_csv_file(file):
 
     """
-    Args:
-        file (str): Path to the csv file
-    Returns:
-        signal_data_dic (dict): Dictionary with signal data
-        temp_data_dic (dict): Dictionary with temperature data
-        conditions (list): List of conditions
-        signals (np.ndarray): List of signal names
+    Load a CSV file containing temperature and signal columns and return structured data.
+
+    Parameters
+    ----------
+    file : str
+        Path to the csv file
+
+    Returns
+    -------
+    signal_data_dic : dict
+        Dictionary mapping signal names to lists of 1D numpy arrays (one array per condition)
+    temp_data_dic : dict
+        Dictionary mapping signal names to lists of temperature arrays corresponding to the signals
+    conditions : list
+        List of condition names
+    signals : numpy.ndarray
+        Array of signal name strings
     """
 
     signal_data_dic = {}
@@ -363,10 +414,17 @@ def load_csv_file(file):
 def get_start_line_quantstudio_txt(file_name):
 
     """
-    Args:
-        file_name (str): Path to the QuantStudio txt file
-    Returns:
-        int: Number of the first line not starting with "*" + 1
+    Find the start line for QuantStudio text files (first non-comment data line).
+
+    Parameters
+    ----------
+    file_name : str
+        Path to the QuantStudio txt file
+
+    Returns
+    -------
+    int
+        Number  of the first line not starting with '*' plus one
     """
 
     with codecs.open(file_name, 'r', encoding='utf-8',errors='ignore') as rf:
@@ -383,24 +441,23 @@ def get_start_line_quantstudio_txt(file_name):
 def load_quantstudio_txt(QSfile):
 
     """
+    Load QuantStudio TXT files (.txt) exported from QuantStudio instruments.
 
-    Input: A txt file ('QSfile') where column 2 has the well position, 
-    column 3 the temperature and column 4 the fluorescence signal. Index starts at 1!
+    Parameters
+    ----------
+    QSfile : str
+        Path to the QuantStudio txt file
 
-    --- Caution ---
-    The first rows of the file are comments that start with '*' and are not readed
-    The temperature and signal column have commas that need to be deleted
-
-    Columns are separated by spaces
-
-    Args:
-        QSfile (str): Path to the QuantStudio txt file
-    Returns:
-        signal_data_dic (dict): Dictionary with signal data
-        temp_data_dic (dict): Dictionary with temperature data
-        conditions (list): List of conditions
-        signals (np.ndarray): List of signal names
-
+    Returns
+    -------
+    signal_data_dic : dict
+        Dictionary with signal data (key: 'Fluorescence')
+    temp_data_dic : dict
+        Dictionary with temperature arrays per condition
+    conditions : list
+        List of condition names (well identifiers)
+    signals : numpy.ndarray
+        Array with signal name(s)
     """
 
     start_row = get_start_line_quantstudio_txt(QSfile)
@@ -436,17 +493,21 @@ def load_quantstudio_txt(QSfile):
 def load_thermofluor_xlsx(thermofluor_file):
 
     """
-    Load DSF Thermofluor xls file and extract data
-    The xls file generated by the ThermoFluor assay in a qPCR instrument.
-    This file has one sheet called 'RFU' where the first row has the sample positions (header), the first column has the temperature data,
-    and all subsequent columns store the fluorescence data.
+    Load DSF Thermofluor xls file and extract data.
 
-    Args:
-        thermofluor_file (str): Path to the xls file
-    Returns:
-        signal_data_dic (dict): Dictionary with signal data
-        temp_data_dic (dict): Dictionary with temperature data
-        conditions (list): List of conditions
+    Parameters
+    ----------
+    thermofluor_file : str
+        Path to the xls file
+
+    Returns
+    -------
+    signal_data_dic : dict
+        Dictionary with signal data
+    temp_data_dic : dict
+        Dictionary with temperature data
+    conditions : list
+        List of conditions
     """
 
     xls  = pd.ExcelFile(thermofluor_file)
@@ -472,11 +533,15 @@ def space_combinations(word):
     """
     Generate all combinations of a word with 0, 1, or 2 spaces before and/or after the word.
 
-    Args:
-        word (str): The word to generate combinations for.
+    Parameters
+    ----------
+    word : str
+        The word to generate combinations for.
 
-    Returns:
-        list: List of strings with all combinations of spaces before and after the word.
+    Returns
+    -------
+    list
+        List of strings with all combinations of spaces before and after the word.
     """
     spaces = [' ', '  ', '   ']
     combos = []
@@ -488,15 +553,23 @@ def space_combinations(word):
 def load_nanoDSF_xlsx(processed_dsf_file):
 
     """
-    Load nanotemper processed xlsx file and extract relevant data
+    Load nanotemper processed xlsx file and extract relevant data.
 
-    Args:
-        processed_dsf_file (str): Path to the processed xlsx file
-        sheet_names (list): List of sheet names to load
-    Returns:
-        signal_data_dic (dict): Dictionary with signal data
-        temp_data_dic (dict): Dictionary with temperature data
-        conditions (list): List of conditions
+    Parameters
+    ----------
+    processed_dsf_file : str
+        Path to the processed xlsx file
+
+    Returns
+    -------
+    signal_data_dic : dict
+        Dictionary with signal data
+    temp_data_dic : dict
+        Dictionary with temperature data
+    conditions : list
+        List of conditions
+    signals : numpy.ndarray
+        Array of signal names
     """
 
     sheet_names = get_sheet_names_of_xlsx(processed_dsf_file)
@@ -560,22 +633,22 @@ def load_panta_xlsx(pantaFile):
 
     """
     Load the xlsx file generated by a Prometheus Panta instrument.
-    This file has one sheet called ‘Overview’ with a column called 'Sample ID' with the names of the samples,
-    and one sheet called ‘Data Export’ where all the data is stored. The ‘Data Export’ sheet columns should have the following order:
 
-    Temperature capillary 1 ; Ratio capillary 1 ; … ; Temperature capillary 1 ; 350 nm capillary 1 ; … ;
-    Temperature capillary 1 ; 330 nm capillary 1 ; … ; Temperature capillary 1 ; scattering capillary 1 ; … ;
-    Temperature capillary 2 ; Ratio capillary 2; … ;  Temperature capillary n ; Ratio capillary n.
+    Parameters
+    ----------
+    pantaFile : str
+        Path to the xlsx file
 
-    Columns whose names include "Derivative" are not read.
-
-    Args:
-        pantaFile (str): Path to the xlsx file
-    Returns:
-        signal_data_dic (dict): Dictionary with signal data
-        temp_data_dic (dict): Dictionary with temperature data
-        conditions (list): List of conditions
-        signals (np.ndarray): List of signal names, such as 330nm and 350nm
+    Returns
+    -------
+    signal_data_dic : dict
+        Dictionary with signal data
+    temp_data_dic : dict
+        Dictionary with temperature data
+    conditions : list
+        List of conditions
+    signals : numpy.ndarray
+        List of signal names, such as 330nm and 350nm
     """
 
     try:
@@ -654,34 +727,23 @@ def load_panta_xlsx(pantaFile):
 def load_uncle_multi_channel(uncle_file):
 
     """
+    Function to load the data from the UNCLE instrument.
 
-    Function to load the data from the UNCLE instrument
+    Parameters
+    ----------
+    uncle_file : str
+        Path to the xlsx file
 
-    Below is an example of the data format:
-
-        Toms run.uni			Sample Name	1 mg/ml Protein
-        Temp :25, Time:134.9	Temp :25.49, Time:185.4	Temp :25.99, Time:236.4	Temp :26.48, Time:286.2	Temp :27, Time:336.2	Temp :27.48, Time:386.3	Temp :27.98, Time:436.3	Temp :28.46, Time:486.1	Temp :29.02, Time:536.1	Temp :29.5, Time:586	Temp :30, Time:636.2	Temp :30.49, Time:686.2	Temp :31, Time:736.2	Temp :31.5, Time:786.2	Temp :32, Time:836.2	Temp :32.48, Time:886.2	Temp :33, Time:936.1	Temp :33.5, Time:986.2	Temp :34.01, Time:1036.2	Temp :34.49, Time:1086.1	Temp :35, Time:1136.9	Temp :35.5, Time:1187.1
-        Wavelength	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity	Intensity
-
-        249.182266235352	22.384	22.417	22.45	22.406	22.373	22.362	22.373	22.439	22.384	22.406	22.417	22.406	22.45	22.439	22.483	22.461	22.428	22.395	22.417	22.439	22.439	22.373
-        249.664016723633	13.144	14.261	14.458	16.035	16.068	19.025	11.369	14.491	15.969	17.777	23.691	20.57	14.754	20.668	25.137	20.8	22.311	21.293	21.095	19.65	21.128	16.725
-
-    The line should be discarded
-    The second line contains the time and temperature data. We're interested only in the temperature data
-    The third line can be discarded
-    The fourth line is empty
-    The fifth line contains the first row of the signal data, with the wavelength data in the first column
-
-    The file is a xlsx file with as many sheets as channels
-
-    Args:
-        uncle_file (str): Path to the xlsx file
-    Returns:
-        signal_data_dic (dict): Dictionary with signal data
-        temp_data_dic (dict): Dictionary with temperature data
-        conditions (list): List of conditions
-        signals (np.ndarray): List of signal names, such as 330nm and 350nm
-
+    Returns
+    -------
+    signal_data_dic : dict
+        Dictionary with signal data (keys: wavelength strings like '350 nm')
+    temp_data_dic : dict
+        Dictionary with temperature arrays per condition
+    conditions : list
+        List of sample names
+    signals : list
+        List of wavelength strings
     """
 
     # Get the names of the sheets
@@ -779,15 +841,23 @@ def load_uncle_multi_channel(uncle_file):
 def load_mx3005p_txt(filename):
     """
     Load Agilent MX3005P qPCR txt file and extract data
-        
-    Args:
-        filename (str): Path to the MX3005P txt file. The second column has the fluorescence data, and 
-                        the third column the temperature. Wells are separated by rows containing a sentence like this one: 'Segment  2 Plateau  1 Well  1'
-    Returns:
-        signal_data_dic (dict): Dictionary with signal data
-        temp_data_dic (dict): Dictionary with temperature data
-        conditions (list): List of conditions (well numbers)
-        signals (np.ndarray): List of signal names
+
+    Parameters
+    ----------
+    filename : str
+        Path to the MX3005P txt file. The second column has the fluorescence data, and
+        the third column the temperature. Wells are separated by rows containing a sentence like this one: 'Segment  2 Plateau  1 Well  1'
+
+    Returns
+    -------
+    signal_data_dic : dict
+        Dictionary with signal data
+    temp_data_dic : dict
+        Dictionary with temperature data
+    conditions : list
+        List of conditions (well numbers)
+    signals : numpy.ndarray
+        List of signal names
     """
     
     signal_data_dic = {'Fluorescence': []}
