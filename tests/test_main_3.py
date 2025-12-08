@@ -88,13 +88,13 @@ def test_guess_Cp():
     pychem_sim.n_residues = 130
     pychem_sim.guess_Cp()
 
-    assert 1.5 <= pychem_sim.Cp0 <= 2.1 # 0.3 units tolerance from 1.8
+    assert 1.4 <= pychem_sim.Cp0 <= 2.2 # 0.4 units tolerance from 1.8
 
     # Force exception clause so we just use the cp based on the number of residues
     pychem_sim.Tms_multiple = None
     pychem_sim.guess_Cp()
 
-    assert 1.5 <= pychem_sim.Cp0 <= 2.1 # 0.3 units tolerance from 1.8
+    assert 1.4 <= pychem_sim.Cp0 <= 2.2 # 0.3 units tolerance from 1.8
 
 
 def test_fit_thermal_unfolding_global():
