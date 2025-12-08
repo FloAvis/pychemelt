@@ -3,6 +3,7 @@ Tests to ensure that the main functionalities of the pychemelt Sample class work
 The order of the tests is important, as some functions depend on the previous ones.
 """
 import numpy as np
+import pytest
 
 from pychemelt import Sample
 from pychemelt.utils.signals import signal_two_state_tc_unfolding_monomer_exponential
@@ -79,13 +80,32 @@ def test_fit_thermal_unfolding_local():
 
 def test_guess_Cp():
 
+    # Raise error if self.n_residues is zero
+    pychem_sim.n_residues = 0
+    with pytest.raises(ValueError):
+        pychem_sim.guess_Cp()
+
     pychem_sim.n_residues = 130
     pychem_sim.guess_Cp()
 
     assert 1.5 <= pychem_sim.Cp0 <= 2.1 # 0.3 units tolerance from 1.8
 
+    # Force exception clause so we just use the cp based on the number of residues
+    pychem_sim.Tms_multiple = None
+    pychem_sim.guess_Cp()
+
+    assert 1.5 <= pychem_sim.Cp0 <= 2.1 # 0.3 units tolerance from 1.8
+
+
 def test_fit_thermal_unfolding_global():
 
+    pychem_sim.max_points = 200
+
+    with pytest.raises(ValueError):
+       pychem_sim.Cp0 = 0 # Force error
+       pychem_sim.fit_thermal_unfolding_global()
+
+    pychem_sim.Cp0 = 1.8
     pychem_sim.fit_thermal_unfolding_global()
 
     assert pychem_sim.params_df is not None

@@ -55,6 +55,16 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 pythonpath = ["src"]
+
+norecursedirs = [
+    "experimental",
+    "dev",
+    "build",
+    "dist",
+    ".venv",
+    "__pycache__"
+]
+
 addopts = [
     "--cov=src/pychemelt",
     "--cov-report=html",

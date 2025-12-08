@@ -2,7 +2,6 @@
 Tests to ensure that the main functionalities of the pychemelt Sample class work as expected.
 The order of the tests is important, as some functions depend on the previous ones.
 """
-import pandas as pd
 import numpy as np
 import pytest
 
@@ -99,3 +98,27 @@ def test_init_slope_dic():
     # Raise error if self.poly_order_native or self.poly_order_unfolded is None
     with pytest.raises(ValueError):
         sample.init_slope_dic()
+
+def test_guess_initial_parameters_ratio():
+
+    sample.n_residues = 130
+    sample.guess_initial_parameters(poly_order_native=1,poly_order_unfolded=1)
+
+    np.testing.assert_allclose(sample.thermodynamic_params_guess[0],71.8,rtol=0.1)
+
+def test_different_format_data():
+
+    file2 = './test_files/MX3005P.txt'
+
+    sample.read_multiple_files([file2])
+
+    assert len(sample.conditions) == 48
+
+    assert  'Fluorescence' not in sample.signals
+    assert '350nm' in sample.signals
+
+def test_read_same_format_data():
+
+    sample.read_multiple_files('./test_files/nDSFdemoFile.xlsx')
+
+    assert len(sample.conditions) == 48 * 2

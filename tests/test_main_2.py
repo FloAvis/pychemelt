@@ -59,7 +59,7 @@ def aux_create_pychem_sim(params,concs):
 
     pychem_sim.set_denaturant_concentrations()
 
-    pychem_sim.set_signal(['Fluo'])
+    pychem_sim.set_signal('Fluo')
 
     pychem_sim.select_conditions(normalise_to_global_max=False)
     pychem_sim.expand_multiple_signal()
@@ -83,6 +83,11 @@ def test_estimate_baseline_parameters():
     pychem_sim.estimate_baseline_parameters(poly_order_native=0, poly_order_unfolded=0)
 
     np.testing.assert_allclose(pychem_sim.bNs_per_signal[0][0],params['a_N'], rtol=0.01, atol=0)
+
+    # Reset fittings results
+    sample.reset_fittings_results()
+    assert len(sample.bNs_per_signal) == 0
+
 
     # ------------ #
     params = def_params.copy()

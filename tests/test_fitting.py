@@ -13,6 +13,8 @@ from pychemelt.utils.signals import (
     signal_two_state_t_unfolding_monomer
 )
 
+rng = np.random.default_rng(2)
+
 def test_fit_line_robust():
 
     m = 30
@@ -20,7 +22,7 @@ def test_fit_line_robust():
 
     x = np.linspace(0,10,100)
     y = m * x + b
-    y = y + np.random.normal(0,0.1,100)
+    y = y + rng.normal(0,0.1,100)
 
     m_fit, b_fit = fit_line_robust(x, y)
 
@@ -44,7 +46,7 @@ def test_fit_quadratic_robust():
     x = np.linspace(0,10,100)
 
     y = a * x ** 2 + b * x + c
-    y = y + np.random.normal(0,0.1,100)
+    y = y + rng.normal(0,0.1,100)
 
     a_fit, b_fit, c_fit = fit_quadratic_robust(x, y)
 
@@ -64,7 +66,7 @@ def test_fit_exponential_robust():
 
     y = a + c * np.exp(-alpha * x)
 
-    y = y + np.random.normal(0,0.01,100)
+    y = y + rng.normal(0,0.01,100)
 
     a_fit, c_fit, alpha_fit = fit_exponential_robust(x, y)
 
@@ -102,10 +104,10 @@ for D in concs:
     y = signal_two_state_tc_unfolding_monomer(temp_range, D, **params)
 
     # Add gaussian error to signal
-    y += np.random.normal(0, 0.005, len(y))
+    y += rng.normal(0, 0.005, len(y))
 
     # Add gaussian error to PROTEIN concentration
-    y *= np.random.normal(1, 0.001)
+    y *= rng.normal(1, 0.001)
 
     signal_list.append(y)
     temp_list.append(temp_range)
