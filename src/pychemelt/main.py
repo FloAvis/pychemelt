@@ -5,6 +5,7 @@ The current model assumes the protein is a monomer and that the unfolding is rev
 
 import pandas as pd
 import numpy as np
+from prompt_toolkit import pep440
 
 from .utils.signals import *
 from .utils.fitting import *
@@ -50,6 +51,11 @@ class Sample:
         self.alphaUs_per_signal = []
 
         self.nr_den = 0  # Number of denaturant concentrations
+
+        self.poly_order_native = None # Native state baseline polynomial order
+        self.poly_order_unfolded = None # Unfolded state baseline polynomial order
+
+        self.t_melting_init_multiple = None # Initial guess for tm based on derivative
 
         self.fit_m_dep = False  # Fit the temperature dependence of the m-value
 
@@ -324,6 +330,11 @@ class Sample:
         max_temp : float, optional
             Maximum temperature
         """
+
+        # Give an error if max_temp is smaller than min_temp
+        if max_temp < min_temp:
+            raise ValueError('max_temp must be larger than min_temp')
+
         # Limit the signal to the temperature range
         for i in range(len(self.signal_lst_multiple)):
             self.signal_lst_multiple[i], self.temp_lst_multiple[i] = subset_signal_by_temperature(
@@ -347,12 +358,12 @@ class Sample:
         e.g., all 350nm datasets are mapped to 0, all 330nm datasets to 1, etc.
         """
 
-        signals_id = []
+        signal_ids = []
 
         for i, s in enumerate(self.signal_lst_multiple):
-            signals_id.extend([i for _ in range(len(s))])
+            signal_ids.extend([i for _ in range(len(s))])
 
-        self.signals_id = signals_id
+        self.signal_ids = signal_ids
 
         return None
 
@@ -389,6 +400,7 @@ class Sample:
                     derivative = first_derivative_savgol(t, s, window_length)
 
                 else:
+
                     t_for_ip = np.arange(np.min(t), np.max(t), 0.1)
 
                     # We interpolate the data to make it evenly spaced, every 0.1 degrees
@@ -450,6 +462,10 @@ class Sample:
         return None
 
     def init_slope_dic(self):
+
+        # Require self.poly_order_native and self.poly_order_unfolded to be set
+        if self.poly_order_native is None or self.poly_order_unfolded is None:
+            raise ValueError('poly_order_native and poly_order_unfolded must be set before calling init_slope_dic')
 
         self.fit_slopes_dic = {
             'fit_slope_native': self.poly_order_native > 0,
@@ -517,12 +533,14 @@ class Sample:
             self.qNs_per_signal.append(qNs)
             self.qUs_per_signal.append(qUs)
 
+        self.baselines = 'polynomial'
+
         return None
 
     def estimate_baseline_parameters_exponential(
             self,
-            window_range_native=15,
-            window_range_unfolded=15):
+            window_range_native=18,
+            window_range_unfolded=18):
 
         """
         Estimate the baseline parameters for multiple signals
@@ -560,6 +578,8 @@ class Sample:
             self.cUs_per_signal.append(cUs)
             self.alphaNs_per_signal.append(alphaNs)
             self.alphaUs_per_signal.append(alphaUs)
+
+        self.baselines = 'exponential'
 
         return None
 
@@ -727,24 +747,47 @@ class Sample:
         We fit one curve at a time, with individual parameters
         """
 
+        # Require self.t_melting_init_multiple
+        if self.t_melting_init_multiple is None:
+
+            self.estimate_derivative()
+            self.guess_Tm()
+
         self.Tms_multiple = []
         self.dHs_multiple = []
         self.predicted_lst_multiple = []
 
         for i in range(len(self.signal_lst_multiple)):
-            Tms, dHs, predicted_lst = fit_local_thermal_unfolding_to_signal_lst(
-                self.signal_lst_multiple[i],
-                self.temp_lst_multiple[i],
-                self.t_melting_init_multiple[i],
-                self.bNs_per_signal[i],
-                self.bUs_per_signal[i],
-                self.kNs_per_signal[i],
-                self.kUs_per_signal[i],
-                self.qNs_per_signal[i],
-                self.qUs_per_signal[i],
-                poly_order_native=self.poly_order_native,
-                poly_order_unfolded=self.poly_order_unfolded
-            )
+
+            if self.baselines == 'polynomial':
+
+                Tms, dHs, predicted_lst = fit_local_thermal_unfolding_to_signal_lst(
+                    self.signal_lst_multiple[i],
+                    self.temp_lst_multiple[i],
+                    self.t_melting_init_multiple[i],
+                    self.bNs_per_signal[i],
+                    self.bUs_per_signal[i],
+                    self.kNs_per_signal[i],
+                    self.kUs_per_signal[i],
+                    self.qNs_per_signal[i],
+                    self.qUs_per_signal[i],
+                    poly_order_native=self.poly_order_native,
+                    poly_order_unfolded=self.poly_order_unfolded
+                )
+
+            elif self.baselines == 'exponential':
+
+                Tms, dHs, predicted_lst = fit_local_thermal_unfolding_to_signal_lst_exponential(
+                    self.signal_lst_multiple[i],
+                    self.temp_lst_multiple[i],
+                    self.t_melting_init_multiple[i],
+                    self.aNs_per_signal[i],
+                    self.aUs_per_signal[i],
+                    self.cNs_per_signal[i],
+                    self.cUs_per_signal[i],
+                    self.alphaNs_per_signal[i],
+                    self.alphaUs_per_signal[i]
+                )
 
             self.Tms_multiple.append(Tms)
             self.dHs_multiple.append(dHs)
@@ -764,6 +807,10 @@ class Sample:
         This method creates/updates attributes used later in fitting:
         - Tms, dHs, slope_dh_tm, intercept_dh_tm, Cp0, Cp0 assigned to self.Cp0
         """
+
+        # If the number of residues is still zero, raise an error
+        if self.n_residues == 0:
+            raise ValueError('The number of residues is still zero. Please set n_residues before calling guess_Cp')
 
         # Requires self.single_fit_done
 
@@ -815,6 +862,9 @@ class Sample:
 
             Cp0 = expected_Cp0
 
+        # Cp0 needs to be positive
+        Cp0 = max(Cp0, 0)
+
         self.Cp0 = Cp0
 
         return None
@@ -862,6 +912,7 @@ class Sample:
         use_ratio = 'Ratio' in self.signals and self.signal_names[0] != 'Ratio'
 
         if use_ratio:
+
             current_signal = self.signal_names[0]
 
             # Extract temperature limits
@@ -991,65 +1042,111 @@ class Sample:
             'Cp (kcal/mol/°C)',
             'm-value (kcal/mol/M)']
 
-        # Collapse all the bN and bU values into a single list
-        self.bNs_expanded = np.concatenate(self.bNs_per_signal, axis=0)
-        self.bUs_expanded = np.concatenate(self.bUs_per_signal, axis=0)
+        if self.baselines == 'polynomial':
 
-        # Collapse all the kN and kU values into a single list
-        self.kNs_expanded = np.concatenate(self.kNs_per_signal, axis=0)
-        self.kUs_expanded = np.concatenate(self.kUs_per_signal, axis=0)
+            # Collapse all the bN and bU values into a single list
+            self.bNs_expanded = np.concatenate(self.bNs_per_signal, axis=0)
+            self.bUs_expanded = np.concatenate(self.bUs_per_signal, axis=0)
 
-        # Collapse all the qN and qU values into a single list
-        self.qNs_expanded = np.concatenate(self.qNs_per_signal, axis=0)
-        self.qUs_expanded = np.concatenate(self.qUs_per_signal, axis=0)
+            # Collapse all the kN and kU values into a single list
+            self.kNs_expanded = np.concatenate(self.kNs_per_signal, axis=0)
+            self.kUs_expanded = np.concatenate(self.kUs_per_signal, axis=0)
 
-        p0 = np.concatenate([p0, self.bNs_expanded, self.bUs_expanded])
+            # Collapse all the qN and qU values into a single list
+            self.qNs_expanded = np.concatenate(self.qNs_per_signal, axis=0)
+            self.qUs_expanded = np.concatenate(self.qUs_per_signal, axis=0)
 
-        # We need to append as many bN and bU as the number of denaturant concentrations
-        # times the number of signal types
-        for signal in self.signal_names:
-            params_names += (['bN - ' + str(self.denaturant_concentrations[i]) +
-                              ' - ' + str(signal) for i in range(self.nr_den)])
+            p0 = np.concatenate([p0, self.bNs_expanded, self.bUs_expanded])
 
-        for signal in self.signal_names:
-            params_names += (['bU - ' + str(self.denaturant_concentrations[i]) +
-                              ' - ' + str(signal) for i in range(self.nr_den)])
-
-        if self.poly_order_native > 0:
-
-            p0 = np.concatenate([p0, self.kNs_expanded])
-
+            # We need to append as many bN and bU as the number of denaturant concentrations
+            # times the number of signal types
             for signal in self.signal_names:
-                params_names += (['kN - ' + str(self.denaturant_concentrations[i]) +
+                params_names += (['bN - ' + str(self.denaturant_concentrations[i]) +
                                   ' - ' + str(signal) for i in range(self.nr_den)])
 
-        if self.poly_order_unfolded > 0:
-            p0 = np.concatenate([p0, self.kUs_expanded])
-
             for signal in self.signal_names:
-                params_names += (['kU - ' + str(self.denaturant_concentrations[i]) +
+                params_names += (['bU - ' + str(self.denaturant_concentrations[i]) +
                                   ' - ' + str(signal) for i in range(self.nr_den)])
 
-        if self.poly_order_native == 2:
-            p0 = np.concatenate([p0, self.qNs_expanded])
-            for signal in self.signal_names:
-                params_names += (['qN - ' + str(self.denaturant_concentrations[i]) +
-                                  ' - ' + str(signal) for i in range(self.nr_den)])
+            if self.poly_order_native > 0:
 
-        if self.poly_order_unfolded == 2:
-            p0 = np.concatenate([p0, self.qUs_expanded])
-            for signal in self.signal_names:
-                params_names += (['qU - ' + str(self.denaturant_concentrations[i]) +
-                                  ' - ' + str(signal) for i in range(self.nr_den)])
+                p0 = np.concatenate([p0, self.kNs_expanded])
 
-        low_bounds = (p0.copy())
-        high_bounds = (p0.copy())
+                for signal in self.signal_names:
+                    params_names += (['kN - ' + str(self.denaturant_concentrations[i]) +
+                                      ' - ' + str(signal) for i in range(self.nr_den)])
 
-        low_bounds[4:] = [x / 60 if x > 0 else 60 * x for x in low_bounds[4:]]
-        high_bounds[4:] = [60 * x if x > 0 else x / 60 for x in high_bounds[4:]]
+            if self.poly_order_unfolded > 0:
+                p0 = np.concatenate([p0, self.kUs_expanded])
 
-        low_bounds[4:] = low_bounds[4:] - 10
-        high_bounds[4:] = high_bounds[4:] + 10
+                for signal in self.signal_names:
+                    params_names += (['kU - ' + str(self.denaturant_concentrations[i]) +
+                                      ' - ' + str(signal) for i in range(self.nr_den)])
+
+            if self.poly_order_native == 2:
+                p0 = np.concatenate([p0, self.qNs_expanded])
+                for signal in self.signal_names:
+                    params_names += (['qN - ' + str(self.denaturant_concentrations[i]) +
+                                      ' - ' + str(signal) for i in range(self.nr_den)])
+
+            if self.poly_order_unfolded == 2:
+                p0 = np.concatenate([p0, self.qUs_expanded])
+                for signal in self.signal_names:
+                    params_names += (['qU - ' + str(self.denaturant_concentrations[i]) +
+                                      ' - ' + str(signal) for i in range(self.nr_den)])
+
+            low_bounds = (p0.copy())
+            high_bounds = (p0.copy())
+
+            low_bounds[4:] = [x / 120 if x > 0 else 120 * x for x in low_bounds[4:]]
+            high_bounds[4:] = [120 * x if x > 0 else x / 120 for x in high_bounds[4:]]
+
+            low_bounds[4:] = low_bounds[4:] - 10
+            high_bounds[4:] = high_bounds[4:] + 10
+
+        # elif self.baselines == 'exponential':
+        else:
+
+            self.aNs_expanded = np.concatenate(self.aNs_per_signal, axis=0)
+            self.aUs_expanded = np.concatenate(self.aUs_per_signal, axis=0)
+            self.cNs_expanded = np.concatenate(self.cNs_per_signal, axis=0)
+            self.cUs_expanded = np.concatenate(self.cUs_per_signal, axis=0)
+            self.alphaNs_expanded = np.concatenate(self.alphaNs_per_signal, axis=0)
+            self.alphaUs_expanded = np.concatenate(self.alphaUs_per_signal, axis=0)
+
+            p0 = np.concatenate([
+                p0,
+                self.aNs_expanded,
+                self.aUs_expanded,
+                self.cNs_expanded,
+                self.cUs_expanded,
+                self.alphaNs_expanded,
+                self.alphaUs_expanded
+            ])
+
+            for param_name in ['intercept_native', 'intercept_unfolded',
+                               'pre_exp_term_native', 'pre_exp_term_unfolded',
+                               'exp_coeff_native', 'exp_coeff_unfolded']:
+
+                for signal in self.signal_names:
+
+                    params_names += ([
+                        param_name +' - ' + str(self.denaturant_concentrations[i]) +
+                        ' - ' + str(signal) for i in range(self.nr_den)
+                    ])
+
+            low_bounds = (p0.copy())
+            high_bounds = (p0.copy())
+
+            low_bounds[4:]  = [0 for _ in high_bounds[4:]]
+            high_bounds[4:] = [np.inf  for _ in high_bounds[4:]]
+
+            # Verify that the low bounds are fine
+            for i in range(4,len(low_bounds)):
+
+                if low_bounds[i] >= p0[i]:
+
+                    p0[i] = 0.1
 
         self.limited_tm = tm_limits is not None
 
@@ -1108,6 +1205,7 @@ class Sample:
         self.limited_cp = cp_limits is not None and not self.fixed_cp
 
         if self.limited_cp:
+
             cp_lower, cp_upper = cp_limits
 
         else:
@@ -1148,58 +1246,69 @@ class Sample:
             p0[id_m] = 2
             high_bounds[id_m] += 1
 
+        print(p0 > low_bounds)
+        print(p0 < high_bounds)
+
         # Populate the expanded signal and temperature lists
         self.expand_multiple_signal()
 
+        kwargs = {
+            'denaturant_concentrations' : self.denaturant_concentrations_expanded,
+            'initial_parameters': p0,
+            'low_bounds' : low_bounds,
+            'high_bounds' : high_bounds,
+            'cp_value' : cp_value
+        }
+
+        if self.baselines == 'polynomial':
+
+            fit_fx = fit_tc_unfolding_single_slopes
+
+            kwargs['fit_slopes'] = self.fit_slopes_dic
+            kwargs['signal_fx'] = signal_two_state_tc_unfolding_monomer
+
+        #elif self.baselines == 'exponential':
+        else:
+
+            fit_fx = fit_tc_unfolding_single_slopes_exponential
+
+            kwargs['signal_fx'] = signal_two_state_tc_unfolding_monomer_exponential
+
+
         # Do a quick prefit with a reduced data set
         if self.pre_fit:
-            global_fit_params, cov, predicted = fit_tc_unfolding_single_slopes(
-                self.temp_lst_expanded_subset,
-                self.signal_lst_expanded_subset,
-                self.denaturant_concentrations_expanded,
-                p0,
-                low_bounds,
-                high_bounds,
-                signal_two_state_tc_unfolding_monomer,
-                fit_slopes=self.fit_slopes_dic,
-                cp_value=self.cp_value,
-                fit_m1=False)
+
+            kwargs['list_of_temperatures'] = self.temp_lst_expanded_subset
+            kwargs['list_of_signals'] = self.signal_lst_expanded_subset
+
+            global_fit_params, cov, predicted = fit_fx(**kwargs)
 
             p0 = global_fit_params
 
-        # first fit without m-value dependence on temperature
-        global_fit_params, cov, predicted = fit_tc_unfolding_single_slopes(
-            self.temp_lst_expanded,
-            self.signal_lst_expanded,
-            self.denaturant_concentrations_expanded,
-            p0,
-            low_bounds,
-            high_bounds,
-            signal_two_state_tc_unfolding_monomer,
-            fit_slopes=self.fit_slopes_dic,
-            cp_value=self.cp_value,
-            fit_m1=False)
+        # Now use the whole dataset
+        kwargs['list_of_temperatures'] = self.temp_lst_expanded
+        kwargs['list_of_signals'] = self.signal_lst_expanded
+
+        # First fit without m-value dependence on temperature
+        global_fit_params, cov, predicted = fit_fx(**kwargs)
 
         # Insert the initial estimate for the m-value dependence of temperature, in the position 4
         if fit_m_dep:
+
+            kwargs['fit_m1'] = fit_m_dep
+
             p0 = global_fit_params
-            p0 = np.insert(p0, 4, 0)
-            low_bounds = np.insert(low_bounds, 4, -0.5)
-            high_bounds = np.insert(high_bounds, 4, 0.5)
+            p0 = np.insert(p0, id_m+1, 0)
+            low_bounds = np.insert(low_bounds, id_m+1, -0.5)
+            high_bounds = np.insert(high_bounds, id_m+1, 0.5)
 
-            params_names.insert(4, 'm - T dependence')
+            kwargs['initial_parameters'] = p0
+            kwargs['low_bounds'] = low_bounds
+            kwargs['high_bounds'] = high_bounds
 
-            global_fit_params, cov, predicted = fit_tc_unfolding_single_slopes(
-                self.temp_lst_expanded,
-                self.signal_lst_expanded,
-                self.denaturant_concentrations_expanded,
-                p0,
-                low_bounds,
-                high_bounds,
-                signal_two_state_tc_unfolding_monomer,
-                fit_slopes=self.fit_slopes_dic,
-                cp_value=self.cp_value,
-                fit_m1=True)
+            params_names.insert(id_m+1, 'm - T dependence')
+
+            global_fit_params, cov, predicted = fit_fx(**kwargs)
 
         for _ in range(3):
 
@@ -1215,17 +1324,11 @@ class Sample:
 
                 p0, low_bounds, high_bounds = p0_new, low_bounds_new, high_bounds_new
 
-                global_fit_params, cov, predicted = fit_tc_unfolding_single_slopes(
-                    self.temp_lst_expanded,
-                    self.signal_lst_expanded,
-                    self.denaturant_concentrations_expanded,
-                    p0,
-                    low_bounds,
-                    high_bounds,
-                    signal_two_state_tc_unfolding_monomer,
-                    fit_slopes=self.fit_slopes_dic,
-                    cp_value=self.cp_value,
-                    fit_m1=fit_m_dep)
+                kwargs['initial_parameters'] = p0
+                kwargs['low_bounds'] = low_bounds
+                kwargs['high_bounds'] = high_bounds
+
+                global_fit_params, cov, predicted = fit_fx(**kwargs)
 
             else:
 
@@ -1269,6 +1372,9 @@ class Sample:
         if not self.global_fit_done:
             self.fit_thermal_unfolding_global()
 
+        if self.signal_ids is None:
+            self.set_signal_id()
+
         param_init = 3 + self.fit_m_dep + (self.cp_value is None)
 
         p0 = self.global_fit_params[:param_init]
@@ -1277,127 +1383,221 @@ class Sample:
 
         n_datasets = self.nr_den * self.nr_signals
 
-        bNs = self.global_fit_params[param_init:param_init + n_datasets]
-        bUs = self.global_fit_params[param_init + n_datasets:param_init + 2 * n_datasets]
+        if self.baselines == 'polynomial':
 
-        low_bounds_bNs = self.low_bounds[param_init:param_init + n_datasets]
-        low_bounds_bUs = self.low_bounds[param_init + n_datasets:param_init + 2 * n_datasets]
+            bNs = self.global_fit_params[param_init:param_init + n_datasets]
+            bUs = self.global_fit_params[param_init + n_datasets:param_init + 2 * n_datasets]
 
-        high_bounds_bNs = self.high_bounds[param_init:param_init + n_datasets]
-        high_bounds_bUs = self.high_bounds[param_init + n_datasets:param_init + 2 * n_datasets]
+            low_bounds_bNs = self.low_bounds[param_init:param_init + n_datasets]
+            low_bounds_bUs = self.low_bounds[param_init + n_datasets:param_init + 2 * n_datasets]
 
-        id_start = param_init + 2 * n_datasets
+            high_bounds_bNs = self.high_bounds[param_init:param_init + n_datasets]
+            high_bounds_bUs = self.high_bounds[param_init + n_datasets:param_init + 2 * n_datasets]
 
-        params_names = self.params_names[:id_start]
+            id_start = param_init + 2 * n_datasets
 
-        if self.poly_order_native > 0:
-            kNs = self.global_fit_params[id_start:id_start + n_datasets]
-            params_names += ['kN - ' + signal_name for signal_name in self.signal_names]
-            low_bounds_kNs = self.low_bounds[id_start:id_start + n_datasets]
-            high_bounds_kNs = self.high_bounds[id_start:id_start + n_datasets]
+            params_names = self.params_names[:id_start]
+
+            if self.poly_order_native > 0:
+                kNs = self.global_fit_params[id_start:id_start + n_datasets]
+                params_names += ['kN - ' + signal_name for signal_name in self.signal_names]
+                low_bounds_kNs = self.low_bounds[id_start:id_start + n_datasets]
+                high_bounds_kNs = self.high_bounds[id_start:id_start + n_datasets]
+                id_start += n_datasets
+
+            if self.poly_order_unfolded > 0:
+                kUs = self.global_fit_params[id_start:id_start + n_datasets]
+                params_names += ['kU - ' + signal_name for signal_name in self.signal_names]
+                low_bounds_kUs = self.low_bounds[id_start:id_start + n_datasets]
+                high_bounds_kUs = self.high_bounds[id_start:id_start + n_datasets]
+                id_start += n_datasets
+
+            if self.poly_order_native == 2:
+                qNs = self.global_fit_params[id_start:id_start + n_datasets]
+                params_names += ['qN - ' + signal_name for signal_name in self.signal_names]
+                low_bounds_qNs = self.low_bounds[id_start:id_start + n_datasets]
+                high_bounds_qNs = self.high_bounds[id_start:id_start + n_datasets]
+                id_start += n_datasets
+
+            if self.poly_order_unfolded == 2:
+                qUs = self.global_fit_params[id_start:id_start + n_datasets]
+                params_names += ['qU - ' + signal_name for signal_name in self.signal_names]
+                low_bounds_qUs = self.low_bounds[id_start:id_start + n_datasets]
+                high_bounds_qUs = self.high_bounds[id_start:id_start + n_datasets]
+
+            p0 = np.concatenate([p0, bNs, bUs])
+            low_bounds = np.concatenate([low_bounds, low_bounds_bNs, low_bounds_bUs])
+            high_bounds = np.concatenate([high_bounds, high_bounds_bNs, high_bounds_bUs])
+
+            # Baselines are still independent for each signal and denaturant concentration
+            # Slopes and quadratic terms are shared - per signal only
+
+            if self.poly_order_native > 0:
+
+                kNs = re_arrange_params(kNs, self.nr_signals)
+                low_bounds_kNs = re_arrange_params(low_bounds_kNs, self.nr_signals)
+                high_bounds_kNs = re_arrange_params(high_bounds_kNs, self.nr_signals)
+
+                for kNs_i, low_bounds_kNs_i, high_bounds_kNs_i in zip(kNs, low_bounds_kNs, high_bounds_kNs):
+                    p0 = np.append(p0, np.median(kNs_i))
+                    low_bounds = np.append(low_bounds, np.min(low_bounds_kNs_i))
+                    high_bounds = np.append(high_bounds, np.max(high_bounds_kNs_i))
+
+            if self.poly_order_unfolded > 0:
+
+                kUs = re_arrange_params(kUs, self.nr_signals)
+                low_bounds_kUs = re_arrange_params(low_bounds_kUs, self.nr_signals)
+                high_bounds_kUs = re_arrange_params(high_bounds_kUs, self.nr_signals)
+
+                for kUs_i, low_bounds_kUs_i, high_bounds_kUs_i in zip(kUs, low_bounds_kUs, high_bounds_kUs):
+                    p0 = np.append(p0, np.median(kUs_i))
+                    low_bounds = np.append(low_bounds, np.min(low_bounds_kUs_i))
+                    high_bounds = np.append(high_bounds, np.max(high_bounds_kUs_i))
+
+            if self.poly_order_native == 2:
+
+                qNs = re_arrange_params(qNs, self.nr_signals)
+                low_bounds_qNs = re_arrange_params(low_bounds_qNs, self.nr_signals)
+                high_bounds_qNs = re_arrange_params(high_bounds_qNs, self.nr_signals)
+
+                for qNs_i, low_bounds_qNs_i, high_bounds_qNs_i in zip(qNs, low_bounds_qNs, high_bounds_qNs):
+                    p0 = np.append(p0, np.median(qNs_i))
+                    low_bounds = np.append(low_bounds, np.min(low_bounds_qNs_i))
+                    high_bounds = np.append(high_bounds, np.max(high_bounds_qNs_i))
+
+            if self.poly_order_unfolded == 2:
+
+                qUs = re_arrange_params(qUs, self.nr_signals)
+                low_bounds_qUs = re_arrange_params(low_bounds_qUs, self.nr_signals)
+                high_bounds_qUs = re_arrange_params(high_bounds_qUs, self.nr_signals)
+
+                for qUs_i, low_bounds_qUs_i, high_bounds_qUs_i in zip(qUs, low_bounds_qUs, high_bounds_qUs):
+                    p0 = np.append(p0, np.median(qUs_i))
+                    low_bounds = np.append(low_bounds, np.min(low_bounds_qUs_i))
+                    high_bounds = np.append(high_bounds, np.max(high_bounds_qUs_i))
+
+        # elif self.baselines == 'exponential':
+        else:
+
+            aNs = self.global_fit_params[param_init:param_init + n_datasets]
+            aUs = self.global_fit_params[param_init + n_datasets:param_init + 2 * n_datasets]
+
+            low_bounds_aNs = self.low_bounds[param_init:param_init + n_datasets]
+            low_bounds_aUs = self.low_bounds[param_init + n_datasets:param_init + 2 * n_datasets]
+
+            high_bounds_aNs = self.high_bounds[param_init:param_init + n_datasets]
+            high_bounds_aUs = self.high_bounds[param_init + n_datasets:param_init + 2 * n_datasets]
+
+            id_start = param_init + 2 * n_datasets
+
+            params_names = self.params_names[:id_start]
+
+            cNs = self.global_fit_params[id_start:id_start + n_datasets]
+            params_names += ['cN - ' + signal_name for signal_name in self.signal_names]
+            low_bounds_cNs = self.low_bounds[id_start:id_start + n_datasets]
+            high_bounds_cNs = self.high_bounds[id_start:id_start + n_datasets]
             id_start += n_datasets
 
-        if self.poly_order_unfolded > 0:
-            kUs = self.global_fit_params[id_start:id_start + n_datasets]
-            params_names += ['kU - ' + signal_name for signal_name in self.signal_names]
-            low_bounds_kUs = self.low_bounds[id_start:id_start + n_datasets]
-            high_bounds_kUs = self.high_bounds[id_start:id_start + n_datasets]
+            cUs = self.global_fit_params[id_start:id_start + n_datasets]
+            params_names += ['cU - ' + signal_name for signal_name in self.signal_names]
+            low_bounds_cUs = self.low_bounds[id_start:id_start + n_datasets]
+            high_bounds_cUs = self.high_bounds[id_start:id_start + n_datasets]
             id_start += n_datasets
 
-        if self.poly_order_native == 2:
-            qNs = self.global_fit_params[id_start:id_start + n_datasets]
-            params_names += ['qN - ' + signal_name for signal_name in self.signal_names]
-            low_bounds_qNs = self.low_bounds[id_start:id_start + n_datasets]
-            high_bounds_qNs = self.high_bounds[id_start:id_start + n_datasets]
+            alphaNs = self.global_fit_params[id_start:id_start + n_datasets]
+            params_names += ['alphaN - ' + signal_name for signal_name in self.signal_names]
+            low_bounds_alphaNs = self.low_bounds[id_start:id_start + n_datasets]
+            high_bounds_alphaNs = self.high_bounds[id_start:id_start + n_datasets]
             id_start += n_datasets
 
-        if self.poly_order_unfolded == 2:
             qUs = self.global_fit_params[id_start:id_start + n_datasets]
-            params_names += ['qU - ' + signal_name for signal_name in self.signal_names]
-            low_bounds_qUs = self.low_bounds[id_start:id_start + n_datasets]
-            high_bounds_qUs = self.high_bounds[id_start:id_start + n_datasets]
+            params_names += ['alphaU - ' + signal_name for signal_name in self.signal_names]
+            low_bounds_alphaUs = self.low_bounds[id_start:id_start + n_datasets]
+            high_bounds_alphaUs = self.high_bounds[id_start:id_start + n_datasets]
 
-        p0 = np.concatenate([p0, bNs, bUs])
-        low_bounds = np.concatenate([low_bounds, low_bounds_bNs, low_bounds_bUs])
-        high_bounds = np.concatenate([high_bounds, high_bounds_bNs, high_bounds_bUs])
+            p0 = np.concatenate([p0, aNs, aUs])
+            low_bounds = np.concatenate([low_bounds, low_bounds_aNs, low_bounds_aUs])
+            high_bounds = np.concatenate([high_bounds, high_bounds_aNs, high_bounds_aUs])
 
-        # Baselines are still independent for each signal and denaturant concentration
-        # Slopes and quadratic terms are shared - per signal only
+            cNs = re_arrange_params(cNs, self.nr_signals)
+            low_bounds_cNs = re_arrange_params(low_bounds_cNs, self.nr_signals)
+            high_bounds_cNs = re_arrange_params(high_bounds_cNs, self.nr_signals)
 
-        if self.poly_order_native > 0:
+            for cNs_i, low_bounds_cNs_i, high_bounds_cNs_i in zip(cNs, low_bounds_cNs, high_bounds_cNs):
+                p0 = np.append(p0, np.median(cNs_i))
+                low_bounds = np.append(low_bounds, np.min(low_bounds_cNs_i))
+                high_bounds = np.append(high_bounds, np.max(high_bounds_cNs_i))
 
-            kNs = re_arrange_params(kNs, self.nr_signals)
-            low_bounds_kNs = re_arrange_params(low_bounds_kNs, self.nr_signals)
-            high_bounds_kNs = re_arrange_params(high_bounds_kNs, self.nr_signals)
+            cUs = re_arrange_params(cUs, self.nr_signals)
+            low_bounds_cUs = re_arrange_params(low_bounds_cUs, self.nr_signals)
+            high_bounds_cUs = re_arrange_params(high_bounds_cUs, self.nr_signals)
 
-            for kNs_i, low_bounds_kNs_i, high_bounds_kNs_i in zip(kNs, low_bounds_kNs, high_bounds_kNs):
-                p0 = np.append(p0, np.median(kNs_i))
-                low_bounds = np.append(low_bounds, np.min(low_bounds_kNs_i))
-                high_bounds = np.append(high_bounds, np.max(high_bounds_kNs_i))
+            for cUs_i, low_bounds_cUs_i, high_bounds_cUs_i in zip(cUs, low_bounds_cUs, high_bounds_cUs):
+                p0 = np.append(p0, np.median(cUs_i))
+                low_bounds = np.append(low_bounds, np.min(low_bounds_cUs_i))
+                high_bounds = np.append(high_bounds, np.max(high_bounds_cUs_i))
 
-        if self.poly_order_unfolded > 0:
+            alphaNs = re_arrange_params(alphaNs, self.nr_signals)
+            low_bounds_alphaNs = re_arrange_params(low_bounds_alphaNs, self.nr_signals)
+            high_bounds_alphaNs = re_arrange_params(high_bounds_alphaNs, self.nr_signals)
 
-            kUs = re_arrange_params(kUs, self.nr_signals)
-            low_bounds_kUs = re_arrange_params(low_bounds_kUs, self.nr_signals)
-            high_bounds_kUs = re_arrange_params(high_bounds_kUs, self.nr_signals)
+            for alphaNs_i, low_bounds_alphaNs_i, high_bounds_alphaNs_i in zip(
+                    alphaNs, low_bounds_alphaNs, high_bounds_alphaNs):
+                p0 = np.append(p0, np.median(alphaNs_i))
+                low_bounds = np.append(low_bounds, np.min(low_bounds_alphaNs_i))
+                high_bounds = np.append(high_bounds, np.max(high_bounds_alphaNs_i))
 
-            for kUs_i, low_bounds_kUs_i, high_bounds_kUs_i in zip(kUs, low_bounds_kUs, high_bounds_kUs):
-                p0 = np.append(p0, np.median(kUs_i))
-                low_bounds = np.append(low_bounds, np.min(low_bounds_kUs_i))
-                high_bounds = np.append(high_bounds, np.max(high_bounds_kUs_i))
+            alphaUs = re_arrange_params(qUs, self.nr_signals)
+            low_bounds_alphaUs = re_arrange_params(low_bounds_alphaUs, self.nr_signals)
+            high_bounds_alphaUs = re_arrange_params(high_bounds_alphaUs, self.nr_signals)
 
-        if self.poly_order_native == 2:
+            for alphaUs_i, low_bounds_alphaUs_i, high_bounds_alphaUs_i in zip(
+                    alphaUs, low_bounds_alphaUs, high_bounds_alphaUs):
+                p0 = np.append(p0, np.median(alphaUs_i))
+                low_bounds = np.append(low_bounds, np.min(low_bounds_alphaUs_i))
+                high_bounds = np.append(high_bounds, np.max(high_bounds_alphaUs_i))
 
-            qNs = re_arrange_params(qNs, self.nr_signals)
-            low_bounds_qNs = re_arrange_params(low_bounds_qNs, self.nr_signals)
-            high_bounds_qNs = re_arrange_params(high_bounds_qNs, self.nr_signals)
 
-            for qNs_i, low_bounds_qNs_i, high_bounds_qNs_i in zip(qNs, low_bounds_qNs, high_bounds_qNs):
-                p0 = np.append(p0, np.median(qNs_i))
-                low_bounds = np.append(low_bounds, np.min(low_bounds_qNs_i))
-                high_bounds = np.append(high_bounds, np.max(high_bounds_qNs_i))
+        kwargs = {
 
-        if self.poly_order_unfolded == 2:
+            'denaturant_concentrations': self.denaturant_concentrations_expanded,
+            'list_of_temperatures': self.temp_lst_expanded_subset,
+            'list_of_signals': self.signal_lst_expanded_subset,
+            'initial_parameters': p0,
+            'low_bounds': low_bounds,
+            'high_bounds': high_bounds,
+            'cp_value': self.cp_value,
+            'fit_m1': self.fit_m_dep,
+            'signal_ids':self.signal_ids
 
-            qUs = re_arrange_params(qUs, self.nr_signals)
-            low_bounds_qUs = re_arrange_params(low_bounds_qUs, self.nr_signals)
-            high_bounds_qUs = re_arrange_params(high_bounds_qUs, self.nr_signals)
+        }
 
-            for qUs_i, low_bounds_qUs_i, high_bounds_qUs_i in zip(qUs, low_bounds_qUs, high_bounds_qUs):
-                p0 = np.append(p0, np.median(qUs_i))
-                low_bounds = np.append(low_bounds, np.min(low_bounds_qUs_i))
-                high_bounds = np.append(high_bounds, np.max(high_bounds_qUs_i))
+        if self.baselines == 'polynomial':
+
+            fit_fx = fit_tc_unfolding_shared_slopes_many_signals
+            signal_fx = signal_two_state_tc_unfolding_monomer
+            kwargs['fit_slopes'] = self.fit_slopes_dic
+
+        else:
+
+            fit_fx = fit_tc_unfolding_shared_slopes_many_signals_exponential
+            signal_fx = signal_two_state_tc_unfolding_monomer_exponential
+
+        kwargs['signal_fx'] = signal_fx
+
 
         if self.pre_fit:
             # Do a pre-fit with a reduced data set
-            global_fit_params, cov, predicted = fit_tc_unfolding_shared_slopes_many_signals(
-                self.temp_lst_expanded_subset,
-                self.signal_lst_expanded_subset,
-                self.signals_id,
-                self.denaturant_concentrations_expanded,
-                p0,
-                low_bounds,
-                high_bounds,
-                signal_two_state_tc_unfolding_monomer,
-                fit_slopes=self.fit_slopes_dic,
-                cp_value=self.cp_value,
-                fit_m1=self.fit_m_dep)
+            global_fit_params, cov, predicted = fit_fx(**kwargs)
 
             p0 = global_fit_params
         # End of pre-fit
 
-        global_fit_params, cov, predicted = fit_tc_unfolding_shared_slopes_many_signals(
-            self.temp_lst_expanded,
-            self.signal_lst_expanded,
-            self.signals_id,
-            self.denaturant_concentrations_expanded,
-            p0,
-            low_bounds,
-            high_bounds,
-            signal_two_state_tc_unfolding_monomer,
-            fit_slopes=self.fit_slopes_dic,
-            cp_value=self.cp_value,
-            fit_m1=self.fit_m_dep)
+        # Use whole dataset
+        kwargs['list_of_temperatures'] = self.temp_lst_expanded
+        kwargs['list_of_signals'] = self.signal_lst_expanded
+
+        global_fit_params, cov, predicted = fit_fx(**kwargs)
 
         for _ in range(3):
 
@@ -1417,18 +1617,11 @@ class Sample:
 
                 p0, low_bounds, high_bounds = p0_new, low_bounds_new, high_bounds_new
 
-                global_fit_params, cov, predicted = fit_tc_unfolding_shared_slopes_many_signals(
-                    self.temp_lst_expanded,
-                    self.signal_lst_expanded,
-                    self.signals_id,
-                    self.denaturant_concentrations_expanded,
-                    p0,
-                    low_bounds,
-                    high_bounds,
-                    signal_two_state_tc_unfolding_monomer,
-                    fit_slopes=self.fit_slopes_dic,
-                    cp_value=self.cp_value,
-                    fit_m1=self.fit_m_dep)
+                kwargs['initial_parameters'] = p0
+                kwargs['low_bounds'] = low_bounds
+                kwargs['high_bounds'] = high_bounds
+
+                global_fit_params, cov, predicted = fit_fx(**kwargs)
 
             else:
 
@@ -1610,6 +1803,8 @@ class Sample:
             low_bounds[c_U_idx] -= 5
             high_bounds[c_U_idx] += 5
 
+
+
         # If required, include a scale factor for each denaturant concentration
         if model_scale_factor:
             # The last denaturant concentration is fixed to 1, the rest are fitted
@@ -1631,11 +1826,12 @@ class Sample:
         # Do a prefit with a reduced dataset
 
         if self.pre_fit:
+
             global_fit_params, cov, predicted = fit_tc_unfolding_many_signals(
 
                 self.temp_lst_expanded_subset,
                 self.signal_lst_expanded_subset,
-                self.signals_id,
+                self.signal_ids,
                 self.denaturant_concentrations_expanded,
                 p0,
                 low_bounds,
@@ -1661,7 +1857,7 @@ class Sample:
 
             self.temp_lst_expanded,
             self.signal_lst_expanded,
-            self.signals_id,
+            self.signal_ids,
             self.denaturant_concentrations_expanded,
             p0,
             low_bounds,
@@ -1716,7 +1912,7 @@ class Sample:
                 global_fit_params, cov, predicted = fit_tc_unfolding_many_signals(
                     self.temp_lst_expanded,
                     self.signal_lst_expanded,
-                    self.signals_id,
+                    self.signal_ids,
                     self.denaturant_concentrations_expanded,
                     p0,
                     low_bounds,
@@ -1804,7 +2000,7 @@ class Sample:
                     global_fit_params, cov, predicted = fit_tc_unfolding_many_signals(
                         self.temp_lst_expanded,
                         self.signal_lst_expanded,
-                        self.signals_id,
+                        self.signal_ids,
                         self.denaturant_concentrations_expanded,
                         global_fit_params,
                         low_bounds,

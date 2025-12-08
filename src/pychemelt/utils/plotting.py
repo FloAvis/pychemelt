@@ -18,7 +18,7 @@ class PlotConfig:
     height: int = 800
     type: str = "png"
     font_size: int = 16
-    marker_size: int = 5
+    marker_size: int = 8
     line_width: int = 3
 
 @dataclass
@@ -168,22 +168,27 @@ def plot_unfolding(
 
     subplot_idx = 0
 
-    nr_den = pychemelt_sample.nr_den
-
     fittings_done = pychemelt_sample.global_fit_params is not None
 
     ys_fit = None
+
+    nr_den = pychemelt_sample.nr_den
 
     for i in range(n_subplots):
 
         row = row_col_info[subplot_idx][0]
         col = row_col_info[subplot_idx][1]
 
-        xs = pychemelt_sample.temp_lst_multiple[i]
-        ys = pychemelt_sample.signal_lst_multiple[i]
-
         if fittings_done:
+            # Reduced dataset if fittings were done
             ys_fit = pychemelt_sample.predicted_lst_multiple[i]
+            xs     = pychemelt_sample.temp_lst_expanded[i*nr_den:(i+1)*nr_den]
+            ys     = pychemelt_sample.signal_lst_expanded[i*nr_den:(i+1)*nr_den]
+
+        else:
+            # Full dataset if no fittings were done
+            xs = pychemelt_sample.temp_lst_multiple[i]
+            ys = pychemelt_sample.signal_lst_multiple[i]
 
         for j,conc in enumerate(concs):
 
@@ -203,9 +208,13 @@ def plot_unfolding(
             )
 
             if fittings_done:
+
+                # count np.nans in ys_fit
+                ys_fit_j = ys_fit[j]
+
                 fig.add_trace(
                     go.Scatter(
-                        x=x, y=ys_fit[j], mode='lines',
+                        x=x, y=ys_fit_j, mode='lines',
                         line=dict(color='black', width=plot_config.line_width),
                         showlegend=False,
                         hoverinfo='skip',

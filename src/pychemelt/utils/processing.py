@@ -415,20 +415,26 @@ def fit_local_thermal_unfolding_to_signal_lst(
         low_bounds[1]  = 10
         high_bounds[1] = 500
 
-        params, cov, predicted = fit_thermal_unfolding(
-            [t], [s],
-            p0, low_bounds, high_bounds,
-            signal_two_state_t_unfolding_monomer,
-            0,
-            fit_slopes=fit_slopes_dic)
+        try:
 
-        rel_errors = relative_errors(params, cov)
+            params, cov, predicted = fit_thermal_unfolding(
+                [t], [s],
+                p0, low_bounds, high_bounds,
+                signal_two_state_t_unfolding_monomer,
+                0,
+                fit_slopes=fit_slopes_dic)
 
-        if rel_errors[0] < 50 and rel_errors[1] < 50:
-            Tms.append(params[0])
-            dHs.append(params[1])
+            rel_errors = relative_errors(params, cov)
 
-        predicted_lst.append(predicted[0])
+            if rel_errors[0] < 50 and rel_errors[1] < 50:
+                Tms.append(params[0])
+                dHs.append(params[1])
+
+            predicted_lst.append(predicted[0])
+
+        except:
+
+            pass
 
         i += 1
 
@@ -467,45 +473,36 @@ def fit_local_thermal_unfolding_to_signal_lst_exponential(
         low_bounds = p0.copy()
         high_bounds = p0.copy()
 
-        max_s_abs = np.max(np.abs(s))
-
         low_bounds[0] = np.min(t)
         high_bounds[0] = np.max(t) + 15
 
         low_bounds[1]  = 10
         high_bounds[1] = 500
 
-        low_bounds[2]   = 0
-        high_bounds[2]  = np.min(s)
+        low_bounds[2:6] = -np.inf
+        low_bounds[6:]  = 0
 
-        low_bounds[3]   = 0
-        high_bounds[3]  = np.min(s)
+        high_bounds[2:] = np.inf
 
-        low_bounds[4]  = -3 * max_s_abs
-        high_bounds[4] =  3 * max_s_abs
+        try:
 
-        low_bounds[5]  = -3 * max_s_abs
-        high_bounds[5] =  3 * max_s_abs
+            params, cov, predicted = fit_thermal_unfolding_exponential(
+                [t], [s],
+                p0, low_bounds, high_bounds,
+                signal_two_state_t_unfolding_monomer_exponential,
+                0)
 
-        low_bounds[6]  = 0
-        high_bounds[6] = 0.1
+            rel_errors = relative_errors(params, cov)
 
-        low_bounds[7]  = 0
-        high_bounds[7] = 0.1
+            if rel_errors[0] < 50 and rel_errors[1] < 50:
+                Tms.append(params[0])
+                dHs.append(params[1])
 
-        params, cov, predicted = fit_thermal_unfolding_exponential(
-            [t], [s],
-            p0, low_bounds, high_bounds,
-            signal_two_state_t_unfolding_monomer_exponential,
-            0)
+            predicted_lst.append(predicted[0])
 
-        rel_errors = relative_errors(params, cov)
+        except:
 
-        if rel_errors[0] < 50 and rel_errors[1] < 50:
-            Tms.append(params[0])
-            dHs.append(params[1])
-
-        predicted_lst.append(predicted[0])
+            pass
 
         i += 1
 
