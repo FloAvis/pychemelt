@@ -6,7 +6,6 @@ import numpy as np
 
 from pychemelt import Sample
 from pychemelt.utils.signals import signal_two_state_tc_unfolding_monomer_exponential
-from tests.test_main_1 import sample
 
 def_params = {
     'DHm': 120,
