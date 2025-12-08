@@ -5,7 +5,6 @@ The current model assumes the protein is a monomer and that the unfolding is rev
 
 import pandas as pd
 import numpy as np
-from prompt_toolkit import pep440
 
 from .utils.signals import *
 from .utils.fitting import *
