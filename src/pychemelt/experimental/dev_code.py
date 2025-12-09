@@ -259,3 +259,89 @@ def get_desired_rss(y, y_fit, p,alpha=0.05):
 
     return rss_p(rss, n, p, alpha)
 
+def compare_linear_to_quadratic(x,y):
+
+    """
+    Compare the linear and quadratic fits to the data using an F-test.
+
+    Parameters
+    ----------
+    x : array-like
+        x data
+    y : array-like
+        y data
+
+    Returns
+    -------
+    bool
+        True if the linear model is statistically preferable to the quadratic model
+    """
+
+    m, b       = fit_line_robust(x, y)
+    y_pred_lin = m * x + b
+
+    a,b,c     = fit_quadratic_robust(x, y)
+    y_pred_quad = a * x ** 2 + b * x + c
+
+    # Residual sums
+    rss_lin = np.sum((y - y_pred_lin) ** 2)
+    rss_quad = np.sum((y - y_pred_quad) ** 2)
+
+    # R² and Adjusted R²
+    n = len(x)
+    p_lin = 1
+    p_quad = 2
+
+    # F-test
+    numerator   = (rss_lin - rss_quad) / (p_quad - p_lin)
+    denominator = rss_quad / (n - (p_quad + 1))
+    f_stat = numerator / denominator
+    p_value = 1 - f_dist.cdf(f_stat, dfn=p_quad - p_lin, dfd=n - (p_quad + 1))
+
+    # True if linear model is better
+    return p_value > 0.05
+
+def fu_two_state_dimer(K,C):
+    """
+    Given the equilibrium constant K of N2 <-> 2U and the concentration of dimer equivalent C,
+    return the fraction of unfolded protein.
+
+    Parameters
+    ----------
+    K : float
+        Equilibrium constant of the reaction N2 <-> 2U
+    C : float
+        Concentration of dimer equivalent
+
+    Returns
+    -------
+    float
+        Fraction of unfolded protein
+    """
+
+    return solve_one_root_quadratic(4*C, K, -K)
+
+def arrhenius(T, Tf, Ea):
+    """
+    Arrhenius equation: defines dependence of reaction rate constant k on temperature.
+    In this version of the equation we use Tf (a temperature of k=1) to avoid specifying a pre-exponential constant A.
+
+    Parameters
+    ----------
+    T : array-like
+        Temperature (°C or K)
+    Tf : float
+        Reference temperature at which the reaction rate constant equals 1 (°C or K)
+    Ea : float
+        Activation energy (kcal/mol)
+
+    Returns
+    -------
+    numpy.ndarray
+        Reaction rate constant at the given temperature
+    """
+
+    T  = temperature_to_kelvin(T)
+    Tf = temperature_to_kelvin(Tf)
+
+    return np.exp(-Ea / R_gas * (1 / T - 1 / Tf))

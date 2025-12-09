@@ -162,63 +162,74 @@ def test_fit_tc_unfolding_single_slopes():
     low_bounds = [30,30,0,0] + [-np.inf]*(len(concs)*6)
     high_bounds = [80,200,5,5] + [np.inf]*(len(concs)*6)
 
-    # Fit only the lowest concentration
+    fit_slopes_dic = {
+        'fit_slope_native': True,
+        'fit_slope_unfolded': True,
+        'fit_quadratic_native': True,
+        'fit_quadratic_unfolded': True
+    }
+
+    kwargs = {
+
+        'fit_slopes' : fit_slopes_dic,
+        'list_of_temperatures':temp_list,
+        'list_of_signals':signal_list,
+        'denaturant_concentrations':concs,
+        'signal_fx':signal_two_state_tc_unfolding_monomer,
+    }
+
     global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes(
-            temp_list,
-            signal_list,
-            concs,
-            initial_parameters,
-            low_bounds,
-            high_bounds,
-            signal_two_state_tc_unfolding_monomer,
-            fit_slopes = {
-                'fit_slope_native' : True,
-                'fit_slope_unfolded' : True,
-                'fit_quadratic_native' : True,
-                'fit_quadratic_unfolded' : True
-            },
-            list_of_oligomer_conc=None)
+            initial_parameters=initial_parameters,
+            low_bounds=low_bounds,
+            high_bounds=high_bounds,
+            **kwargs
+    )
 
-    # Verify the Tm fitting
-    np.testing.assert_allclose(global_fit_params[0], 60, rtol=0.1, atol=0)
+    expected = [60,100,1.6,2.6]
 
-    # Verify DH fitting
-    np.testing.assert_allclose(global_fit_params[1], 100, rtol=0.1, atol=0)
-
-    # Verify Cp fitting
-    np.testing.assert_allclose(global_fit_params[2], 1.6, rtol=0.1, atol=0)
-
-    # Verify m0 fitting
-    np.testing.assert_allclose(global_fit_params[3], 2.6, rtol=0.1, atol=0)
+    # Verify the fitting
+    np.testing.assert_allclose(global_fit_params[:4], expected, rtol=0.1, atol=0)
 
     # Now do fitting with fixed Tm
     initial_parameters_tm = initial_parameters.copy()[1:]
     low_bounds_tm = low_bounds.copy()[1:]
     high_bounds_tm = high_bounds.copy()[1:]
 
-    # Fit only the lowest concentration
     global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes(
-            temp_list,
-            signal_list,
-            concs,
-            initial_parameters_tm,
-            low_bounds_tm,
-            high_bounds_tm,
-            signal_two_state_tc_unfolding_monomer,
-            fit_slopes = {
-                'fit_slope_native' : True,
-                'fit_slope_unfolded' : True,
-                'fit_quadratic_native' : True,
-                'fit_quadratic_unfolded' : True
-            },
+            initial_parameters=initial_parameters_tm,
+            low_bounds=low_bounds_tm,
+            high_bounds=high_bounds_tm,
             tm_value=60,
-            list_of_oligomer_conc=None)
+            **kwargs
+    )
 
-    # Verify DH fitting
-    np.testing.assert_allclose(global_fit_params[0], 100, rtol=0.1, atol=0)
+    expected = [100,1.6,2.6]
 
-    # Verify Cp fitting
-    np.testing.assert_allclose(global_fit_params[1], 1.6, rtol=0.1, atol=0)
+    # Verify the fitting
+    np.testing.assert_allclose(global_fit_params[:3], expected, rtol=0.1, atol=0)
 
-    # Verify m0 fitting
-    np.testing.assert_allclose(global_fit_params[2], 2.6, rtol=0.1, atol=0)
+    # Fitting with fixed DH
+    initial_parameters_dh = initial_parameters.copy()
+    low_bounds_dh = low_bounds.copy()
+    high_bounds_dh = high_bounds.copy()
+
+    # Remove the Dh parameter at index 1
+    initial_parameters_dh.pop(1)
+    low_bounds_dh.pop(1)
+    high_bounds_dh.pop(1)
+
+    global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes(
+            initial_parameters=initial_parameters_dh,
+            low_bounds=low_bounds_dh,
+            high_bounds=high_bounds_dh,
+            dh_value=100,
+            **kwargs
+    )
+
+    expected = [60,1.6,2.6]
+
+    # Verify the fitting
+    np.testing.assert_allclose(global_fit_params[:3], expected, rtol=0.1, atol=0)
+
+
+

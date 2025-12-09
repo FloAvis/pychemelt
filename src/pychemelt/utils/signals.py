@@ -154,7 +154,6 @@ def signal_two_state_t_unfolding_monomer(
     return fn*(S_native) + fu*(S_unfolded)
 
 
-
 def signal_two_state_t_unfolding_monomer_exponential(
         T,Tm,dHm,aN,cN,alpha_n,aU,cU,
         alpha_u,Cp=0,extra_arg=None):

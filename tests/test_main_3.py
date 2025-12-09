@@ -126,3 +126,16 @@ def test_fit_thermal_unfolding_global_global():
     actual   = pychem_sim.params_df.iloc[:4,1]
 
     np.testing.assert_allclose(actual,expected,rtol=0.3)
+
+def test_fit_thermal_unfolding_global_global_global():
+
+    pychem_sim.params_df = None
+
+    pychem_sim.fit_thermal_unfolding_global_global_global()
+
+    assert pychem_sim.params_df is not None
+
+    expected = [65, 120, 1.8, 2.6]
+    actual   = pychem_sim.params_df.iloc[:4,1]
+
+    np.testing.assert_allclose(actual,expected,rtol=0.3)

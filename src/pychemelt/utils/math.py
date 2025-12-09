@@ -73,8 +73,11 @@ def first_derivative_savgol(x, y, window_length=5, polyorder=4):
     dx = np.mean(np.diff(x))
     odd_n_data_points_window_len = np.ceil(window_length / dx) // 2 * 2 + 1
 
+    print(odd_n_data_points_window_len)
+
     if polyorder >= odd_n_data_points_window_len:
-        polyorder = int(odd_n_data_points_window_len - 1)
+        # Raise error we need more data points for polynomial fit
+        raise ValueError("polyorder must be less than window_length.")
 
     # Apply Savitzky-Golay filter for first derivative
     dydx = savgol_filter(y, window_length=odd_n_data_points_window_len, polyorder=polyorder, deriv=1,mode="nearest")

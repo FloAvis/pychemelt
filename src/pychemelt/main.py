@@ -1012,7 +1012,7 @@ class Sample:
             low_bounds = (p0.copy())
             high_bounds = (p0.copy())
 
-            low_bounds[4:]  = [0 for _ in high_bounds[4:]]
+            low_bounds[4:]  = [0       for _ in high_bounds[4:]]
             high_bounds[4:] = [np.inf  for _ in high_bounds[4:]]
 
             # Verify that the low bounds are fine
@@ -1114,11 +1114,10 @@ class Sample:
         id_m = 2 + (not self.fixed_cp)
 
         low_bounds[id_m] = 0.5
-        high_bounds[id_m] = 6
+        high_bounds[id_m] = 9
 
-        if p0[id_m] >= 4:
-            p0[id_m] = 2
-            high_bounds[id_m] += 1
+        if p0[id_m] >= 6:
+            high_bounds[id_m] += 2
 
         # Populate the expanded signal and temperature lists
         self.expand_multiple_signal()
@@ -1428,7 +1427,6 @@ class Sample:
                 low_bounds = np.append(low_bounds, np.min(low_bounds_alphaUs_i))
                 high_bounds = np.append(high_bounds, np.max(high_bounds_alphaUs_i))
 
-
         kwargs = {
 
             'denaturant_concentrations': self.denaturant_concentrations_expanded,
@@ -1553,115 +1551,222 @@ class Sample:
 
         n_datasets = self.nr_den * self.nr_signals
 
-        bNs = self.global_fit_params[param_init:param_init + n_datasets]
-        bUs = self.global_fit_params[param_init + n_datasets:param_init + 2 * n_datasets]
+        if self.baselines == 'polynomial':
 
-        bNs_per_signal = re_arrange_params(bNs, self.nr_signals)
-        bUs_per_signal = re_arrange_params(bUs, self.nr_signals)
+            bNs = self.global_fit_params[param_init:param_init + n_datasets]
+            bUs = self.global_fit_params[param_init + n_datasets:param_init + 2 * n_datasets]
 
-        m1s, b1s, m1s_low, b1s_low, m1s_high, b1s_high = [], [], [], [], [], []
-        m2s, b2s, m2s_low, b2s_low, m2s_high, b2s_high = [], [], [], [], [], []
+            bNs_per_signal = re_arrange_params(bNs, self.nr_signals)
+            bUs_per_signal = re_arrange_params(bUs, self.nr_signals)
 
-        for bNs, bUs in zip(bNs_per_signal, bUs_per_signal):
-            # Estimate the slope of bNs versus denaturant concentration
-            m1, b1 = fit_line_robust(self.denaturant_concentrations, bNs)
-            m1_low = m1 / 100 if m1 > 0 else 100 * m1
-            m1_high = 100 * m1 if m1 > 0 else m1 / 100
-            b1_low = b1 / 100 if b1 > 0 else 100 * b1
-            b1_high = 100 * b1 if b1 > 0 else b1 / 100
+            m1s, b1s, m1s_low, b1s_low, m1s_high, b1s_high = [], [], [], [], [], []
+            m2s, b2s, m2s_low, b2s_low, m2s_high, b2s_high = [], [], [], [], [], []
 
-            # Estimate the slope of bUs versus denaturant concentration
-            m2, b2 = fit_line_robust(self.denaturant_concentrations, bUs)
-            m2_low = m2 / 100 if m2 > 0 else 100 * m2
-            m2_high = 100 * m2 if m2 > 0 else m2 / 100
-            b2_low = b2 / 100 if b2 > 0 else 100 * b2
-            b2_high = 100 * b2 if b2 > 0 else b2 / 100
+            for bNs, bUs in zip(bNs_per_signal, bUs_per_signal):
+                # Estimate the slope of bNs versus denaturant concentration
+                m1, b1 = fit_line_robust(self.denaturant_concentrations, bNs)
+                m1_low = m1 / 100 if m1 > 0 else 100 * m1
+                m1_high = 100 * m1 if m1 > 0 else m1 / 100
+                b1_low = b1 / 100 if b1 > 0 else 100 * b1
+                b1_high = 100 * b1 if b1 > 0 else b1 / 100
 
-            m1s.append(m1)
-            b1s.append(b1)
-            m1s_low.append(m1_low)
-            b1s_low.append(b1_low)
-            m1s_high.append(m1_high)
-            b1s_high.append(b1_high)
+                # Estimate the slope of bUs versus denaturant concentration
+                m2, b2 = fit_line_robust(self.denaturant_concentrations, bUs)
+                m2_low = m2 / 100 if m2 > 0 else 100 * m2
+                m2_high = 100 * m2 if m2 > 0 else m2 / 100
+                b2_low = b2 / 100 if b2 > 0 else 100 * b2
+                b2_high = 100 * b2 if b2 > 0 else b2 / 100
 
-            m2s.append(m2)
-            b2s.append(b2)
-            m2s_low.append(m2_low)
-            b2s_low.append(b2_low)
-            m2s_high.append(m2_high)
-            b2s_high.append(b2_high)
+                m1s.append(m1)
+                b1s.append(b1)
+                m1s_low.append(m1_low)
+                b1s_low.append(b1_low)
+                m1s_high.append(m1_high)
+                b1s_high.append(b1_high)
 
-        idx = param_init + 2 * n_datasets
+                m2s.append(m2)
+                b2s.append(b2)
+                m2s_low.append(m2_low)
+                b2s_low.append(b2_low)
+                m2s_high.append(m2_high)
+                b2s_high.append(b2_high)
 
-        params_names += ['a_N - ' + signal_name for signal_name in self.signal_names]
-        params_names += ['a_U - ' + signal_name for signal_name in self.signal_names]
+            idx = param_init + 2 * n_datasets
 
-        if self.poly_order_native > 0:
-            kNs = self.global_fit_params[idx:idx + self.nr_signals]
-            low_bounds_kNs = self.low_bounds[idx:idx + self.nr_signals]
-            high_bounds_kNs = self.high_bounds[idx:idx + self.nr_signals]
+            params_names += ['a_N - ' + signal_name for signal_name in self.signal_names]
+            params_names += ['a_U - ' + signal_name for signal_name in self.signal_names]
+
+            if self.poly_order_native > 0:
+                kNs = self.global_fit_params[idx:idx + self.nr_signals]
+                low_bounds_kNs = self.low_bounds[idx:idx + self.nr_signals]
+                high_bounds_kNs = self.high_bounds[idx:idx + self.nr_signals]
+
+                idx += self.nr_signals
+                params_names += ['b_N - ' + signal_name for signal_name in self.signal_names]
+
+            if self.poly_order_unfolded > 0:
+                kUs = self.global_fit_params[idx:idx + self.nr_signals]
+                low_bounds_kUs = self.low_bounds[idx:idx + self.nr_signals]
+                high_bounds_kUs = self.high_bounds[idx:idx + self.nr_signals]
+
+                idx += self.nr_signals
+                params_names += ['b_U - ' + signal_name for signal_name in self.signal_names]
+
+            params_names += ['c_N - ' + signal_name for signal_name in self.signal_names]
+            params_names += ['c_U - ' + signal_name for signal_name in self.signal_names]
+
+            if self.poly_order_native == 2:
+                qNs = self.global_fit_params[idx:idx + self.nr_signals]
+                low_bounds_qNs = self.low_bounds[idx:idx + self.nr_signals]
+                high_bounds_qNs = self.high_bounds[idx:idx + self.nr_signals]
+                idx += self.nr_signals
+
+                params_names += ['d_N - ' + signal_name for signal_name in self.signal_names]
+
+            if self.poly_order_unfolded == 2:
+                qUs = self.global_fit_params[idx:idx + self.nr_signals]
+                low_bounds_qUs = self.low_bounds[idx:idx + self.nr_signals]
+                high_bounds_qUs = self.high_bounds[idx:idx + self.nr_signals]
+                idx += self.nr_signals
+
+                params_names += ['d_U - ' + signal_name for signal_name in self.signal_names]
+
+            p0 = np.concatenate([p0, b1s, b2s])
+            low_bounds = np.concatenate([low_bounds, b1s_low, b2s_low])
+            high_bounds = np.concatenate([high_bounds, b1s_high, b2s_high])
+
+            if self.poly_order_native > 0:
+                p0 = np.concatenate([p0, kNs])
+                low_bounds = np.concatenate([low_bounds, low_bounds_kNs])
+                high_bounds = np.concatenate([high_bounds, high_bounds_kNs])
+
+            if self.poly_order_unfolded > 0:
+                p0 = np.concatenate([p0, kUs])
+                low_bounds = np.concatenate([low_bounds, low_bounds_kUs])
+                high_bounds = np.concatenate([high_bounds, high_bounds_kUs])
+
+            p0 = np.concatenate([p0, m1s, m2s])
+            low_bounds = np.concatenate([low_bounds, m1s_low, m2s_low])
+            high_bounds = np.concatenate([high_bounds, m1s_high, m2s_high])
+
+            if self.poly_order_native == 2:
+                p0 = np.concatenate([p0, qNs])
+                low_bounds = np.concatenate([low_bounds, low_bounds_qNs])
+                high_bounds = np.concatenate([high_bounds, high_bounds_qNs])
+
+            if self.poly_order_unfolded == 2:
+                p0 = np.concatenate([p0, qUs])
+                low_bounds = np.concatenate([low_bounds, low_bounds_qUs])
+                high_bounds = np.concatenate([high_bounds, high_bounds_qUs])
+
+        # elif self.baselines == 'exponential':
+        # Order of params is aN, aU, cN, cU, alphaN, alphaU
+        # Exponential baseline for the native state is f(T) = aN + cN * exp(-alpha * ΔT)
+        else:
+
+            aNs = self.global_fit_params[param_init:param_init + n_datasets]
+            aUs = self.global_fit_params[param_init + n_datasets:param_init + 2 * n_datasets]
+
+            aNs_per_signal = re_arrange_params(aNs, self.nr_signals)
+            aUs_per_signal = re_arrange_params(aUs, self.nr_signals)
+
+            m1s, b1s, m1s_low, b1s_low, m1s_high, b1s_high = [], [], [], [], [], []
+            m2s, b2s, m2s_low, b2s_low, m2s_high, b2s_high = [], [], [], [], [], []
+
+            for aNs, aUs in zip(aNs_per_signal, aUs_per_signal):
+                # Estimate the slope of bNs versus denaturant concentration
+                m1, b1 = fit_line_robust(self.denaturant_concentrations, aNs)
+                m1_low = m1 / 100 if m1 > 0 else 100 * m1
+                m1_high = 100 * m1 if m1 > 0 else m1 / 100
+                b1_low = b1 / 100 if b1 > 0 else 100 * b1
+                b1_high = 100 * b1 if b1 > 0 else b1 / 100
+
+                # Estimate the slope of bUs versus denaturant concentration
+                m2, b2 = fit_line_robust(self.denaturant_concentrations, aUs)
+                m2_low = m2 / 100 if m2 > 0 else 100 * m2
+                m2_high = 100 * m2 if m2 > 0 else m2 / 100
+                b2_low = b2 / 100 if b2 > 0 else 100 * b2
+                b2_high = 100 * b2 if b2 > 0 else b2 / 100
+
+                m1s.append(m1)
+                b1s.append(b1)
+                m1s_low.append(m1_low)
+                b1s_low.append(b1_low)
+                m1s_high.append(m1_high)
+                b1s_high.append(b1_high)
+
+                m2s.append(m2)
+                b2s.append(b2)
+                m2s_low.append(m2_low)
+                b2s_low.append(b2_low)
+                m2s_high.append(m2_high)
+                b2s_high.append(b2_high)
+
+            idx = param_init + 2 * n_datasets
+
+            params_names += ['intercept_N   - ' + signal_name for signal_name in self.signal_names]
+            params_names += ['intercept_U - ' + signal_name for signal_name in self.signal_names]
+
+            cNs = self.global_fit_params[idx:idx + self.nr_signals]
+            low_bounds_cNs = self.low_bounds[idx:idx + self.nr_signals]
+            high_bounds_cNs = self.high_bounds[idx:idx + self.nr_signals]
 
             idx += self.nr_signals
-            params_names += ['b_N - ' + signal_name for signal_name in self.signal_names]
+            params_names += ['pre_exp_coeff_N - ' + signal_name for signal_name in self.signal_names]
 
-        if self.poly_order_unfolded > 0:
-            kUs = self.global_fit_params[idx:idx + self.nr_signals]
-            low_bounds_kUs = self.low_bounds[idx:idx + self.nr_signals]
-            high_bounds_kUs = self.high_bounds[idx:idx + self.nr_signals]
+            cUs = self.global_fit_params[idx:idx + self.nr_signals]
+            low_bounds_cUs = self.low_bounds[idx:idx + self.nr_signals]
+            high_bounds_cUs = self.high_bounds[idx:idx + self.nr_signals]
 
             idx += self.nr_signals
-            params_names += ['b_U - ' + signal_name for signal_name in self.signal_names]
+            params_names += ['pre_exp_coeff_U - ' + signal_name for signal_name in self.signal_names]
 
-        params_names += ['c_N - ' + signal_name for signal_name in self.signal_names]
-        params_names += ['c_U - ' + signal_name for signal_name in self.signal_names]
+            params_names += ['c_N - ' + signal_name for signal_name in self.signal_names]
+            params_names += ['c_U - ' + signal_name for signal_name in self.signal_names]
 
-        if self.poly_order_native == 2:
-            qNs = self.global_fit_params[idx:idx + self.nr_signals]
-            low_bounds_qNs = self.low_bounds[idx:idx + self.nr_signals]
-            high_bounds_qNs = self.high_bounds[idx:idx + self.nr_signals]
+            alphaNs = self.global_fit_params[idx:idx + self.nr_signals]
+            low_bounds_alphaNs = self.low_bounds[idx:idx + self.nr_signals]
+            high_bounds_alphaNs = self.high_bounds[idx:idx + self.nr_signals]
             idx += self.nr_signals
 
-            params_names += ['d_N - ' + signal_name for signal_name in self.signal_names]
+            params_names += ['alpha_N - ' + signal_name for signal_name in self.signal_names]
 
-        if self.poly_order_unfolded == 2:
-            qUs = self.global_fit_params[idx:idx + self.nr_signals]
-            low_bounds_qUs = self.low_bounds[idx:idx + self.nr_signals]
-            high_bounds_qUs = self.high_bounds[idx:idx + self.nr_signals]
+            alphaUs = self.global_fit_params[idx:idx + self.nr_signals]
+            low_bounds_alphaUs = self.low_bounds[idx:idx + self.nr_signals]
+            high_bounds_alphaUs = self.high_bounds[idx:idx + self.nr_signals]
             idx += self.nr_signals
 
-            params_names += ['d_U - ' + signal_name for signal_name in self.signal_names]
+            params_names += ['alpha_U - ' + signal_name for signal_name in self.signal_names]
 
-        p0 = np.concatenate([p0, b1s, b2s])
-        low_bounds = np.concatenate([low_bounds, b1s_low, b2s_low])
-        high_bounds = np.concatenate([high_bounds, b1s_high, b2s_high])
 
-        if self.poly_order_native > 0:
-            p0 = np.concatenate([p0, kNs])
-            low_bounds = np.concatenate([low_bounds, low_bounds_kNs])
-            high_bounds = np.concatenate([high_bounds, high_bounds_kNs])
+            p0 = np.concatenate([p0, b1s, b2s])
+            low_bounds = np.concatenate([low_bounds, b1s_low, b2s_low])
+            high_bounds = np.concatenate([high_bounds, b1s_high, b2s_high])
 
-        if self.poly_order_unfolded > 0:
-            p0 = np.concatenate([p0, kUs])
-            low_bounds = np.concatenate([low_bounds, low_bounds_kUs])
-            high_bounds = np.concatenate([high_bounds, high_bounds_kUs])
+            p0 = np.concatenate([p0, cNs])
+            low_bounds = np.concatenate([low_bounds, low_bounds_cNs])
+            high_bounds = np.concatenate([high_bounds, high_bounds_cNs])
 
-        p0 = np.concatenate([p0, m1s, m2s])
-        low_bounds = np.concatenate([low_bounds, m1s_low, m2s_low])
-        high_bounds = np.concatenate([high_bounds, m1s_high, m2s_high])
+            p0 = np.concatenate([p0, cUs])
+            low_bounds = np.concatenate([low_bounds, low_bounds_cUs])
+            high_bounds = np.concatenate([high_bounds, high_bounds_cUs])
 
-        if self.poly_order_native == 2:
-            p0 = np.concatenate([p0, qNs])
-            low_bounds = np.concatenate([low_bounds, low_bounds_qNs])
-            high_bounds = np.concatenate([high_bounds, high_bounds_qNs])
+            p0 = np.concatenate([p0, m1s, m2s])
+            low_bounds = np.concatenate([low_bounds, m1s_low, m2s_low])
+            high_bounds = np.concatenate([high_bounds, m1s_high, m2s_high])
 
-        if self.poly_order_unfolded == 2:
-            p0 = np.concatenate([p0, qUs])
-            low_bounds = np.concatenate([low_bounds, low_bounds_qUs])
-            high_bounds = np.concatenate([high_bounds, high_bounds_qUs])
+            p0 = np.concatenate([p0, alphaNs])
+            low_bounds = np.concatenate([low_bounds, low_bounds_alphaNs])
+            high_bounds = np.concatenate([high_bounds, high_bounds_alphaNs])
+
+            p0 = np.concatenate([p0, alphaUs])
+            low_bounds = np.concatenate([low_bounds, low_bounds_alphaUs])
+            high_bounds = np.concatenate([high_bounds, high_bounds_alphaUs])
 
         # Increase the bounds for c_N and c_U
         # Find index in the param names
         for signal_name in self.signal_names:
+
             c_N_name = 'c_N - ' + signal_name
             c_U_name = 'c_U - ' + signal_name
 
@@ -1673,8 +1778,6 @@ class Sample:
 
             low_bounds[c_U_idx] -= 5
             high_bounds[c_U_idx] += 5
-
-
 
         # If required, include a scale factor for each denaturant concentration
         if model_scale_factor:
@@ -1695,55 +1798,53 @@ class Sample:
         scale_factor_exclude_ids = [self.nr_den - 1] if model_scale_factor else []
 
         # Do a prefit with a reduced dataset
+        kwargs = {
+
+            'list_of_temperatures' : self.temp_lst_expanded_subset,
+            'list_of_signals' : self.signal_lst_expanded_subset,
+            'signal_ids' : self.signal_ids,
+            'denaturant_concentrations': self.denaturant_concentrations_expanded,
+            'initial_parameters': p0,
+            'low_bounds': low_bounds,
+            'high_bounds': high_bounds,
+            'fit_m1': self.fit_m_dep,
+            'model_scale_factor':model_scale_factor,
+            'cp_value' : self.cp_value,
+            'scale_factor_exclude_ids':scale_factor_exclude_ids
+
+        }
+
+        if self.baselines == 'polynomial':
+
+            fit_fx = fit_tc_unfolding_many_signals
+
+            kwargs['fit_slope_native_temp'] = self.poly_order_native > 0
+            kwargs['fit_slope_unfolded_temp'] = self.poly_order_unfolded > 0
+            kwargs['fit_quadratic_native'] = self.poly_order_native == 2
+            kwargs['fit_quadratic_unfolded'] = self.poly_order_unfolded == 2
+            kwargs['fit_slope_native_den'] = True
+            kwargs['fit_slope_unfolded_den'] = True
+            kwargs['signal_fx'] = signal_two_state_tc_unfolding_monomer
+
+        else:
+
+            fit_fx = fit_tc_unfolding_many_signals_exponential
+            kwargs['signal_fx'] = signal_two_state_tc_unfolding_monomer_exponential
 
         if self.pre_fit:
 
-            global_fit_params, cov, predicted = fit_tc_unfolding_many_signals(
-
-                self.temp_lst_expanded_subset,
-                self.signal_lst_expanded_subset,
-                self.signal_ids,
-                self.denaturant_concentrations_expanded,
-                p0,
-                low_bounds,
-                high_bounds,
-                signal_two_state_tc_unfolding_monomer,
-                fit_slope_native_temp=self.poly_order_native > 0,
-                fit_slope_unfolded_temp=self.poly_order_unfolded > 0,
-                fit_slope_unfolded_den=True,
-                fit_slope_native_den=True,
-                fit_quadratic_native=self.poly_order_native == 2,
-                fit_quadratic_unfolded=self.poly_order_unfolded == 2,
-                fit_m1=self.fit_m_dep,
-                model_scale_factor=model_scale_factor,
-                scale_factor_exclude_ids=scale_factor_exclude_ids,
-                cp_value=self.cp_value)
+            global_fit_params, cov, predicted = fit_fx(**kwargs)
 
             # Assign the fitted parameters to the initial guess for the full dataset
             p0 = global_fit_params
 
             # End of prefit with reduced dataset
 
-        global_fit_params, cov, predicted = fit_tc_unfolding_many_signals(
+        # Use the whole dataset
+        kwargs['list_of_signals'] = self.signal_lst_expanded
+        kwargs['list_of_temperatures'] = self.temp_lst_expanded
 
-            self.temp_lst_expanded,
-            self.signal_lst_expanded,
-            self.signal_ids,
-            self.denaturant_concentrations_expanded,
-            p0,
-            low_bounds,
-            high_bounds,
-            signal_two_state_tc_unfolding_monomer,
-            fit_slope_native_temp=self.poly_order_native > 0,
-            fit_slope_unfolded_temp=self.poly_order_unfolded > 0,
-            fit_slope_unfolded_den=True,
-            fit_slope_native_den=True,
-            fit_quadratic_native=self.poly_order_native == 2,
-            fit_quadratic_unfolded=self.poly_order_unfolded == 2,
-            fit_m1=self.fit_m_dep,
-            model_scale_factor=model_scale_factor,
-            scale_factor_exclude_ids=scale_factor_exclude_ids,
-            cp_value=self.cp_value)
+        global_fit_params, cov, predicted = fit_fx(**kwargs)
 
         n_correction_params = self.nr_den - 1
 
@@ -1772,6 +1873,7 @@ class Sample:
             )
 
             if model_scale_factor:
+
                 p0_new = np.concatenate((p0_new, cf_guess))
                 low_bounds_new = np.concatenate((low_bounds_new, low_bounds_cf))
                 high_bounds_new = np.concatenate((high_bounds_new, high_bounds_cf))
@@ -1780,25 +1882,11 @@ class Sample:
 
                 p0, low_bounds, high_bounds = p0_new, low_bounds_new, high_bounds_new
 
-                global_fit_params, cov, predicted = fit_tc_unfolding_many_signals(
-                    self.temp_lst_expanded,
-                    self.signal_lst_expanded,
-                    self.signal_ids,
-                    self.denaturant_concentrations_expanded,
-                    p0,
-                    low_bounds,
-                    high_bounds,
-                    signal_two_state_tc_unfolding_monomer,
-                    fit_slope_native_temp=self.poly_order_native > 0,
-                    fit_slope_unfolded_temp=self.poly_order_unfolded > 0,
-                    fit_slope_unfolded_den=True,
-                    fit_slope_native_den=True,
-                    fit_quadratic_native=self.poly_order_native == 2,
-                    fit_quadratic_unfolded=self.poly_order_unfolded == 2,
-                    fit_m1=self.fit_m_dep,
-                    model_scale_factor=model_scale_factor,
-                    scale_factor_exclude_ids=scale_factor_exclude_ids,
-                    cp_value=self.cp_value)
+                kwargs['initial_parameters'] = p0
+                kwargs['low_bounds'] = low_bounds
+                kwargs['high_bounds'] = high_bounds
+
+                global_fit_params, cov, predicted = fit_fx(**kwargs)
 
             else:
 
@@ -1812,11 +1900,17 @@ class Sample:
             # plus m1 if fitted
             idx_start = 3 + self.fit_m_dep + (self.cp_value is None)
 
-            # Add index according to the native baseline polynomial order
-            idx_start += (self.poly_order_native + 2) * self.nr_signals
+            if self.baselines == 'polynomial':
 
-            # Add index according to the unfolded baseline polynomial order
-            idx_start += (self.poly_order_unfolded + 2) * self.nr_signals
+                # Add index according to the native baseline polynomial order
+                idx_start += (self.poly_order_native + 2) * self.nr_signals
+                # Add index according to the unfolded baseline polynomial order
+                idx_start += (self.poly_order_unfolded + 2) * self.nr_signals
+
+            else:
+
+                # Add index according to the native baseline
+                idx_start += 8 * self.nr_signals
 
             # Take m1 into account, if fitting it
             idx_start += self.fit_m_dep
@@ -1862,31 +1956,19 @@ class Sample:
                 else:
 
                     for idx in reversed(idxs_to_remove):
+
                         global_fit_params = np.delete(global_fit_params, idx)
                         low_bounds = np.delete(low_bounds, idx)
                         high_bounds = np.delete(high_bounds, idx)
 
                         del params_names[idx]
 
-                    global_fit_params, cov, predicted = fit_tc_unfolding_many_signals(
-                        self.temp_lst_expanded,
-                        self.signal_lst_expanded,
-                        self.signal_ids,
-                        self.denaturant_concentrations_expanded,
-                        global_fit_params,
-                        low_bounds,
-                        high_bounds,
-                        signal_two_state_tc_unfolding_monomer,
-                        fit_slope_native_temp=self.poly_order_native > 0,
-                        fit_slope_unfolded_temp=self.poly_order_unfolded > 0,
-                        fit_slope_unfolded_den=True,
-                        fit_slope_native_den=True,
-                        fit_quadratic_native=self.poly_order_native == 2,
-                        fit_quadratic_unfolded=self.poly_order_unfolded == 2,
-                        fit_m1=self.fit_m_dep,
-                        model_scale_factor=model_scale_factor,
-                        scale_factor_exclude_ids=scale_factor_exclude_ids,
-                        cp_value=self.cp_value)
+                    kwargs['initial_parameters'] = global_fit_params
+                    kwargs['low_bounds'] = low_bounds
+                    kwargs['high_bounds'] = high_bounds
+                    kwargs['scale_factor_exclude_ids'] = scale_factor_exclude_ids
+
+                    global_fit_params, cov, predicted = fit_fx(**kwargs)
 
         rel_errors = relative_errors(global_fit_params, cov)
 

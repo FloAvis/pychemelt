@@ -8,13 +8,17 @@ fit_line_robust - to fit a line to xy data
 fit_line_robust_quadratic - to fit a quadratic to xy data
 fit_exponential_robust - to fit an exponential to xy data
 
-compare_linear_to_quadratic - fit xy data to linear and quadratic models and compare the results
-
 fit_thermal_unfolding - to fit unfolding curves with a shared Tm, and DH but different baselines and slopes.
+No denaturant concentration is taken into account
+
+fit_thermal_unfolding_exponential - to fit unfolding curves with a shared Tm and DH, but different baselines and exponential terms.
 No denaturant concentration is taken into account
 
 fit_tc_unfolding_single_slopes - to fit unfolding curves with shared Tm, DH, Cp and m.
 The curves can still have different baseline and slopes
+
+fit_tc_unfolding_single_slopes_exponential - to fit unfolding curves with shared Tm, DH, Cp and m.
+The curves can still have different baselines
 
 fit_tc_unfolding_shared_slopes_many_signals - to fit unfolding curves with shared Tm, DH, Cp and m.
 The slope terms are shared. The intercepts can be different.
@@ -27,7 +31,6 @@ The slope terms are shared. The intercepts are defined by global parameters.
 import numpy as np
 from scipy.optimize     import curve_fit
 from scipy.optimize     import least_squares
-from scipy.stats import f as f_dist
 
 from ..utils.math import get_rss
 
@@ -50,12 +53,6 @@ def fit_line_robust(x,y):
     b : float
         Intercept of the fitted line
     """
-
-    # convert x and y to numpy arrays, if they are lists
-    if isinstance(x, list):
-        x = np.array(x)
-    if isinstance(y, list):
-        y = np.array(y)
 
     def linear_model(x,params):
         m,b = params
@@ -96,12 +93,6 @@ def fit_quadratic_robust(x,y):
     c : float
         Constant coefficient of the fitted polynomial
     """
-
-    # convert x and y to numpy arrays, if they are lists
-    if isinstance(x, list):
-        x = np.array(x)
-    if isinstance(y, list):
-        y = np.array(y)
 
     def model(x,params):
         a,b,c = params
@@ -147,12 +138,6 @@ def fit_exponential_robust(x,y):
         Exponential factor
     """
 
-    # convert x and y to numpy arrays, if they are lists
-    if isinstance(x, list):
-        x = np.array(x)
-    if isinstance(y, list):
-        y = np.array(y)
-
     def model(x,a,c,alpha):
 
         return a + c * np.exp(-alpha * x)
@@ -196,6 +181,7 @@ def fit_exponential_robust(x,y):
                 p0 = params
                 rss = rss_curr
                 best_alpha = alpha
+
         except:
 
             pass
@@ -218,47 +204,7 @@ def fit_exponential_robust(x,y):
 
     return a,c,alpha
 
-def compare_linear_to_quadratic(x,y):
 
-    """
-    Compare the linear and quadratic fits to the data using an F-test.
-
-    Parameters
-    ----------
-    x : array-like
-        x data
-    y : array-like
-        y data
-
-    Returns
-    -------
-    bool
-        True if the linear model is statistically preferable to the quadratic model
-    """
-
-    m, b       = fit_line_robust(x, y)
-    y_pred_lin = m * x + b
-
-    a,b,c     = fit_quadratic_robust(x, y)
-    y_pred_quad = a * x ** 2 + b * x + c
-
-    # Residual sums
-    rss_lin = np.sum((y - y_pred_lin) ** 2)
-    rss_quad = np.sum((y - y_pred_quad) ** 2)
-
-    # R² and Adjusted R²
-    n = len(x)
-    p_lin = 1
-    p_quad = 2
-
-    # F-test
-    numerator   = (rss_lin - rss_quad) / (p_quad - p_lin)
-    denominator = rss_quad / (n - (p_quad + 1))
-    f_stat = numerator / denominator
-    p_value = 1 - f_dist.cdf(f_stat, dfn=p_quad - p_lin, dfd=n - (p_quad + 1))
-
-    # True if linear model is better
-    return p_value > 0.05
 
 def fit_thermal_unfolding(
     list_of_temperatures, 
@@ -1791,6 +1737,201 @@ def fit_tc_unfolding_many_signals(
                 T, d, DHm, Tm, Cp0, m0, m1,
                 a_N, b_N, c_N, d_N,
                 a_U, b_U, c_U, d_U, c
+            )
+
+            scale_factor = 1 if not model_scale_factor else factors[i]
+
+            y = y * scale_factor
+
+            signal.append(y)
+
+        return np.concatenate(signal, axis=0)
+
+    global_fit_params, cov = curve_fit(
+        unfolding, 1, all_signal,
+        p0=initial_parameters,
+        bounds=(low_bounds, high_bounds))
+
+    predicted = unfolding(1, *global_fit_params)
+
+    # Convert predict to list of lists
+    predicted_lst = []
+
+    init = 0
+    for T in list_of_temperatures:
+        n = len(T)
+        predicted_lst.append(predicted[init:init + n])
+        init += n
+
+    return global_fit_params, cov, predicted_lst
+
+
+def fit_tc_unfolding_many_signals_exponential(
+        list_of_temperatures,
+        list_of_signals,
+        signal_ids,
+        denaturant_concentrations,
+        initial_parameters,
+        low_bounds,
+        high_bounds,
+        signal_fx,
+        oligomer_concentrations=None,
+        fit_m1=False,
+        model_scale_factor=False,
+        scale_factor_exclude_ids=[],
+        cp_value=None
+):
+    """
+    Fit thermochemical unfolding curves for many signals (optimized variant).
+    Use exponential baselines
+
+    Parameters
+    ----------
+    list_of_temperatures : list of array-like
+    list_of_signals : list of array-like
+    signal_ids : list of int
+        Signal-type id for each dataset (0..n_signals-1)
+    denaturant_concentrations : list
+        Denaturant concentrations for each dataset (flattened across signals)
+    initial_parameters : array-like
+        Initial guess for the parameters
+    low_bounds : array-like
+        Lower bounds for the parameters
+    high_bounds : array-like
+        Upper bounds for the parameters
+    signal_fx : callable
+        Signal model function
+    oligomer_concentrations : list, optional
+        Oligomer concentrations per dataset (used by oligomeric models)
+    fit_m1 : bool, optional
+        Whether to include and fit temperature dependence of the m-value (m1)
+    model_scale_factor : bool, optional
+        If True, include a per-denaturant concentration scale factor to account for intensity differences
+    scale_factor_exclude_ids : list, optional
+        IDs of scale factors to exclude / fix to 1
+    cp_value : float or None, optional
+        If provided, Cp is fixed to this value and not fitted
+
+    Returns
+    -------
+    global_fit_params : numpy.ndarray
+    cov : numpy.ndarray
+    predicted_lst : list of numpy.ndarray
+    """
+
+    all_signal = np.concatenate(list_of_signals, axis=0)
+
+    n_signals = np.max(signal_ids) + 1
+
+    nr_den = int(len(denaturant_concentrations) / n_signals)
+
+    if len(scale_factor_exclude_ids) > 0 and model_scale_factor:
+        # Sort them in ascending order to avoid issues when inserting
+        scale_factor_exclude_ids = sorted(scale_factor_exclude_ids)
+
+    # Find if highest concentration of denaturant has a higher signal or not
+    """
+    if model_scale_factor:
+        den_conc_simple = denaturant_concentrations[:nr_den]
+
+        # Find the index that sorts them in descending order from highest to lowest
+        sort_indeces = np.argsort(den_conc_simple)[::-1]
+
+        signal_first = list_of_signals[:nr_den]
+
+        signal_sort = [signal_first[i] for i in sort_indeces]
+
+        higher_den_equal_higher_signal = signal_sort[0][0] > signal_sort[-1][0]
+    """
+
+    def unfolding(dummyVariable, *args):
+
+        if cp_value is not None:
+
+            Cp0 = cp_value
+            Tm, DHm, m0 = args[:3]  # Enthalpy of unfolding, Temperature of melting, m0, m1
+
+        else:
+
+            Tm, DHm, Cp0, m0 = args[:4]  # Enthalpy of unfolding, Temperature of melting, Cp0, m0, m1
+
+        id_param_init = 3 + fit_m1 + (cp_value is None)
+
+        m1 = args[id_param_init] if fit_m1 else 0
+
+        # First filter, verify that DG is not lower than 0 at 5C
+        # In other words, we do not have cold denaturation at 5C
+        """
+        Tfive = temperature_to_kelvin(5)
+        TmK   = temperature_to_kelvin(Tm)
+
+        DGfive = DHm * (1 - Tfive / TmK) + Cp0 * (Tfive - TmK - Tfive * np.log(Tfive / TmK))
+
+        if DGfive < 0:
+            print('error')
+            return np.zeros(len(all_signal))
+        """
+
+        intercept_Ns = args[id_param_init:id_param_init + n_signals]
+        intercept_Us = args[id_param_init + n_signals:id_param_init + 2 * n_signals]
+
+        id_param_init = id_param_init + 2 * n_signals
+
+        pre_exp_coeff_Ns = args[id_param_init:id_param_init + n_signals]
+        id_param_init += n_signals
+
+        pre_exp_coeff_Us = args[id_param_init:id_param_init + n_signals]
+        id_param_init += n_signals
+
+        c_Ns = args[id_param_init:id_param_init + n_signals]
+        id_param_init += n_signals
+
+        c_Us = args[id_param_init:id_param_init + n_signals]
+        id_param_init += n_signals
+
+        alpha_Ns = args[id_param_init:id_param_init + n_signals]
+        id_param_init += n_signals
+
+        alpha_Us = args[id_param_init:id_param_init + n_signals]
+        id_param_init += n_signals
+
+        if model_scale_factor:
+            # One per denaturant concentration
+            factors = args[id_param_init:id_param_init + (nr_den - len(scale_factor_exclude_ids))]
+
+            for id_ex in scale_factor_exclude_ids:
+                factors = np.insert(factors, id_ex, 1)
+
+            # Repeat the list so have the same length as list_of_temperatures, equal to denaturant concentration * number of signals
+            factors = np.tile(factors, n_signals)
+
+            id_param_init += nr_den
+
+        signal = []
+
+        for i, T in enumerate(list_of_temperatures):
+
+            intercept_N = intercept_Ns[signal_ids[i]]
+            intercept_U = intercept_Us[signal_ids[i]]
+            pre_exp_coeff_N = pre_exp_coeff_Ns[signal_ids[i]]
+            pre_exp_coeff_U = pre_exp_coeff_Us[signal_ids[i]]
+            c_N = c_Ns[signal_ids[i]]
+            c_U = c_Us[signal_ids[i]]
+            alpha_N = alpha_Ns[signal_ids[i]]
+            alpha_U = alpha_Us[signal_ids[i]]
+
+            d = denaturant_concentrations[i]
+
+            c = 0 if oligomer_concentrations is None else oligomer_concentrations[i]
+
+            d_factor = 1
+
+            d = d * d_factor
+
+            y = signal_fx(
+                T, d, DHm, Tm, Cp0, m0, m1,
+                intercept_N, pre_exp_coeff_N, c_N, alpha_N,
+                intercept_U, pre_exp_coeff_U, c_U, alpha_U, c
             )
 
             scale_factor = 1 if not model_scale_factor else factors[i]

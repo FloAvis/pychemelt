@@ -50,32 +50,6 @@ def eq_constant_thermo(T,DH1,T1,Cp):
     return K
 
 
-def arrhenius(T, Tf, Ea):
-    """
-    Arrhenius equation: defines dependence of reaction rate constant k on temperature.
-    In this version of the equation we use Tf (a temperature of k=1) to avoid specifying a pre-exponential constant A.
-
-    Parameters
-    ----------
-    T : array-like
-        Temperature (°C or K)
-    Tf : float
-        Reference temperature at which the reaction rate constant equals 1 (°C or K)
-    Ea : float
-        Activation energy (kcal/mol)
-
-    Returns
-    -------
-    numpy.ndarray
-        Reaction rate constant at the given temperature
-    """
-
-    T  = temperature_to_kelvin(T)
-    Tf = temperature_to_kelvin(Tf)
-
-    return np.exp(-Ea / R_gas * (1 / T - 1 / Tf))
-
-
 def eq_constant_termochem(T,D,DHm,Tm,Cp0,m0,m1):
 
     """
