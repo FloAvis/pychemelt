@@ -112,26 +112,25 @@ def test_fit_tc_unfolding_single_slopes_exponential():
 
     # End of - Fit with fixed Tm
 
-    # Fit with fixed DH
-    p0_dh = p0.copy()
-    low_bounds_dh = low_bounds.copy()
-    high_bounds_dh = high_bounds.copy()
+    # Fit with fixed DH and fixed Tm
+    p0_dh = p0_tm.copy()
+    low_bounds_dh = low_bounds_tm.copy()
+    high_bounds_dh = high_bounds_tm.copy()
 
-    p0_dh.pop(1)
-    low_bounds_dh.pop(1)
-    high_bounds_dh.pop(1)
+    p0_dh.pop(0)
+    low_bounds_dh.pop(0)
+    high_bounds_dh.pop(0)
 
-    print(p0_dh[:5])
-    """
     global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes_exponential(
         initial_parameters=p0_dh,
         low_bounds=low_bounds_dh,
         high_bounds=high_bounds_dh,
         dh_value=120,
+        tm_value=65,
         **kwargs
     )
 
-    expected = [65,1.8,2.6]
-    """
-    #np.testing.assert_allclose(global_fit_params[:3], expected, rtol=0.1, atol=0)
+    expected = [1.8,2.6]
+
+    np.testing.assert_allclose(global_fit_params[:2], expected, rtol=0.1, atol=0)
     # End of - Fit with fixed DH
