@@ -547,7 +547,8 @@ def re_arrange_params(params,n_signals):
     for i in range(n_signals):
 
         params_i = params[i*n_params:(i+1)*n_params]
-        params_arranged.append(params_i)
+        params_i_arr = np.array(params_i) # We need an array because later we will use them for fitting the signal dependence on denaturant concentration
+        params_arranged.append(params_i_arr)
 
     return params_arranged
 

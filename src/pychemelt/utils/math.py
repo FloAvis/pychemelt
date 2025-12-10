@@ -73,8 +73,6 @@ def first_derivative_savgol(x, y, window_length=5, polyorder=4):
     dx = np.mean(np.diff(x))
     odd_n_data_points_window_len = np.ceil(window_length / dx) // 2 * 2 + 1
 
-    print(odd_n_data_points_window_len)
-
     if polyorder >= odd_n_data_points_window_len:
         # Raise error we need more data points for polynomial fit
         raise ValueError("polyorder must be less than window_length.")

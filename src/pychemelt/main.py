@@ -53,6 +53,8 @@ class Sample:
 
         self.nr_den = 0  # Number of denaturant concentrations
 
+        self.signal_ids = None
+
         self.poly_order_native = None # Native state baseline polynomial order
         self.poly_order_unfolded = None # Unfolded state baseline polynomial order
 
@@ -314,6 +316,8 @@ class Sample:
 
         self.boolean_lst = boolean_lst
         self.normalise_to_global_max = normalise_to_global_max
+
+        self.denaturant_concentrations = np.array(self.denaturant_concentrations)
 
         return None
 
@@ -1674,6 +1678,9 @@ class Sample:
             m2s, b2s, m2s_low, b2s_low, m2s_high, b2s_high = [], [], [], [], [], []
 
             for aNs, aUs in zip(aNs_per_signal, aUs_per_signal):
+
+                print(aNs)
+
                 # Estimate the slope of bNs versus denaturant concentration
                 m1, b1 = fit_line_robust(self.denaturant_concentrations, aNs)
                 m1_low = m1 / 100 if m1 > 0 else 100 * m1
