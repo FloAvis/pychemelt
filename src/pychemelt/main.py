@@ -1679,8 +1679,6 @@ class Sample:
 
             for aNs, aUs in zip(aNs_per_signal, aUs_per_signal):
 
-                print(aNs)
-
                 # Estimate the slope of bNs versus denaturant concentration
                 m1, b1 = fit_line_robust(self.denaturant_concentrations, aNs)
                 m1_low = m1 / 100 if m1 > 0 else 100 * m1

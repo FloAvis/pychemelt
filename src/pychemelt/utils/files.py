@@ -122,8 +122,6 @@ def detect_file_type(file):
             return 'thermofluor'
         elif "Data Export" in sheet_names or "melting-scan" in sheet_names:
             return 'panta'
-        elif "Profiles_raw" in sheet_names:
-            return 'tycho'
         elif file_is_of_type_uncle(file):
             return 'uncle'
         else:
@@ -140,7 +138,8 @@ def detect_file_type(file):
             if 'Well' in splittedLine and 'Target' in splittedLine and 'Reading' in splittedLine:
                 return 'quantstudio'
 
-    return None
+    # Return an error if no extension is found
+    raise ValueError(f'File extension not recognized: {file_extension}')
 
 def detect_encoding(file_path):
 
@@ -314,13 +313,7 @@ def load_csv_file(file):
             signal_data = np.array(dat.iloc[:, (idx_start + 1):]).astype('float')
             temperature_data = np.array(dat.iloc[:, idx_start]).astype('float')
 
-            # Produce error if signal data is empty
-            if signal_data.size == 0:
-                raise ValueError('Signal data is empty')
-
-            # Produce error if temperature data  is non-numeric
-            if np.isnan(temperature_data).any():
-                raise ValueError('Temperature data is non-numeric')
+            print(idx_start)
 
             break
 

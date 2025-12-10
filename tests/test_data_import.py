@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from pychemelt.utils.files import (
     get_sheet_names_of_xlsx,
@@ -49,7 +50,12 @@ def test_file_is_of_type_uncle():
 
     assert file_is_of_type_uncle(uncle_file)
 
+def test_file_is_of_type_uncle_false():
+
+    assert not file_is_of_type_uncle(MX3005P_file)
+
 def test_detect_file_type():
+
     assert detect_file_type(uncle_file) == 'uncle'
     assert detect_file_type(MX3005P_file) == 'mx3005p'
     assert detect_file_type(quantStudio_file) == 'quantstudio'
@@ -57,9 +63,23 @@ def test_detect_file_type():
     assert detect_file_type(supr_file) == 'supr'
     assert detect_file_type(panta_file) == 'panta'
     assert detect_file_type(nDSF_file) == 'prometheus'
+    assert detect_file_type('file.csv') == 'csv'
+
 
 def test_detect_encoding():
     assert detect_encoding(MX3005P_file) == 'utf-8'
+
+def test_load_two_cols_csv():
+
+    signal_data_dic, temp_data_dic, conditions, signals = load_csv_file('./test_files/two_cols.csv')
+
+    assert len(conditions) == 1
+
+def test_load_many_cols_csv():
+
+    signal_data_dic, temp_data_dic, conditions, signals = load_csv_file('./test_files/many_cols.csv')
+
+    assert len(conditions) > 1
 
 def test_find_indexes_of_non_signal_conditions():
 
