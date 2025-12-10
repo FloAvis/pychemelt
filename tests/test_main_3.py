@@ -139,3 +139,15 @@ def test_fit_thermal_unfolding_global_global_global():
     actual   = pychem_sim.params_df.iloc[:4,1]
 
     np.testing.assert_allclose(actual,expected,rtol=0.3)
+
+    df = pychem_sim.signal_to_df(signal_type='fitted',scaled=True)
+
+    assert len(df) == 490
+
+    df = pychem_sim.signal_to_df(signal_type='raw',scaled=True)
+
+    assert len(df) == 490
+
+    df = pychem_sim.signal_to_df(signal_type='fitted',scaled=False)
+
+    assert len(df) == 490

@@ -784,7 +784,6 @@ def fit_tc_unfolding_single_slopes_exponential(
         else:
 
             DHm = dh_value
-            print(DHm)
 
         if cp_value is None:
 
