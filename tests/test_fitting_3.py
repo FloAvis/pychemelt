@@ -1,6 +1,5 @@
 import numpy as np
 
-from extra_tests.test import low_bounds
 from pychemelt.utils.fitting import evaluate_need_to_refit
 
 # Model / ground-truth parameters
