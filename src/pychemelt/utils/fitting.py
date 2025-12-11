@@ -1392,14 +1392,18 @@ def fit_tc_unfolding_many_signals(
 
             Cp0 = cp_value
             Tm, DHm, m0 = args[:3]  # Enthalpy of unfolding, Temperature of melting, m0, m1
-        
+            id_param_init = 3
+
         else:
 
             Tm, DHm, Cp0, m0 = args[:4]  # Enthalpy of unfolding, Temperature of melting, Cp0, m0, m1
+            id_param_init = 4
 
-        id_param_init = 3 + fit_m1 + (cp_value is None)
-
-        m1 = args[id_param_init] if fit_m1 else 0
+        if fit_m1:
+            m1 = args[id_param_init]
+            id_param_init += 1
+        else:
+            m1 = 0
 
         # First filter, verify that DG is not lower than 0 at 5C
         # In other words, we do not have cold denaturation at 5C
@@ -1420,6 +1424,7 @@ def fit_tc_unfolding_many_signals(
         id_param_init = id_param_init + 2 * n_signals
 
         if fit_slope_native_temp:
+
             b_Ns = args[id_param_init:id_param_init + n_signals]
             id_param_init += n_signals
 
@@ -1440,6 +1445,7 @@ def fit_tc_unfolding_many_signals(
             id_param_init += n_signals
 
         else:
+
             c_Ns = [0] * n_signals
 
         if fit_slope_unfolded_den:
@@ -1459,8 +1465,10 @@ def fit_tc_unfolding_many_signals(
             d_Ns = [0] * n_signals
 
         if fit_quadratic_unfolded:
+
             d_Us = args[id_param_init:id_param_init + n_signals]
             id_param_init += n_signals
+
         else:
             d_Us = [0] * n_signals
 
@@ -1615,14 +1623,18 @@ def fit_tc_unfolding_many_signals_exponential(
 
             Cp0 = cp_value
             Tm, DHm, m0 = args[:3]  # Enthalpy of unfolding, Temperature of melting, m0, m1
+            id_param_init = 3
 
         else:
 
             Tm, DHm, Cp0, m0 = args[:4]  # Enthalpy of unfolding, Temperature of melting, Cp0, m0, m1
+            id_param_init = 4
 
-        id_param_init = 3 + fit_m1 + (cp_value is None)
-
-        m1 = args[id_param_init] if fit_m1 else 0
+        if fit_m1:
+            m1 = args[id_param_init]
+            id_param_init += 1
+        else:
+            m1 = 0
 
         # First filter, verify that DG is not lower than 0 at 5C
         # In other words, we do not have cold denaturation at 5C
@@ -1766,10 +1778,17 @@ def evaluate_need_to_refit(
         Updated upper bounds
     """
 
+    # We need to create copies of the arrays, otherwise they will be overwritten
+    global_fit_params = global_fit_params.copy()
+    p0 = p0.copy()
+    high_bounds = high_bounds.copy()
+    low_bounds = low_bounds.copy()
+
     re_fit = False
 
     # Check the Tm boundary - upper
     tm_diff = high_bounds[0] - global_fit_params[0]
+
     # Expand the boundary if the Tm is too close to the boundary
     if tm_diff < 6 and check_tm:
         high_bounds[0] = global_fit_params[0] + 12
@@ -1778,6 +1797,7 @@ def evaluate_need_to_refit(
 
     # Check the Tm boundary - lower
     tm_diff = global_fit_params[0] - low_bounds[0]
+
     # Expand the boundary if the Tm is too close to the boundary
     if tm_diff < 6 and check_tm:
         low_bounds[0] = global_fit_params[0] - 12
@@ -1815,6 +1835,7 @@ def evaluate_need_to_refit(
 
     # Evaluate if m1 is fitted
     id_start = id_next + 1
+
     if fit_m1:
 
         m1_diff = high_bounds[id_start] - global_fit_params[id_start]

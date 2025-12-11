@@ -128,6 +128,30 @@ def remove_non_numeric_char(input_string):
 
     return re.sub(r'[^\d.]', '', input_string)
 
+def adjust_value_to_interval(value,lower_bound,upper_bound,shift):
+
+    """
+    Verify that a value is within the specified bounds.
+    If the value is outside the bounds, adjust it to the nearest bound.
+    Parameters
+    ----------
+    value : float
+        The value to be adjusted.
+    lower_bound : float
+        The lower bound of the interval.
+    upper_bound : float
+        The upper bound of the interval.
+    shift : float
+        How much to shift the value if it is outside the bounds.
+    """
+
+    if value < lower_bound:
+        return lower_bound + shift
+    elif value > upper_bound:
+        return upper_bound - shift
+    else:
+        return value
+
 
 def clean_conditions_labels(conditions):
     """

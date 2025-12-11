@@ -2,7 +2,9 @@ import numpy as np
 
 from pychemelt.utils.fitting import (
     fit_thermal_unfolding_exponential,
-    fit_tc_unfolding_single_slopes_exponential
+    fit_tc_unfolding_single_slopes_exponential,
+    fit_tc_unfolding_shared_slopes_many_signals_exponential,
+    fit_tc_unfolding_many_signals_exponential
 )
 
 from pychemelt.utils.signals import (
@@ -10,28 +12,51 @@ from pychemelt.utils.signals import (
     signal_two_state_tc_unfolding_monomer_exponential
 )
 
-rng = np.random.default_rng(2)
+# Centralized test constants
+RNG_SEED = 2
+TEMP_START = 30.0
+TEMP_STOP = 90.0
+N_TEMPS = 80
+CONCS = [0.01, 1, 2, 2.6, 3, 4, 5]
+
+# Model / ground-truth parameters
+DHm_VAL = 120
+Tm_VAL = 65
+CP0_VAL = 1.8
+M0_VAL = 2.6
+M1_VAL = 0
+
+INTERCEPT_N = 100
+PRE_EXP_N = 1
+C_N_VAL = 0
+ALPHA_N_VAL = 0.1
+INTERCEPT_U = 110
+PRE_EXP_U = 1
+C_U_VAL = 0
+ALPHA_U_VAL = 0.2
+
+rng = np.random.default_rng(RNG_SEED)
 
 def_params = {
-    'DHm': 120,
-    'Tm': 65,
-    'Cp0': 1.8,
-    'm0': 2.6,
-    'm1': 0,
-    'intercept_n': 100,
-    'pre_exp_n':1,
-    'c_N':0,
-    'alpha_N':0.1,
-    'intercept_u':110,
-    'pre_exp_u':1,
-    'c_U':0,
-    'alpha_U':0.2
+    'DHm': DHm_VAL,
+    'Tm': Tm_VAL,
+    'Cp0': CP0_VAL,
+    'm0': M0_VAL,
+    'm1': M1_VAL,
+    'intercept_n': INTERCEPT_N,
+    'pre_exp_n': PRE_EXP_N,
+    'c_N': C_N_VAL,
+    'alpha_N': ALPHA_N_VAL,
+    'intercept_u': INTERCEPT_U,
+    'pre_exp_u': PRE_EXP_U,
+    'c_U': C_U_VAL,
+    'alpha_U': ALPHA_U_VAL
 }
 
-concs = [0.01,1,2,2.6,3,4,5]
+concs = CONCS
 
 # Calculate signal range for proper y-axis scaling
-temp_range  = np.linspace(30, 90, 80)
+temp_range  = np.linspace(TEMP_START, TEMP_STOP, N_TEMPS)
 signal_list = []
 temp_list   = []
 
@@ -48,9 +73,9 @@ for D in concs:
 
 def test_fit_thermal_unfolding_exponential():
 
-    p0 = [60,100] + [1]*6
-    low_bounds = [30,30]   + [-np.inf]*6
-    high_bounds = [70,200] + [np.inf]*6
+    p0 = [Tm_VAL - 5, INTERCEPT_N] + [1]*6
+    low_bounds = [TEMP_START, TEMP_START]   + [-np.inf]*6
+    high_bounds = [TEMP_STOP, 200] + [np.inf]*6
 
     global_fit_params, cov, predicted_lst = fit_thermal_unfolding_exponential(
         temp_list[:1],
@@ -61,15 +86,16 @@ def test_fit_thermal_unfolding_exponential():
         signal_fx=signal_two_state_t_unfolding_monomer_exponential,
     )
 
-    expected = [65,120]
+    expected = [Tm_VAL, DHm_VAL]
 
     np.testing.assert_allclose(global_fit_params[:2], expected, rtol=0.1, atol=0)
 
+
 def test_fit_tc_unfolding_single_slopes_exponential():
 
-    p0 = [65,120,1.8,2.6]      + [0.1]*(6*7)
-    low_bounds = [30,30,1,1]   + [1e-5]*(6*7)
-    high_bounds = [90,200,5,5] + [1e3]*(6*7)
+    p0 = [Tm_VAL, DHm_VAL, CP0_VAL, M0_VAL] + [0.1]*(6*len(concs))
+    low_bounds = [TEMP_START, TEMP_START, 1, 1]   + [1e-5]*(6*len(concs))
+    high_bounds = [TEMP_STOP, 200, 5, 5] + [1e3]*(6*len(concs))
 
     kwargs = {
         'list_of_temperatures' : temp_list,
@@ -85,7 +111,7 @@ def test_fit_tc_unfolding_single_slopes_exponential():
         **kwargs
     )
 
-    expected = [65,120,1.8,2.6]
+    expected = [Tm_VAL, DHm_VAL, CP0_VAL, M0_VAL]
 
     np.testing.assert_allclose(global_fit_params[:4], expected, rtol=0.1, atol=0)
 
@@ -102,35 +128,105 @@ def test_fit_tc_unfolding_single_slopes_exponential():
         initial_parameters=p0_tm,
         low_bounds=low_bounds_tm,
         high_bounds=high_bounds_tm,
-        tm_value=65,
+        tm_value=Tm_VAL,
         **kwargs
     )
 
-    expected = [120,1.8,2.6]
+    expected = [DHm_VAL, CP0_VAL, M0_VAL]
 
     np.testing.assert_allclose(global_fit_params[:3], expected, rtol=0.1, atol=0)
 
     # End of - Fit with fixed Tm
 
-    # Fit with fixed DH and fixed Tm
-    p0_dh = p0_tm.copy()
-    low_bounds_dh = low_bounds_tm.copy()
-    high_bounds_dh = high_bounds_tm.copy()
+    # Fit with fixed DH and fixed Tm and fixed Cp - allow fit of m1
+    p0_2 = p0_tm[2:]
+    low_bounds_2 = low_bounds_tm[2:]
+    high_bounds_2 = high_bounds_tm[2:]
 
-    p0_dh.pop(0)
-    low_bounds_dh.pop(0)
-    high_bounds_dh.pop(0)
+    p0_2.insert(1, 0)
+    low_bounds_2.insert(1, -0.5)
+    high_bounds_2.insert(1, 0.5)
 
     global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes_exponential(
-        initial_parameters=p0_dh,
-        low_bounds=low_bounds_dh,
-        high_bounds=high_bounds_dh,
-        dh_value=120,
-        tm_value=65,
+        initial_parameters=p0_2,
+        low_bounds=low_bounds_2,
+        high_bounds=high_bounds_2,
+        dh_value=DHm_VAL,
+        tm_value=Tm_VAL,
+        cp_value=CP0_VAL,
+        fit_m1=True,
         **kwargs
     )
 
-    expected = [1.8,2.6]
-
-    np.testing.assert_allclose(global_fit_params[:2], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(global_fit_params[0], M0_VAL, rtol=0.1, atol=0)
     # End of - Fit with fixed DH
+
+
+def test_fit_tc_unfolding_shared_slopes_many_signals_exponential():
+
+    # p0 includes initial parameters for m, m1 and the shared intercepts
+    # The pre-exp and exp coefficients are fitted separately
+    p0 = [M0_VAL, M1_VAL, INTERCEPT_N, INTERCEPT_U] + [1,1]*len(temp_list) + [0,0]*len(temp_list) + [ALPHA_N_VAL, ALPHA_U_VAL]*len(temp_list)
+
+    low_bounds = [-1      for _ in p0]
+    high_bounds = [np.inf for _ in p0]
+
+    kwargs = {
+        'list_of_temperatures' : temp_list,
+        'list_of_signals' : signal_list,
+        'denaturant_concentrations' : concs,
+        'signal_fx' : signal_two_state_tc_unfolding_monomer_exponential,
+        'fit_m1' : True,
+        'tm_value' : Tm_VAL,
+        'dh_value' : DHm_VAL,
+        'cp_value' : CP0_VAL,
+        'signal_ids' : [0 for _ in range(len(signal_list))]
+    }
+
+    global_fit_params, cov, predicted_lst = fit_tc_unfolding_shared_slopes_many_signals_exponential(
+        initial_parameters=p0,
+        low_bounds=low_bounds,
+        high_bounds=high_bounds,
+        **kwargs
+    )
+
+    np.testing.assert_allclose(global_fit_params[0], M0_VAL, rtol=0.1, atol=0)
+
+
+def test_fit_tc_unfolding_many_signals_exponential():
+
+    # p0 includes initial parameters for m, m1 and the shared intercepts
+    # The pre-exp and exp coefficients are fitted separately
+    p0 = [Tm_VAL,DHm_VAL,M0_VAL,M1_VAL]
+    p0 += [INTERCEPT_N, INTERCEPT_U]
+    p0 += [ALPHA_N_VAL, ALPHA_U_VAL]
+    p0 += [PRE_EXP_N, PRE_EXP_U]
+    p0 += [C_N_VAL, C_U_VAL]
+    p0 += [ALPHA_N_VAL,ALPHA_U_VAL]
+
+    low_bounds = [-0.1 for _ in p0]
+    high_bounds = [1e3 for _ in p0]
+
+    M1_VAL_index = 3
+    low_bounds[M1_VAL_index] = -0.05
+    high_bounds[M1_VAL_index] = 0.05
+
+    kwargs = {
+        'list_of_temperatures' : temp_list,
+        'list_of_signals' : signal_list,
+        'denaturant_concentrations' : concs,
+        'signal_fx' : signal_two_state_tc_unfolding_monomer_exponential,
+        'signal_ids' : [0 for _ in range(len(signal_list))],
+        'model_scale_factor': False,
+        'cp_value' : CP0_VAL,
+        'fit_m1' : True
+    }
+
+    global_fit_params, cov, predicted_lst = fit_tc_unfolding_many_signals_exponential(
+        initial_parameters=p0,
+        low_bounds=low_bounds,
+        high_bounds=high_bounds,
+        **kwargs
+    )
+
+    np.testing.assert_allclose(global_fit_params[:4], p0[:4], rtol=0.1, atol=1e-2)

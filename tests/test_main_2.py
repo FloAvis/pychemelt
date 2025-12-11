@@ -176,10 +176,7 @@ def test_fit_thermal_unfolding_global():
 
 def test_fit_thermal_unfolding_global_global():
 
-    sample.set_signal_id()
-
-    # Re-do fit without constraints
-    sample.fit_thermal_unfolding_global()
+    sample.global_fit_done = False # Force re-fitting
 
     sample.fit_thermal_unfolding_global_global()
 
@@ -193,7 +190,7 @@ def test_fit_thermal_unfolding_global_global_global():
     for model_scale_factor in [True,False]:
 
         sample.fit_thermal_unfolding_global() # Needs to be done firsts
-        sample.fit_thermal_unfolding_global_global() # Needs to be done first
+        sample.global_global_fit_done = False # Force re-fitting clause
         sample.fit_thermal_unfolding_global_global_global(model_scale_factor=model_scale_factor)
 
         expected = [60.2, 100, 1.7, 2.6]

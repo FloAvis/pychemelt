@@ -1040,11 +1040,7 @@ class Sample:
         high_bounds[0] = tm_upper
 
         # Verify that the initial guess is within the user-defined limits
-        if p0[0] < tm_lower:
-            p0[0] = tm_lower + 1
-
-        if p0[0] > tm_upper:
-            p0[0] = tm_upper - 1
+        p0[0] = adjust_value_to_interval(p0[0], tm_lower, tm_upper,1)
 
         self.limited_dh = dh_limits is not None
 
@@ -1054,13 +1050,7 @@ class Sample:
             # Verify that the initial guess is within the user-defined limits
             if self.thermodynamic_params_guess is not None:
 
-                dh_guess = p0[1]
-
-                if dh_guess < dh_lower:
-                    p0[1] = dh_lower + 1
-
-                if dh_guess > dh_lower:
-                    p0[1] = dh_upper - 1
+                p0[1] = adjust_value_to_interval(p0[1], dh_lower, dh_upper, 1)
 
         else:
 
@@ -1105,23 +1095,12 @@ class Sample:
             high_bounds[2] = cp_upper
 
             # Verify that the Cp initial guess is within the user-defined limits
-            if p0[2] < cp_lower:
-                p0[2] = cp_lower + 0.1
-
-            if p0[2] > cp_upper:
-                p0[2] = cp_upper - 0.1
-
-            if p0[2] >= 5 and not self.limited_cp:
-                p0[2] = 2
-                high_bounds[2] += 1
+            p0[2] = adjust_value_to_interval(p0[2], cp_lower, cp_upper, 0.5)
 
         id_m = 2 + (not self.fixed_cp)
 
         low_bounds[id_m] = 0.5
         high_bounds[id_m] = 9
-
-        if p0[id_m] >= 6:
-            high_bounds[id_m] += 2
 
         # Populate the expanded signal and temperature lists
         self.expand_multiple_signal()
@@ -1187,7 +1166,11 @@ class Sample:
         for _ in range(3):
 
             re_fit, p0_new, low_bounds_new, high_bounds_new = evaluate_need_to_refit(
-                global_fit_params, high_bounds, low_bounds, p0, fit_m_dep,
+                global_fit_params,
+                high_bounds,
+                low_bounds,
+                p0,
+                fit_m1=fit_m_dep,
                 check_cp=not self.limited_cp,
                 check_dh=not self.limited_dh,
                 check_tm=not self.limited_tm,
@@ -1479,7 +1462,7 @@ class Sample:
                 high_bounds,
                 low_bounds,
                 p0,
-                self.fit_m_dep,
+                fit_m1=self.fit_m_dep,
                 check_cp=not self.limited_cp,
                 check_dh=not self.limited_dh,
                 check_tm=not self.limited_tm,
@@ -1870,7 +1853,7 @@ class Sample:
                 high_bounds[:last_id],
                 low_bounds[:last_id],
                 p0[:last_id],
-                self.fit_m_dep,
+                fit_m1=self.fit_m_dep,
                 check_cp=not self.limited_cp,
                 check_dh=not self.limited_dh,
                 check_tm=not self.limited_tm,

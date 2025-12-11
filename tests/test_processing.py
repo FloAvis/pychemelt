@@ -1,11 +1,12 @@
 import numpy as np
 import pytest
 
-from pychemelt.utils.files import (
+from pychemelt.utils.processing import (
     guess_Tm_from_derivative,
     get_colors_from_numeric_values,
     fit_local_thermal_unfolding_to_signal_lst_exponential,
-    fit_local_thermal_unfolding_to_signal_lst
+    fit_local_thermal_unfolding_to_signal_lst,
+    adjust_value_to_interval
 )
 
 from pychemelt.utils.palette import VIRIDIS
@@ -57,3 +58,11 @@ def test_trigger_exception_fit_local_thermal_unfolding_to_signal_lst():
     )
 
     assert Tms == []
+
+def test_adjust_value_to_interval():
+
+    assert adjust_value_to_interval(10, 0, 100,1) == 10
+
+    assert adjust_value_to_interval(-1, 0, 100,0.5) == 0.5
+
+    assert adjust_value_to_interval(110, 0, 100,0.5) == 99.5
