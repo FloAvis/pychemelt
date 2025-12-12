@@ -23,11 +23,13 @@ nDSF_file = "./test_files/nDSFdemoFile.xlsx"
 uncle_file = "./test_files/UNCLE_multi_channel.xlsx"
 supr_file = "./test_files/example_data.supr"
 panta_file = "./test_files/panta.xlsx"
+panta_file_2 = "./test_files/panta_format_2.xlsx"
+
 qPCR_file = "./test_files/qPCRdemoFile.xls"
 quantStudio_file = "./test_files/quantStudio.txt"
 MX3005P_file = "./test_files/MX3005P.txt"
 csv_file = "./test_files/melting-scan.csv"
-
+csv_file_2 = "./test_files/melting-scan_format_2.csv"
 
 def test_get_sheet_names_of_xlsx():
     sheet_names = get_sheet_names_of_xlsx(nDSF_file)
@@ -65,6 +67,10 @@ def test_detect_file_type():
     assert detect_file_type(nDSF_file) == 'prometheus'
     assert detect_file_type('file.csv') == 'csv'
 
+def test_error_on_unknown_file_type():
+
+    with pytest.raises(ValueError):
+        detect_file_type('./test_files/empty_file.noformat')
 
 def test_detect_encoding():
     assert detect_encoding(MX3005P_file) == 'utf-8'
@@ -80,6 +86,12 @@ def test_load_many_cols_csv():
     signal_data_dic, temp_data_dic, conditions, signals = load_csv_file('./test_files/many_cols.csv')
 
     assert len(conditions) > 1
+
+def test_load_csv_file_format_2():
+
+    signal_data_dic, temp_data_dic, conditions, signals = load_csv_file(csv_file_2)
+
+    assert len(conditions) == 1
 
 def test_find_indexes_of_non_signal_conditions():
 
@@ -108,11 +120,11 @@ def test_load_csv_file():
 
     signal_data_dic, temp_data_dic, conditions, signals = load_csv_file(csv_file)
 
-    assert signals[0] == '350nm'
+    assert signals[0] == '350 nm'
     assert conditions[0] == 'Cap.1'
     assert len(conditions) == 47
-    assert len(signal_data_dic['350nm']) == 47
-    assert len(temp_data_dic['350nm']) == 47
+    assert len(signal_data_dic['350 nm']) == 47
+    assert len(temp_data_dic['350 nm']) == 47
 
 def test_load_quantstudio_txt():
 
@@ -143,6 +155,12 @@ def test_load_nanoDSF_xlsx():
     assert len(conditions) == 48
     assert len(signal_data_dic['350nm']) == 48
     assert len(temp_data_dic['350nm']) == 48
+
+def test_load_pant_xlsx_format_2():
+
+    signal_data_dic, temp_data_dic, conditions, signals = load_panta_xlsx(panta_file_2)
+
+    assert signals[0] == 'Ratio'
 
 def test_load_panta_xlsx():
 

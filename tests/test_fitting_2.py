@@ -1,15 +1,17 @@
 import numpy as np
 
 from pychemelt.utils.fitting import (
-    fit_thermal_unfolding_exponential,
-    fit_tc_unfolding_single_slopes_exponential,
-    fit_tc_unfolding_shared_slopes_many_signals_exponential,
-    fit_tc_unfolding_many_signals_exponential
+    fit_thermal_unfolding,
+    fit_tc_unfolding_single_slopes,
+    fit_tc_unfolding_shared_slopes_many_signals,
+    fit_tc_unfolding_many_signals
 )
 
+from pychemelt.utils.math import exponential_baseline
+
 from pychemelt.utils.signals import (
-    signal_two_state_t_unfolding_monomer_exponential,
-    signal_two_state_tc_unfolding_monomer_exponential
+    signal_two_state_t_unfolding,
+    signal_two_state_tc_unfolding
 )
 
 # Centralized test constants
@@ -43,14 +45,17 @@ def_params = {
     'Cp0': CP0_VAL,
     'm0': M0_VAL,
     'm1': M1_VAL,
-    'intercept_n': INTERCEPT_N,
-    'pre_exp_n': PRE_EXP_N,
-    'c_N': C_N_VAL,
-    'alpha_N': ALPHA_N_VAL,
-    'intercept_u': INTERCEPT_U,
-    'pre_exp_u': PRE_EXP_U,
-    'c_U': C_U_VAL,
-    'alpha_U': ALPHA_U_VAL
+    'p1_N': C_N_VAL,
+    'p2_N': INTERCEPT_N,
+    'p3_N': PRE_EXP_N,
+    'p4_N': ALPHA_N_VAL,
+    'p1_U': C_U_VAL,
+    'p2_U': INTERCEPT_U,
+    'p3_U': PRE_EXP_U,
+    'p4_U': ALPHA_U_VAL,
+    'baseline_N_fx':exponential_baseline,
+    'baseline_U_fx':exponential_baseline
+
 }
 
 concs = CONCS
@@ -62,7 +67,7 @@ temp_list   = []
 
 for D in concs:
 
-    y = signal_two_state_tc_unfolding_monomer_exponential(temp_range, D, **def_params)
+    y = signal_two_state_tc_unfolding(temp_range, D, **def_params)
 
     # Add gaussian error to signal
     y += rng.normal(0, 0.005, len(y))
@@ -77,13 +82,16 @@ def test_fit_thermal_unfolding_exponential():
     low_bounds = [TEMP_START, TEMP_START]   + [-np.inf]*6
     high_bounds = [TEMP_STOP, 200] + [np.inf]*6
 
-    global_fit_params, cov, predicted_lst = fit_thermal_unfolding_exponential(
-        temp_list[:1],
-        signal_list[:1],
+    global_fit_params, cov, predicted_lst = fit_thermal_unfolding(
+        list_of_temperatures=temp_list[:1],
+        list_of_signals=signal_list[:1],
         initial_parameters=p0,
         low_bounds=low_bounds,
         high_bounds=high_bounds,
-        signal_fx=signal_two_state_t_unfolding_monomer_exponential,
+        signal_fx=signal_two_state_t_unfolding,
+        baseline_native_fx=exponential_baseline,
+        baseline_unfolded_fx=exponential_baseline,
+        Cp=0,
     )
 
     expected = [Tm_VAL, DHm_VAL]
@@ -101,10 +109,12 @@ def test_fit_tc_unfolding_single_slopes_exponential():
         'list_of_temperatures' : temp_list,
         'list_of_signals' : signal_list,
         'denaturant_concentrations' : concs,
-        'signal_fx' : signal_two_state_tc_unfolding_monomer_exponential,
+        'signal_fx' : signal_two_state_tc_unfolding,
+        'baseline_native_fx':exponential_baseline,
+        'baseline_unfolded_fx':exponential_baseline
     }
 
-    global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes_exponential(
+    global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes(
         initial_parameters=p0,
         low_bounds=low_bounds,
         high_bounds=high_bounds,
@@ -124,7 +134,7 @@ def test_fit_tc_unfolding_single_slopes_exponential():
     low_bounds_tm.pop(0)
     high_bounds_tm.pop(0)
 
-    global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes_exponential(
+    global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes(
         initial_parameters=p0_tm,
         low_bounds=low_bounds_tm,
         high_bounds=high_bounds_tm,
@@ -147,7 +157,7 @@ def test_fit_tc_unfolding_single_slopes_exponential():
     low_bounds_2.insert(1, -0.5)
     high_bounds_2.insert(1, 0.5)
 
-    global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes_exponential(
+    global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes(
         initial_parameters=p0_2,
         low_bounds=low_bounds_2,
         high_bounds=high_bounds_2,
@@ -175,7 +185,9 @@ def test_fit_tc_unfolding_shared_slopes_many_signals_exponential():
         'list_of_temperatures' : temp_list,
         'list_of_signals' : signal_list,
         'denaturant_concentrations' : concs,
-        'signal_fx' : signal_two_state_tc_unfolding_monomer_exponential,
+        'signal_fx' : signal_two_state_tc_unfolding,
+        'baseline_native_fx':exponential_baseline,
+        'baseline_unfolded_fx':exponential_baseline,
         'fit_m1' : True,
         'tm_value' : Tm_VAL,
         'dh_value' : DHm_VAL,
@@ -183,7 +195,7 @@ def test_fit_tc_unfolding_shared_slopes_many_signals_exponential():
         'signal_ids' : [0 for _ in range(len(signal_list))]
     }
 
-    global_fit_params, cov, predicted_lst = fit_tc_unfolding_shared_slopes_many_signals_exponential(
+    global_fit_params, cov, predicted_lst = fit_tc_unfolding_shared_slopes_many_signals(
         initial_parameters=p0,
         low_bounds=low_bounds,
         high_bounds=high_bounds,
@@ -215,14 +227,16 @@ def test_fit_tc_unfolding_many_signals_exponential():
         'list_of_temperatures' : temp_list,
         'list_of_signals' : signal_list,
         'denaturant_concentrations' : concs,
-        'signal_fx' : signal_two_state_tc_unfolding_monomer_exponential,
+        'signal_fx' : signal_two_state_tc_unfolding,
         'signal_ids' : [0 for _ in range(len(signal_list))],
         'model_scale_factor': False,
         'cp_value' : CP0_VAL,
-        'fit_m1' : True
+        'fit_m1' : True,
+        'baseline_native_fx':exponential_baseline,
+        'baseline_unfolded_fx':exponential_baseline
     }
 
-    global_fit_params, cov, predicted_lst = fit_tc_unfolding_many_signals_exponential(
+    global_fit_params, cov, predicted_lst = fit_tc_unfolding_many_signals(
         initial_parameters=p0,
         low_bounds=low_bounds,
         high_bounds=high_bounds,

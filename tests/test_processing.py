@@ -4,9 +4,15 @@ import pytest
 from pychemelt.utils.processing import (
     guess_Tm_from_derivative,
     get_colors_from_numeric_values,
-    fit_local_thermal_unfolding_to_signal_lst_exponential,
     fit_local_thermal_unfolding_to_signal_lst,
     adjust_value_to_interval
+)
+
+from pychemelt.utils.math import (
+    constant_baseline,
+    linear_baseline,
+    quadratic_baseline,
+    exponential_baseline
 )
 
 from pychemelt.utils.palette import VIRIDIS
@@ -42,19 +48,11 @@ def test_trigger_exception_fit_local_thermal_unfolding_to_signal_lst():
     signal_lst = [[np.nan for _ in range(5)]]
     temp_lst = [[x for x in range(5)]]
 
-    Tms, dHs, predicted_lst =  fit_local_thermal_unfolding_to_signal_lst_exponential(
-        signal_lst, temp_lst, [100],
-        [1], [1], [1], [1], [1], [1]
-    )
-
-    assert Tms == []
-
-    signal_lst = [[np.nan for _ in range(5)]]
-    temp_lst = [[x for x in range(5)]]
-
     Tms, dHs, predicted_lst =  fit_local_thermal_unfolding_to_signal_lst(
         signal_lst, temp_lst, [100],
-        [1], [1], [1], [1], [1], [1]
+        [1], [1], [1], [1], [1], [1],
+        baseline_native_fx = lambda x: x,
+        baseline_unfolded_fx = lambda x: x
     )
 
     assert Tms == []

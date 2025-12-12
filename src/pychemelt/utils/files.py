@@ -165,6 +165,7 @@ def detect_encoding(file_path):
             return enc
         except UnicodeDecodeError:
             continue
+
     return "Unknown encoding"
 
 def find_indexes_of_non_signal_conditions(signal_data,conditions):
@@ -313,8 +314,6 @@ def load_csv_file(file):
             signal_data = np.array(dat.iloc[:, (idx_start + 1):]).astype('float')
             temperature_data = np.array(dat.iloc[:, idx_start]).astype('float')
 
-            print(idx_start)
-
             break
 
         except:
@@ -349,16 +348,16 @@ def load_csv_file(file):
         if len(conditions_350nm) > 0:
             signal_350 = signal_data[:, [i for i, cond in enumerate(conditions) if cond in conditions_350nm]]
             signal_data_as_list = signal_350.transpose().tolist()
-            signal_data_dic["350nm"] = signal_data_as_list
-            temp_data_dic["350nm"] = expand_temperature_list([temperature_data],signal_data_as_list)
-            signals.append("350nm")
+            signal_data_dic["350 nm"] = signal_data_as_list
+            temp_data_dic["350 nm"] = expand_temperature_list([temperature_data],signal_data_as_list)
+            signals.append("350 nm")
 
         if len(conditions_330nm) > 0:
             signal_330 = signal_data[:, [i for i, cond in enumerate(conditions) if cond in conditions_330nm]]
             signal_data_as_list = signal_330.transpose().tolist()
-            signal_data_dic["330nm"] = signal_data_as_list
-            temp_data_dic["330nm"] = expand_temperature_list([temperature_data],signal_data_as_list)
-            signals.append("330nm")
+            signal_data_dic["330 nm"] = signal_data_as_list
+            temp_data_dic["330 nm"] = expand_temperature_list([temperature_data],signal_data_as_list)
+            signals.append("330 nm")
 
         if len(conditions_ratio) > 0:
             signal_ratio = signal_data[:, [i for i, cond in enumerate(conditions) if cond in conditions_ratio]]
@@ -644,13 +643,11 @@ def load_panta_xlsx(pantaFile):
         List of signal names, such as 330nm and 350nm
     """
 
-    try:
+    sheet_names = get_sheet_names_of_xlsx(pantaFile)
 
-        data          = pd.read_excel(pantaFile, "Data Export")
+    data_sheetname = "Data Export" if "Data Export" in sheet_names else "melting-scan"
 
-    except:
-
-        data          = pd.read_excel(pantaFile, "melting-scan") # Alternative format of PANTA
+    data = pd.read_excel(pantaFile, data_sheetname)
 
     signal_data_dic = {}
     temp_data_dic   = {}
@@ -778,22 +775,12 @@ def load_uncle_multi_channel(uncle_file):
             temperature_data = [x.split(':')[1] for x in temperature_data]
             temperature_data = np.array(temperature_data,dtype=float)
 
-            # Check that we have temperature data
-            if len(temperature_data) < 10:
-                continue
-
             # Extract the signal data
             # It contains one column per temperature and one row per wavelength
             signal_data = np.array(
                 data.iloc[3:, 1:].values,
                 dtype=float
                 )
-
-            # Check that we have non nan signal data
-            non_nas = np.logical_not(np.isnan(signal_data).any(axis=1))
-
-            if np.sum(non_nas) < 50:
-                continue
 
             # Assign the wavelength data if wavelengths is None
             if wavelengths is None:

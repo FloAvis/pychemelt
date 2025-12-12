@@ -3,13 +3,24 @@ This module contains helper functions to obtain the signal, given certain parame
 Author: Osvaldo Burastero
 """
 
-from ..utils.rates     import *
-from ..utils.fractions import *
+from .rates     import (
+    eq_constant_termochem,
+    eq_constant_thermo
+)
 
-def signal_two_state_tc_unfolding_monomer(
+from .fractions import (
+    fn_two_state_monomer
+)
+
+from .math import shift_temperature
+
+def signal_two_state_tc_unfolding(
         T,D,DHm,Tm,Cp0,m0,m1,
-        a_N, b_N, c_N, d_N,
-        a_U, b_U, c_U, d_U,extra_arg=None):
+        p1_N, p2_N, p3_N, p4_N,
+        p1_U, p2_U, p3_U, p4_U,
+        baseline_N_fx,
+        baseline_U_fx,
+        extra_arg=None):
 
     """
     Ref: Louise Hamborg et al., 2020. Global analysis of protein stability by temperature and chemical
@@ -31,10 +42,14 @@ def signal_two_state_tc_unfolding_monomer(
         m-value at the reference temperature (Tref)
     m1 : float
         Variation of m-value with temperature
-    a_N, b_N, c_N, d_N : float
-        Parameters describing the native-state baseline (intercept, temp slope, denaturant slope, quadratic term)
-    a_U, b_U, c_U, d_U : float
-        Parameters describing the unfolded-state baseline (intercept, temp slope, denaturant slope, quadratic term)
+    p1_N, p2_N, p3_N, p4_N : float
+        parameters describing the native-state baseline
+    p1_U, p2_U, p3_U, p4_U : float
+        parameters describing the unfolded-state baseline
+    baseline_N_fx : function
+        for the native-state baseline
+    baseline_U_fx : function
+        for the unfolded-state baseline
     extra_arg : None, optional
         Not used but present for API compatibility with oligomeric models
 
@@ -50,63 +65,19 @@ def signal_two_state_tc_unfolding_monomer(
     dT   = shift_temperature(T)
 
     # Baseline signals (with quadratic dependence on temperature)
-    S_native   = a_N + b_N * dT + c_N * D + d_N * (dT**2)
-    S_unfolded = a_U + b_U * dT + c_U * D + d_U * (dT**2)
+    S_native   = baseline_N_fx(dT,D,p1_N, p2_N, p3_N, p4_N)
+    S_unfolded = baseline_U_fx(dT,D,p1_U, p2_U, p3_U, p4_U)
 
     return  fn*(S_native) + fu*(S_unfolded)
 
-def signal_two_state_tc_unfolding_monomer_exponential(
-        T,D,DHm,Tm,Cp0,m0,m1,
-        intercept_n, pre_exp_n, c_N, alpha_N,
-        intercept_u, pre_exp_u, c_U, alpha_U,extra_arg=None):
-
-    """
-    Ref: Louise Hamborg et al., 2020. Global analysis of protein stability by temperature and chemical
-    denaturation
-
-    Parameters
-    ----------
-    T : array-like
-        Temperature
-    D : array-like
-        Denaturant agent concentration
-    DHm : float
-        Variation of enthalpy between the two considered states at Tm
-    Tm : float
-        Temperature at which the equilibrium constant equals one
-    Cp0 : float
-        Variation of calorific capacity between the two states
-    m0 : float
-        m-value at the reference temperature (Tref)
-    m1 : float
-        Variation of m-value with temperature
-    intercept_n, pre_exp_n, c_N, alpha_N : float
-        Parameters describing the native-state baseline (intercept, pre-exponential factor, denaturant slope, exponential term)
-    intercept_u, pre_exp_u, c_U, alpha_U : float
-        Parameters describing the unfolded-state baseline (intercept, pre-exponential factor, denaturant slope, exponential term)
-    extra_arg : None, optional
-        Not used but present for API compatibility with oligomeric models
-
-    Returns
-    -------
-    numpy.ndarray
-        Signal at the given temperatures and denaturant agent concentration, given the parameters
-    """
-
-    K   = eq_constant_termochem(T,D,DHm,Tm,Cp0,m0,m1)
-    fn  = fn_two_state_monomer(K)
-    fu  = 1 - fn
-    dT   = shift_temperature(T)
-
-    # Baseline signals (with quadratic dependence on temperature)
-    S_native   = intercept_n + pre_exp_n * np.exp(-alpha_N * dT) + c_N * D
-    S_unfolded = intercept_u + pre_exp_u * np.exp(-alpha_U * dT) + c_U * D
-
-    return  fn*(S_native) + fu*(S_unfolded)
-
-def signal_two_state_t_unfolding_monomer(
-        T,Tm,dHm,bN,kN,bU,kU,
-        Cp=0,qN=0,qU=0,extra_arg=None):
+def signal_two_state_t_unfolding(
+        T,Tm,dHm,
+        p1_N, p2_N, p3_N,
+        p1_U, p2_U, p3_U,
+        baseline_N_fx,
+        baseline_U_fx,
+        Cp=0,
+        extra_arg=None):
 
     """
     Two-state temperature unfolding (monomer).
@@ -119,20 +90,16 @@ def signal_two_state_t_unfolding_monomer(
         Temperature at which the equilibrium constant equals one
     dHm : float
         Variation of enthalpy between the two considered states at Tm
-    bN : float
-        Intercept of the native state signal
-    kN : float
-        Slope of the native state signal
-    bU : float
-        Intercept of the unfolded state signal
-    kU : float
-        Slope of the unfolded state signal
+    p1_N, p2_N, p3_N : float
+        baseline parameters for the native-state baseline
+    p1_U, p2_U, p3_U : float
+        baseline parameters for the unfolded-state baseline
+    baseline_N_fx : callable
+        function to calculate the baseline for the native state
+    baseline_U_fx : callable
+        function to calculate the baseline for the unfolded state
     Cp : float, optional
         Variation of heat capacity between the two states (default: 0)
-    qN : float, optional
-        Quadratic dependence coefficient for the native state (default: 0)
-    qU : float, optional
-        Quadratic dependence coefficient for the unfolded state (default: 0)
     extra_arg : None, optional
         Not used but present for compatibility
 
@@ -148,58 +115,7 @@ def signal_two_state_t_unfolding_monomer(
 
     dT  = shift_temperature(T)
 
-    S_native   = bN + kN * dT + qN * (dT**2)
-    S_unfolded = bU + kU * dT + qU * (dT**2)
-
-    return fn*(S_native) + fu*(S_unfolded)
-
-
-def signal_two_state_t_unfolding_monomer_exponential(
-        T,Tm,dHm,aN,cN,alpha_n,aU,cU,
-        alpha_u,Cp=0,extra_arg=None):
-
-    """
-    Two-state temperature unfolding (monomer) with exponential baselines.
-
-    Parameters
-    ----------
-    T : array-like
-        Temperature
-    Tm : float
-        Temperature at which the equilibrium constant equals one
-    dHm : float
-        Variation of enthalpy between the two considered states at Tm
-    aN : float
-        Intercept of the native state signal
-    cN : float
-        Pre-exponential factor of the native state signal
-    alpha_n : float
-        Exponential factor of the native state signal
-    aU : float
-        Intercept of the unfolded state signal
-    cU : float
-        Pre-exponential factor of the unfolded state signal
-    alpha_u : float
-        Exponential factor of the unfolded state signal (default: 0)
-    Cp : float, optional
-        Heat capacity change (default: 0)
-    extra_arg : None, optional
-        Not used but present for API compatibility
-
-    Returns
-    -------
-    numpy.ndarray
-        Signal at the given temperatures, given the parameters
-    """
-
-    K   = eq_constant_thermo(T,dHm,Tm,Cp)
-    fn  = fn_two_state_monomer(K)
-    fu  = 1 - fn
-
-    dT  = shift_temperature(T)
-
-    S_native   = aN + cN * np.exp(-alpha_n * dT)
-
-    S_unfolded = aU + cU * np.exp(-alpha_u * dT)
+    S_native   = baseline_N_fx(dT,0,0,p1_N,p2_N,p3_N) # No denaturant dependence, that's why d=0 and den_slope = 0
+    S_unfolded = baseline_U_fx(dT,0,0,p1_U,p2_U,p3_U)  # No denaturant dependence, that's why d=0 and den_slope = 0
 
     return fn*(S_native) + fu*(S_unfolded)

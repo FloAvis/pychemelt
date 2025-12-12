@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 
 from pychemelt import Sample
-from pychemelt.utils.signals import signal_two_state_tc_unfolding_monomer_exponential
+from pychemelt.utils.signals import signal_two_state_tc_unfolding
+from pychemelt.utils.math import exponential_baseline
 
 def_params = {
     'DHm': 120,
@@ -14,14 +15,16 @@ def_params = {
     'Cp0': 1.8,
     'm0': 2.6,
     'm1': 0,
-    'intercept_n': 100,
-    'pre_exp_n':1,
-    'c_N':0,
-    'alpha_N':0.1,
-    'intercept_u':110,
-    'pre_exp_u':1,
-    'c_U':0,
-    'alpha_U':0.2
+    'p1_N': 0,
+    'p2_N': 100,
+    'p3_N': 1,
+    'p4_N': 0.1,
+    'p1_U': 0,
+    'p2_U': 110,
+    'p3_U': 1,
+    'p4_U': 0.2,
+    'baseline_N_fx':exponential_baseline,
+    'baseline_U_fx':exponential_baseline
 }
 
 def_concs = [0.1,0.5,1,2,3,4,5]
@@ -38,7 +41,7 @@ def aux_create_pychem_sim(params,concs):
 
     for D in concs:
 
-        y = signal_two_state_tc_unfolding_monomer_exponential(temp_range, D, **params)
+        y = signal_two_state_tc_unfolding(temp_range, D, **params)
 
         y += rng.normal(0, 0.0005, len(y)) # Small error (seeded)
 
@@ -68,9 +71,12 @@ pychem_sim = aux_create_pychem_sim(def_params,def_concs)
 
 def test_estimate_baseline_parameters_exponential():
 
-    pychem_sim.estimate_baseline_parameters_exponential()
+    pychem_sim.estimate_baseline_parameters(
+        native_baseline_type='exponential',
+        unfolded_baseline_type='exponential'
+    )
 
-    assert len(pychem_sim.alphaNs_per_signal[0]) == len(def_concs)
+    assert len(pychem_sim.third_param_Ns_per_signal[0]) == len(def_concs)
 
 def test_fit_thermal_unfolding_local():
 

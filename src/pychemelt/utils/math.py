@@ -4,18 +4,119 @@ Author: Osvaldo Burastero
 """
 
 import numpy as np
-import pandas as pd
 
-from collections        import Counter
-from scipy              import stats
-
-from ..utils.constants  import Tref_cst
+from .constants  import Tref_cst
 from scipy.signal       import savgol_filter
 
 temperature_to_kelvin  = lambda T: T + 273.15 if np.max(T) < 270 else T
 temperature_to_celsius = lambda T: T - 273.15 if np.max(T) > 270 else T
 shift_temperature      = lambda T: temperature_to_kelvin(T) - Tref_cst
 
+def constant_baseline(dt,d,den_slope,a,*args):
+
+    """
+    Baseline function with no dependence on temperature and dependence on denaturant concentration
+
+    Parameters
+    ----------
+    dt : float
+        delta temperature, not used here but required for compatibility with other baseline functions
+    d : float
+        denaturant concentration
+    den_slope : float
+        linear dependence of signal on denaturant concentration
+    a : float
+        intercept of the baseline
+
+    Returns
+    ------
+    float
+        Baseline signal
+    """
+
+    return a + den_slope * d
+
+def linear_baseline(dt,d,den_slope,a,b,*args):
+
+    """
+    Baseline function with linear dependence on temperature and linear dependence on denaturant concentration
+
+    Parameters
+    ----------
+    dt : float
+        delta temperature, not used here but required for compatibility with other baseline functions
+    d : float
+        denaturant concentration
+    den_slope : float
+        linear dependence of signal on denaturant concentration
+    a : float
+        intercept of the baseline
+    b : float
+        linear dependence of signal on temperature
+
+    Returns
+    ------
+    float
+        Baseline signal
+    """
+
+    return a + b*dt + den_slope * d
+
+def quadratic_baseline(dt,d,den_slope,a,b,c):
+
+    """
+    Baseline function with quadratic dependence on temperature and linear dependence on denaturant concentration
+
+    Parameters
+    ----------
+    dt : float
+        delta temperature, not used here but required for compatibility with other baseline functions
+    d : float
+        denaturant concentration
+    den_slope : float
+        linear dependence of signal on denaturant concentration
+    a : float
+        intercept of the baseline
+    b : float
+        linear dependence of signal on temperature
+    c : float
+        quadratic dependence of signal on temperature
+
+    Returns
+    ------
+    float
+        Baseline signal
+    """
+
+    return a + b*dt + c*dt**2 + den_slope * d
+
+def exponential_baseline(dt,d,den_slope,a,c,alpha):
+
+    """
+    Baseline function with exponential dependence on temperature and linear dependence on denaturant concentration
+
+    Parameters
+    ----------
+    dt : float
+        delta temperature, not used here but required for compatibility with other baseline functions
+    d : float
+        denaturant concentration
+    den_slope : float
+        linear dependence of signal on denaturant concentration
+    a : float
+        intercept of the baseline
+    b : float
+        pre-exponential factor for the dependence on temperature
+    c : float
+        exponential coefficient for the dependence on temperature
+
+    Returns
+    ------
+    float
+        Baseline signal
+    """
+
+    return a + c * np.exp(-alpha * dt) + den_slope * d
 
 def is_evenly_spaced(x, tol = 1e-4):
     """

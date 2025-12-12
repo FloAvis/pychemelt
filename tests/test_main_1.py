@@ -93,16 +93,13 @@ def test_guess_Tm():
     # assert almost
     np.testing.assert_allclose(sample.t_melting_init_multiple[0][-1],63.82,rtol=0.01)
 
-def test_init_slope_dic():
-
-    # Raise error if self.poly_order_native or self.poly_order_unfolded is None
-    with pytest.raises(ValueError):
-        sample.init_slope_dic()
-
 def test_guess_initial_parameters_ratio():
 
     sample.n_residues = 130
-    sample.guess_initial_parameters(poly_order_native=1,poly_order_unfolded=1)
+    sample.guess_initial_parameters(
+        native_baseline_type='linear',
+        unfolded_baseline_type='linear'
+    )
 
     np.testing.assert_allclose(sample.thermodynamic_params_guess[0],71.8,rtol=0.1)
 

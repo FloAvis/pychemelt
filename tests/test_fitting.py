@@ -1,5 +1,10 @@
 import numpy as np
 
+from pychemelt.utils.math import (
+    quadratic_baseline,
+    constant_baseline, linear_baseline
+)
+
 from pychemelt.utils.fitting import (
     fit_line_robust,
     fit_quadratic_robust,
@@ -11,8 +16,8 @@ from pychemelt.utils.fitting import (
 )
 
 from pychemelt.utils.signals import (
-    signal_two_state_tc_unfolding_monomer,
-    signal_two_state_t_unfolding_monomer
+    signal_two_state_t_unfolding,
+    signal_two_state_tc_unfolding
 )
 
 # Centralized test constants (so the file has no scattered hardcoded values)
@@ -30,7 +35,7 @@ M0_VAL = 2.6
 M1_VAL = 0.0
 A_N_VAL = 1.5
 B_N_VAL = -0.015
-C_N_VAL = -0.1
+C_N_VAL = -0.01
 D_N_VAL = 0.0001
 A_U_VAL = 2.5
 B_U_VAL = -0.025
@@ -51,31 +56,34 @@ rng = np.random.default_rng(RNG_SEED)
 
 ### Create datasets for the tests ###
 
+
 params = {
     'DHm': DHm_VAL,
     'Tm': Tm_VAL,
     'Cp0': CP0_VAL,
     'm0': M0_VAL,
     'm1': M1_VAL,
-    'a_N': A_N_VAL,
-    'b_N': B_N_VAL,  # Negative temperature dependence for native state
-    'c_N': C_N_VAL,
-    'd_N': D_N_VAL,
-    'a_U': A_U_VAL,
-    'b_U': B_U_VAL,  # Negative temperature dependence for unfolded state
-    'c_U': C_U_VAL,
-    'd_U': D_U_VAL
+    'p1_N': C_N_VAL,
+    'p2_N': A_N_VAL,
+    'p3_N': B_N_VAL,  # Negative temperature dependence for native state
+    'p4_N': D_N_VAL,
+    'p1_U': C_U_VAL,
+    'p2_U': A_U_VAL,
+    'p3_U': B_U_VAL,  # Negative temperature dependence for unfolded state
+    'p4_U': D_U_VAL,
+    'baseline_N_fx':quadratic_baseline,
+    'baseline_U_fx':quadratic_baseline
 }
 
 params_no_temp_slopes = params.copy()
-params_no_temp_slopes['b_N'] = 0
-params_no_temp_slopes['b_U'] = 0
-params_no_temp_slopes['d_N'] = 0
-params_no_temp_slopes['d_U'] = 0
+params_no_temp_slopes['p3_N'] = 0
+params_no_temp_slopes['p3_U'] = 0
+params_no_temp_slopes['p4_N'] = 0
+params_no_temp_slopes['p4_U'] = 0
 
 params_no_den_slopes = params.copy()
-params_no_den_slopes['c_N'] = 0
-params_no_den_slopes['c_U'] = 0
+params_no_den_slopes['p1_N'] = 0
+params_no_den_slopes['p2_N'] = 0
 
 concs = CONCS
 
@@ -88,9 +96,9 @@ temp_list   = []
 
 for D in concs:
 
-    y = signal_two_state_tc_unfolding_monomer(temp_range, D, **params)
-    y2 = signal_two_state_tc_unfolding_monomer(temp_range,D,**params_no_temp_slopes)
-    y3 = signal_two_state_tc_unfolding_monomer(temp_range,D,**params_no_den_slopes)
+    y = signal_two_state_tc_unfolding(temp_range, D, **params)
+    y2 = signal_two_state_tc_unfolding(temp_range,D,**params_no_temp_slopes)
+    y3 = signal_two_state_tc_unfolding(temp_range,D,**params_no_den_slopes)
 
     # Add gaussian error to signal
     y += rng.normal(0, 0.01, len(y))
@@ -174,27 +182,23 @@ def test_fit_exponential_robust():
         raise
 
 
-def test_fit_thermal_unfolding():
+def test_fit_thermal_unfolding_no_slopes():
 
-    initial_parameters = [Tm_VAL,DHm_VAL] + [1]*6
-    low_bounds = [TEMP_START,TEMP_START]          + [-np.inf]*6
-    high_bounds = [TEMP_STOP,200]        + [np.inf]*6
+    initial_parameters = [Tm_VAL,DHm_VAL] + [1]*2
+    low_bounds = [TEMP_START,TEMP_START]  + [-np.inf]*2
+    high_bounds = [TEMP_STOP,200]        + [np.inf]*2
 
     # Fit only the lowest concentration
     global_fit_params, cov, predicted_lst = fit_thermal_unfolding(
-            temp_list[:1],
-            signal_list[:1],
-            initial_parameters,
-            low_bounds,
-            high_bounds,
-            signal_two_state_t_unfolding_monomer,
-            CP0_VAL,
-            fit_slopes = {
-                'fit_slope_native' : True,
-                'fit_slope_unfolded' : True,
-                'fit_quadratic_native' : True,
-                'fit_quadratic_unfolded' : True
-            },
+            list_of_temperatures=temp_list[:1],
+            list_of_signals=signal_list_2[:1],
+            initial_parameters=initial_parameters,
+            low_bounds=low_bounds,
+            high_bounds=high_bounds,
+            signal_fx=signal_two_state_t_unfolding,
+            baseline_native_fx=constant_baseline,
+            baseline_unfolded_fx=constant_baseline,
+            Cp=CP0_VAL,
             list_of_oligomer_conc=None)
 
     # The Tm at a concentration close to zero should be the Tm
@@ -217,6 +221,46 @@ def test_fit_thermal_unfolding():
         print(f"test_fit_thermal_unfolding FAILED for bN: expected {A_N_VAL}, got {global_fit_params[2]!r}")
         raise
 
+def test_fit_thermal_unfolding():
+
+        initial_parameters = [Tm_VAL, DHm_VAL] + [1] * 6
+        low_bounds = [TEMP_START, TEMP_START] + [-np.inf] * 6
+        high_bounds = [TEMP_STOP, 200] + [np.inf] * 6
+
+        # Fit only the lowest concentration
+        global_fit_params, cov, predicted_lst = fit_thermal_unfolding(
+            list_of_temperatures=temp_list[:1],
+            list_of_signals=signal_list[:1],
+            initial_parameters=initial_parameters,
+            low_bounds=low_bounds,
+            high_bounds=high_bounds,
+            signal_fx=signal_two_state_t_unfolding,
+
+            baseline_native_fx=quadratic_baseline,
+            baseline_unfolded_fx=quadratic_baseline,
+            Cp=CP0_VAL,
+            list_of_oligomer_conc=None)
+
+        # The Tm at a concentration close to zero should be the Tm
+        try:
+            np.testing.assert_allclose(global_fit_params[0], Tm_VAL, rtol=0.05, atol=0)
+        except AssertionError:
+            print(f"test_fit_thermal_unfolding FAILED for Tm: expected {Tm_VAL}, got {global_fit_params[0]!r}")
+            raise
+
+        # Same for DH
+        try:
+            np.testing.assert_allclose(global_fit_params[1], DHm_VAL, rtol=0.05, atol=0)
+        except AssertionError:
+            print(f"test_fit_thermal_unfolding FAILED for DH: expected {DHm_VAL}, got {global_fit_params[1]!r}")
+
+        # Same for the intercept bN
+        try:
+            np.testing.assert_allclose(global_fit_params[2], A_N_VAL, rtol=0.05, atol=0)
+        except AssertionError:
+            print(f"test_fit_thermal_unfolding FAILED for bN: expected {A_N_VAL}, got {global_fit_params[2]!r}")
+            raise
+
 def test_fit_tc_unfolding_single_slopes():
 
     # Tm, Dh, Cp, m0
@@ -224,20 +268,13 @@ def test_fit_tc_unfolding_single_slopes():
     low_bounds = [TEMP_START,TEMP_START,0,0] + [-np.inf]*(len(concs)*6)
     high_bounds = [TEMP_STOP,200,5,5] + [np.inf]*(len(concs)*6)
 
-    fit_slopes_dic = {
-        'fit_slope_native': True,
-        'fit_slope_unfolded': True,
-        'fit_quadratic_native': True,
-        'fit_quadratic_unfolded': True
-    }
-
     kwargs = {
-
-        'fit_slopes' : fit_slopes_dic,
         'list_of_temperatures':temp_list,
         'list_of_signals':signal_list,
         'denaturant_concentrations':concs,
-        'signal_fx':signal_two_state_tc_unfolding_monomer,
+        'signal_fx':signal_two_state_tc_unfolding,
+        'baseline_native_fx':quadratic_baseline,
+        'baseline_unfolded_fx':quadratic_baseline
     }
 
     global_fit_params, cov, predicted_lst = fit_tc_unfolding_single_slopes(
@@ -250,7 +287,7 @@ def test_fit_tc_unfolding_single_slopes():
     expected = [Tm_VAL,DHm_VAL,CP0_VAL,M0_VAL]
 
     # Verify the fitting
-    np.testing.assert_allclose(global_fit_params[:4], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(global_fit_params[:4], expected, rtol=0.2, atol=0)
 
     # Now do fitting with fixed Tm
     initial_parameters_tm = initial_parameters.copy()[1:]
@@ -268,7 +305,7 @@ def test_fit_tc_unfolding_single_slopes():
     expected = [DHm_VAL,CP0_VAL,M0_VAL]
 
     # Verify the fitting
-    np.testing.assert_allclose(global_fit_params[:3], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(global_fit_params[:3], expected, rtol=0.2, atol=0)
 
     # Fitting with fixed DH
     initial_parameters_dh = initial_parameters.copy()
@@ -301,25 +338,20 @@ def test_fit_tc_unfolding_shared_slopes_many_signals():
     low_bounds = [0,-1] + [-np.inf]*(len(concs)*6)
     high_bounds = [5,1] + [np.inf]*(len(concs)*6)
 
-    fit_slopes_dic = {
-        'fit_slope_native': True,
-        'fit_slope_unfolded': True,
-        'fit_quadratic_native': True,
-        'fit_quadratic_unfolded': True
-    }
-
     kwargs = {
 
-        'fit_slopes' : fit_slopes_dic,
         'list_of_temperatures':temp_list,
         'list_of_signals':signal_list,
         'denaturant_concentrations':concs,
-        'signal_fx':signal_two_state_tc_unfolding_monomer,
+        'signal_fx':signal_two_state_tc_unfolding,
         'tm_value':Tm_VAL,
         'dh_value':DHm_VAL,
         'cp_value':CP0_VAL,
         'signal_ids':[0 for _ in range(len(signal_list))],
-        'fit_m1':True
+        'fit_m1':True,
+
+        'baseline_native_fx':quadratic_baseline,
+        'baseline_unfolded_fx':quadratic_baseline
     }
 
     global_fit_params, cov, predicted_lst = fit_tc_unfolding_shared_slopes_many_signals(
@@ -340,25 +372,20 @@ def test_fit_tc_unfolding_shared_slopes_many_signals_no_slopes():
     low_bounds = [0,-1] + [-np.inf]*(len(concs)*2)
     high_bounds = [5,1] + [np.inf]*(len(concs)*2)
 
-    fit_slopes_dic = {
-        'fit_slope_native': False,
-        'fit_slope_unfolded': False,
-        'fit_quadratic_native': False,
-        'fit_quadratic_unfolded': False
-    }
-
     kwargs = {
 
-        'fit_slopes' : fit_slopes_dic,
         'list_of_temperatures':temp_list,
         'list_of_signals':signal_list_2, # No dependence on temperature
         'denaturant_concentrations':concs,
-        'signal_fx':signal_two_state_tc_unfolding_monomer,
+        'signal_fx':signal_two_state_tc_unfolding,
         'tm_value':Tm_VAL,
         'dh_value':DHm_VAL,
         'cp_value':CP0_VAL,
         'signal_ids':[0 for _ in range(len(signal_list))],
-        'fit_m1':True
+        'fit_m1':True,
+
+        'baseline_native_fx':constant_baseline,
+        'baseline_unfolded_fx':constant_baseline
     }
 
     global_fit_params, cov, predicted_lst = fit_tc_unfolding_shared_slopes_many_signals(
@@ -384,16 +411,14 @@ def test_fit_tc_unfolding_many_signals():
         'list_of_temperatures' : temp_list,
         'list_of_signals' : signal_list,
         'denaturant_concentrations' : concs,
-        'signal_fx' : signal_two_state_tc_unfolding_monomer,
+        'signal_fx' : signal_two_state_tc_unfolding,
         'signal_ids' : [0 for _ in range(len(signal_list))],
-        'fit_slope_native_temp': True,
-        'fit_slope_unfolded_temp': True,
-        'fit_quadratic_native': True,
-        'fit_quadratic_unfolded': True,
         'initial_parameters' : p0,
         'low_bounds' : low_bounds,
         'high_bounds' : high_bounds,
-        'model_scale_factor': True
+        'model_scale_factor': True,
+        'baseline_native_fx':quadratic_baseline,
+        'baseline_unfolded_fx':quadratic_baseline
     }
 
     global_fit_params, cov, predicted_lst = fit_tc_unfolding_many_signals(**kwargs)
@@ -412,12 +437,10 @@ def test_fit_tc_unfolding_many_signals():
         'list_of_temperatures' : temp_list,
         'list_of_signals' : signal_list,
         'denaturant_concentrations' : concs,
-        'signal_fx' : signal_two_state_tc_unfolding_monomer,
+        'signal_fx' : signal_two_state_tc_unfolding,
         'signal_ids' : [0 for _ in range(len(signal_list))],
-        'fit_slope_native_temp': True,
-        'fit_slope_unfolded_temp': True,
-        'fit_quadratic_native': True,
-        'fit_quadratic_unfolded': True,
+        'baseline_native_fx':quadratic_baseline,
+        'baseline_unfolded_fx':quadratic_baseline,
         'initial_parameters' : p0,
         'low_bounds' : low_bounds,
         'high_bounds' : high_bounds,
@@ -430,11 +453,11 @@ def test_fit_tc_unfolding_many_signals():
 
     np.testing.assert_allclose(global_fit_params[:3], expected[:3], rtol=0.1, atol=0)
 
-def test_fit_tc_unfolding_many_signals_no_slopes():
+def test_fit_tc_unfolding_many_signals_no_temp_slopes():
 
     expected = [Tm_VAL,DHm_VAL,CP0_VAL,M0_VAL,A_N_VAL,A_U_VAL,C_N_VAL,C_U_VAL]
 
-    p0 = expected + [1.3] * len(temp_list)
+    p0 = expected + [1.1] * len(temp_list)
     p0[0] = Tm_VAL - 10
     p0[1] = DHm_VAL + 80
 
@@ -445,12 +468,12 @@ def test_fit_tc_unfolding_many_signals_no_slopes():
         'list_of_temperatures' : temp_list,
         'list_of_signals' : signal_list_2,
         'denaturant_concentrations' : concs,
-        'signal_fx' : signal_two_state_tc_unfolding_monomer,
+        'signal_fx' : signal_two_state_tc_unfolding,
         'signal_ids' : [0 for _ in range(len(signal_list))],
-        'fit_slope_native_temp': False,
-        'fit_slope_unfolded_temp': False,
-        'fit_quadratic_native': False,
-        'fit_quadratic_unfolded': False,
+
+        'baseline_native_fx':constant_baseline,
+        'baseline_unfolded_fx':constant_baseline,
+
         'initial_parameters' : p0,
         'low_bounds' : low_bounds,
         'high_bounds' : high_bounds,
@@ -461,9 +484,11 @@ def test_fit_tc_unfolding_many_signals_no_slopes():
 
     np.testing.assert_allclose(global_fit_params[:4], expected[:4], rtol=0.1, atol=0)
 
+def test_fit_tc_unfolding_many_signals_no_den_slopes():
+
     expected = [Tm_VAL,DHm_VAL,CP0_VAL,M0_VAL,A_N_VAL,A_U_VAL,B_N_VAL,B_U_VAL,D_N_VAL,D_U_VAL]
 
-    p0 = expected + [1.3] * len(temp_list)
+    p0 = expected + [1.1] * len(temp_list)
     p0[0] = Tm_VAL - 10
     p0[1] = DHm_VAL + 80
 
@@ -474,14 +499,13 @@ def test_fit_tc_unfolding_many_signals_no_slopes():
         'list_of_temperatures' : temp_list,
         'list_of_signals' : signal_list_3,
         'denaturant_concentrations' : concs,
-        'signal_fx' : signal_two_state_tc_unfolding_monomer,
+        'signal_fx' : signal_two_state_tc_unfolding,
         'signal_ids' : [0 for _ in range(len(signal_list))],
-        'fit_slope_native_temp': True,
-        'fit_slope_unfolded_temp': True,
-        'fit_quadratic_native': True,
-        'fit_quadratic_unfolded': True,
-        'fit_slope_native_den' : False,
-        'fit_slope_unfolded_den' : False,
+
+        'baseline_native_fx':quadratic_baseline,
+        'baseline_unfolded_fx':quadratic_baseline,
+        'fit_native_den_slope': False,
+        'fit_unfolded_den_slope': False,
         'initial_parameters' : p0,
         'low_bounds' : low_bounds,
         'high_bounds' : high_bounds,

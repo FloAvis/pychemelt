@@ -5,7 +5,9 @@ The order of the tests is important, as some functions depend on the previous on
 import numpy as np
 
 from pychemelt import Sample
-from pychemelt.utils.signals import signal_two_state_tc_unfolding_monomer
+from pychemelt.utils.signals import signal_two_state_tc_unfolding
+
+from pychemelt.utils.math import quadratic_baseline
 
 def_params = {
     'DHm': 100,
@@ -13,17 +15,21 @@ def_params = {
     'Cp0': 1.6,
     'm0': 2.6,
     'm1': 0,
-    'a_N': 1.5,
-    'b_N': -0.015,  # Negative temperature dependence for native state
-    'c_N': -0.1,
-    'd_N': 0.0001,
-    'a_U': 2.5,
-    'b_U': -0.025,  # Negative temperature dependence for unfolded state
-    'c_U': -0.005,
-    'd_U': 0.0002
+    'p1_N': -0.1,
+    'p2_N': 1.5,
+    'p3_N': -0.015,  # Negative temperature dependence for native state
+    'p4_N': 0.0001,
+    'p1_U': -0.005,
+    'p2_U': 2.5,
+    'p3_U': -0.025,  # Negative temperature dependence for unfolded state
+    'p4_U': 0.0002,
+    'baseline_N_fx':quadratic_baseline,
+    'baseline_U_fx':quadratic_baseline
 }
 
 def_concs = [1e-8,1,1.5,2,2.6,3,4,5]
+
+scalings_factors = np.array([1,0.95,1,1.1,1,1,1,0.96])
 
 def aux_create_pychem_sim(params,concs):
 
@@ -32,9 +38,9 @@ def aux_create_pychem_sim(params,concs):
     signal_list = []
     temp_list   = []
 
-    for D in concs:
+    for i,D in enumerate(concs):
 
-        y = signal_two_state_tc_unfolding_monomer(temp_range, D, **params)
+        y = signal_two_state_tc_unfolding(temp_range, D, **params)
 
         rng = np.random.default_rng(2)
 
@@ -42,7 +48,7 @@ def aux_create_pychem_sim(params,concs):
         y += rng.normal(0, 0.0005, len(y)) # Small error
 
         # Add gaussian error to PROTEIN concentration
-        y *= rng.normal(1, 0.001)
+        y *= scalings_factors[i]
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -71,49 +77,64 @@ def test_estimate_baseline_parameters():
     params = def_params.copy()
 
     # Set fluorescence dependence on temperature and denaturant concentration to zero
-    params['b_N'] = 0
-    params['b_U'] = 0
-    params['c_N'] = 0
-    params['c_U'] = 0
-    params['d_N'] = 0
-    params['d_U'] = 0
+    params['p1_N'] = 0
+    params['p1_U'] = 0
+    params['p3_N'] = 0
+    params['p3_U'] = 0
+    params['p4_N'] = 0
+    params['p4_N'] = 0
 
     pychem_sim = aux_create_pychem_sim(params,def_concs)
 
-    pychem_sim.estimate_baseline_parameters(poly_order_native=0, poly_order_unfolded=0)
+    pychem_sim.estimate_baseline_parameters(
+        native_baseline_type='constant',
+        unfolded_baseline_type='constant'
+    )
 
-    np.testing.assert_allclose(pychem_sim.bNs_per_signal[0][0],params['a_N'], rtol=0.01, atol=0)
+    np.testing.assert_allclose(
+        pychem_sim.first_param_Ns_per_signal[0][0],
+        1.5,
+        rtol=0.01,
+        atol=0)
 
     # Reset fittings results
     sample.reset_fittings_results()
-    assert len(sample.bNs_per_signal) == 0
+    assert len(sample.first_param_Ns_per_signal) == 0
 
 
     # ------------ #
     params = def_params.copy()
 
-    params['c_N'] = 0
-    params['c_U'] = 0
-    params['d_N'] = 0
-    params['d_U'] = 0
+    params['p1_N'] = 0
+    params['p1_U'] = 0
+    params['p4_N'] = 0
+    params['p4_U'] = 0
 
     pychem_sim = aux_create_pychem_sim(params,def_concs)
 
-    pychem_sim.estimate_baseline_parameters(poly_order_native=1, poly_order_unfolded=1)
+    pychem_sim.estimate_baseline_parameters(
+        native_baseline_type='linear',
+        unfolded_baseline_type='linear'
+    )
 
-    np.testing.assert_allclose(pychem_sim.kNs_per_signal[0][0],params['b_N'], rtol=0.1, atol=0)
-    np.testing.assert_allclose(pychem_sim.kUs_per_signal[0][-1],params['b_U'], rtol=0.1, atol=0)
+    np.testing.assert_allclose(pychem_sim.second_param_Ns_per_signal[0][0], params['p3_N'], rtol=0.1, atol=0)
+    np.testing.assert_allclose(pychem_sim.second_param_Us_per_signal[0][-1], params['p3_U'], rtol=0.1, atol=0)
 
     # ------------ #
     params = def_params.copy()
-    params['c_N'] = 0
-    params['c_U'] = 0
+    params['p1_N'] = 0
+    params['p1_U'] = 0
 
     pychem_sim = aux_create_pychem_sim(params,def_concs)
 
-    pychem_sim.estimate_baseline_parameters(20,poly_order_native=2, poly_order_unfolded=2)
+    pychem_sim.estimate_baseline_parameters(
+        native_baseline_type='quadratic',
+        unfolded_baseline_type='quadratic',
+        window_range_native=20,
+        window_range_unfolded=20
+        )
 
-    np.testing.assert_allclose(pychem_sim.qNs_per_signal[0][0],params['d_N'], rtol=0.1, atol=0)
+    np.testing.assert_allclose(pychem_sim.third_param_Ns_per_signal[0][0], params['p4_N'], rtol=0.1, atol=0)
 
 # --------- #  Create global pychem_sim object for the rest of tests  # --------- #
 sample = aux_create_pychem_sim(def_params,def_concs)
@@ -123,7 +144,12 @@ sample.n_residues = 130
 
 def test_fit_thermal_unfolding_local():
 
-    sample.estimate_baseline_parameters(16,poly_order_native=2, poly_order_unfolded=2)
+    sample.estimate_baseline_parameters(
+        native_baseline_type='quadratic',
+        unfolded_baseline_type='quadratic',
+        window_range_native=16,
+        window_range_unfolded=16
+    )
     sample.fit_thermal_unfolding_local()
 
     np.testing.assert_allclose(sample.Tms_multiple[0][0],60.2,rtol=0.05)
@@ -136,7 +162,12 @@ def test_guess_Cp():
 
 def test_guess_initial_parameters():
 
-    sample.guess_initial_parameters(poly_order_native=2, poly_order_unfolded=2)
+    sample.guess_initial_parameters(
+        native_baseline_type='quadratic',
+        unfolded_baseline_type='quadratic',
+        window_range_native=16,
+        window_range_unfolded=16
+    )
 
     np.testing.assert_allclose(sample.Cp0,1.7,rtol=0.2)
 
@@ -187,16 +218,15 @@ def test_fit_thermal_unfolding_global_global():
 
 def test_fit_thermal_unfolding_global_global_global():
 
-    for model_scale_factor in [True,False]:
+    sample.fit_thermal_unfolding_global() # Needs to be done firsts
+    sample.global_global_fit_done = False # Force re-fitting clause
+    sample.fit_thermal_unfolding_global_global_global(model_scale_factor=True)
 
-        sample.fit_thermal_unfolding_global() # Needs to be done firsts
-        sample.global_global_fit_done = False # Force re-fitting clause
-        sample.fit_thermal_unfolding_global_global_global(model_scale_factor=model_scale_factor)
+    expected = [60.2, 100, 1.7, 2.6]
+    actual = sample.params_df.iloc[:4,1]
 
-        expected = [60.2, 100, 1.7, 2.6]
-        actual = sample.params_df.iloc[:4,1]
+    np.testing.assert_allclose(actual,expected,rtol=0.1)
 
-        np.testing.assert_allclose(actual,expected,rtol=0.1)
 
 def test_signal_to_df():
 

@@ -10,17 +10,55 @@ from collections import Counter
 
 from .math import shift_temperature, relative_errors
 
-from .fitting import (
+from ..utils.fitting import (
     fit_line_robust,
     fit_quadratic_robust,
-    fit_thermal_unfolding,
     fit_exponential_robust,
-    fit_thermal_unfolding_exponential
+    fit_thermal_unfolding,
+    baseline_fx_name_to_req_params
 )
 
-from .signals import signal_two_state_t_unfolding_monomer, signal_two_state_t_unfolding_monomer_exponential
+from .signals import signal_two_state_t_unfolding
 
 from .palette import VIRIDIS
+
+def set_param_bounds(p0,param_names):
+
+    low_bounds = []
+    high_bounds = []
+
+    for p in p0:
+
+        if -1 < p < 1:
+
+            low_bounds.append(-5e2)
+            high_bounds.append(5e2)
+
+        elif p > 1:
+
+            low_bounds.append(p/1e3)
+            high_bounds.append(p*1e3)
+
+        else:
+
+            low_bounds.append(p*1e3)
+            high_bounds.append(p/1e3)
+
+    # Set low bounds to zero for specific parameters
+    # For example for all parameters containing 'exp'
+
+    for i,p in enumerate(param_names):
+
+        if 'intercept' in p:
+            low_bounds[i] = 0
+
+        if 'exponential_coefficient' in p:
+            low_bounds[i] = 0
+
+        if 'pre_exponential_factor' in p:
+            low_bounds[i] = 0
+
+    return low_bounds, high_bounds
 
 def expand_temperature_list(temp_lst,signal_lst):
 
@@ -248,34 +286,37 @@ def guess_Tm_from_derivative(temp_lst, deriv_lst, x1, x2):
     return t_melting_init
 
 def estimate_signal_baseline_params(
-   signal_lst,
-   temp_lst,
-   window_range_native=12,
-   window_range_unfolded=12,     
-   poly_order_native=1,
-   poly_order_unfolded=1):
+    signal_lst,
+    temp_lst,
+    native_baseline_type,
+    unfolded_baseline_type,
+    window_range_native=12,
+    window_range_unfolded=12):
         
     """
     Estimate the baseline parameters for the sample
-    Args:
-        window_range_native (int): Range of the window (in degrees) to estimate the baselines and slopes of the native state
-        window_range_unfolded (int): Range of the window (in degrees) to estimate the baselines and slopes of the unfolded state
-        poly_order_native (int): Order of the polynomial to fit the native state baseline (0, 1 or 2)
-        poly_order_unfolded (int): Order of the polynomial to fit the unfolded state baseline (0, 1 or 2)
-    Returns:
-        bNs (list): List of native state baselines
-        bUs (list): List of unfolded state baselines
-        kNs (list): List of native state slopes
-        kUs (list): List of unfolded state slopes
+
+    Parameters
+    ---------
+    window_range_native : float
+        Range of the temperature window to estimate the native state baseline
+    window_range_unfolded : float
+        Range of the temperature window to estimate the unfolded state baseline
+    native_baseline_type : str
+        options: 'constant', 'linear', 'quadratic', 'exponential'
+    unfolded_baseline_type : str
+        options: 'constant', 'linear', 'quadratic', 'exponential'
+
+    Returns
 
     """
 
-    bNs  = []
-    bUs  = []
-    kNs  = []
-    kUs  = []
-    qNs  = []
-    qUs  = []
+    p1Ns  = []
+    p1Us  = []
+    p2Ns  = []
+    p2Us  = []
+    p3Ns  = []
+    p3Us  = []
 
     for s,t in zip(signal_lst,temp_lst):
 
@@ -291,147 +332,109 @@ def estimate_signal_baseline_params(
         # Shift temperature to be centered at Tref !!! defined in constants.py
         temp_denat = shift_temperature(temp_denat)
 
-        if poly_order_native == 0:
-            bN = np.median(signal_native)
-            bNs.append(bN)
+        if native_baseline_type == 'constant':
 
-        if poly_order_unfolded == 0:
-            bU = np.median(signal_denat)
-            bUs.append(bU)
+            p1N = np.median(signal_native)
+            p1Ns.append(p1N)
 
-        if poly_order_native == 1:
+        if unfolded_baseline_type == 'constant':
 
-            kN, bN = fit_line_robust(temp_native,signal_native)
+            p1U = np.median(signal_denat)
+            p1Us.append(p1U)
 
-            bNs.append(bN)
-            kNs.append(kN)
+        if native_baseline_type == 'linear':
 
-        if poly_order_unfolded == 1:
+            p2N, p1N = fit_line_robust(temp_native,signal_native)
 
-            kU, bU = fit_line_robust(temp_denat,signal_denat)
+            p2Ns.append(p2N)
+            p1Ns.append(p1N)
 
-            bUs.append(bU)
-            kUs.append(kU)
+        if unfolded_baseline_type == 'linear':
 
-        if poly_order_native == 2:
+            p2U, p1U = fit_line_robust(temp_denat,signal_denat)
 
-            qN, kN, bN = fit_quadratic_robust(temp_native,signal_native)
+            p2Us.append(p2U)
+            p1Us.append(p1U)
 
-            bNs.append(bN)
-            kNs.append(kN)
-            qNs.append(qN)
+        if native_baseline_type == 'quadratic':
 
-        if poly_order_unfolded == 2:
+            p3N, p2N, p1N = fit_quadratic_robust(temp_native,signal_native)
 
-            qU, kU, bU = fit_quadratic_robust(temp_denat,signal_denat)
+            p3Ns.append(p3N)
+            p2Ns.append(p2N)
+            p1Ns.append(p1N)
 
-            bUs.append(bU)
-            kUs.append(kU)
-            qUs.append(qU) 
+        if unfolded_baseline_type == 'quadratic':
 
-    return bNs, bUs, kNs, kUs, qNs, qUs
+            p3U, p2U, p1U = fit_quadratic_robust(temp_denat,signal_denat)
 
+            p3Us.append(p3U)
+            p2Us.append(p2U)
+            p1Us.append(p1U)
 
-def estimate_signal_baseline_params_exponential(
-        signal_lst,
-        temp_lst,
-        window_range_native=12,
-        window_range_unfolded=12):
-    """
-    Estimate the baseline parameters for the sample using exponential functions
-    Args:
-        window_range_native (int): Range of the window (in degrees) to estimate the baselines and slopes of the native state
-        window_range_unfolded (int): Range of the window (in degrees) to estimate the baselines and slopes of the unfolded state
+        if native_baseline_type == 'exponential':
 
-    Returns:
-        aNs (list): List of native state baselines
-        aUs (list): List of unfolded state baselines
-        cNs (list): List of native state pre exponential factor
-        cUs (list): List of unfolded state  pre exponential factor
-        alphaNs (list): List of native state exponential factors
-        alphaUs (list): List of unfolded state exponential factors
+            p1N, p2N, p3N = fit_exponential_robust(temp_native,signal_native)
 
-    """
+            p3Ns.append(p3N)
+            p2Ns.append(p2N)
+            p1Ns.append(p1N)
 
-    aNs = []
-    aUs = []
-    cNs = []
-    cUs = []
-    alphaNs = []
-    alphaUs = []
+        if unfolded_baseline_type == 'exponential':
 
-    for s, t in zip(signal_lst, temp_lst):
+            p1U, p2U, p3U = fit_exponential_robust(temp_denat,signal_denat)
 
-        signal_native = s[t < np.min(t) + window_range_native]
-        temp_native = t[t < np.min(t) + window_range_native]
+            p3Us.append(p3U)
+            p2Us.append(p2U)
+            p1Us.append(p1U)
 
-        # Shift temperature to be centered at Tref !!! defined in constants.py
-        temp_native = shift_temperature(temp_native)
+    return p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us
 
-        signal_denat = s[t > np.max(t) - window_range_unfolded]
-        temp_denat = t[t > np.max(t) - window_range_unfolded]
-
-        # Shift temperature to be centered at Tref !!! defined in constants.py
-        temp_denat = shift_temperature(temp_denat)
-
-        aN, cN, alphaN = fit_exponential_robust(temp_native, signal_native)
-
-        aU, cU, alphaU = fit_exponential_robust(temp_denat, signal_denat)
-
-        aNs.append(aN)
-        cNs.append(cN)
-        alphaNs.append(alphaN)
-
-        aUs.append(aU)
-        cUs.append(cU)
-        alphaUs.append(alphaU)
-
-    return aNs, aUs, cNs, cUs, alphaNs, alphaUs
 
 def fit_local_thermal_unfolding_to_signal_lst(
     signal_lst,
     temp_lst,
     t_melting_init,
-    bNs,
-    bUs,
-    kNs,
-    kUs,
-    qNs,
-    qUs,
-    poly_order_native=1,
-    poly_order_unfolded=1):
+    p1_Ns,
+    p1_Us,
+    p2_Ns,
+    p2_Us,
+    p3_Ns,
+    p3_Us,
+    baseline_native_fx,
+    baseline_unfolded_fx):
     
     predicted_lst = []
     Tms           = []
     dHs           = []
 
-    fit_slopes_dic = {
-        'fit_slope_native': poly_order_native > 0,
-        'fit_slope_unfolded': poly_order_unfolded > 0,
-        'fit_quadratic_native': poly_order_native > 1,
-        'fit_quadratic_unfolded': poly_order_unfolded > 1
-    }
+    # Obtain the name of the function baseline_native_fx and baseline_unfolded_fx
+    baseline_native_fx_name = baseline_native_fx.__name__
+    baseline_unfolded_fx_name = baseline_unfolded_fx.__name__
+
+    baseline_native_params = baseline_fx_name_to_req_params(baseline_native_fx_name)
+    baseline_unfolded_params = baseline_fx_name_to_req_params(baseline_unfolded_fx_name)
 
     i = 0
     for s,t in zip(signal_lst,temp_lst):
 
-        p0 = np.array([t_melting_init[i], 85.0, bNs[i], bUs[i]])
+        p0 = np.array([t_melting_init[i], 85, p1_Ns[i], p1_Us[i]])
 
-        if poly_order_native > 0:
-            p0 = np.concatenate([p0,[kNs[i]]])
-        if poly_order_unfolded > 0:
-            p0 = np.concatenate([p0,[kUs[i]]])
+        if baseline_native_params[0]:
+            p0 = np.concatenate([p0, [p2_Ns[i]]])
+        if baseline_unfolded_params[0]:
+            p0 = np.concatenate([p0, [p2_Us[i]]])
 
-        if poly_order_native == 2:
-            p0 = np.concatenate([p0,[qNs[i]]])
-        if poly_order_unfolded == 2:
-            p0 = np.concatenate([p0,[qUs[i]]])
+        if baseline_native_params[1]:
+            p0 = np.concatenate([p0, [p3_Ns[i]]])
+        if baseline_unfolded_params[1]:
+            p0 = np.concatenate([p0, [p3_Us[i]]])
 
         low_bounds  = p0.copy()
         high_bounds = p0.copy()
 
-        low_bounds[2:]  = [x / 100 - 5 if x > 0 else 100 * x - 5 for x in low_bounds[2:]]
-        high_bounds[2:] = [100 * x + 5 if x > 0 else x / 100 + 5 for x in high_bounds[2:]]
+        low_bounds[2:]  = [x / 200 - 50 if x > 0 else 200 * x - 50 for x in low_bounds[2:]]
+        high_bounds[2:] = [200 * x + 50 if x > 0 else x / 200 + 50 for x in high_bounds[2:]]
 
         low_bounds[0]  = np.min(t)
         high_bounds[0] = np.max(t) + 15
@@ -442,11 +445,15 @@ def fit_local_thermal_unfolding_to_signal_lst(
         try:
 
             params, cov, predicted = fit_thermal_unfolding(
-                [t], [s],
-                p0, low_bounds, high_bounds,
-                signal_two_state_t_unfolding_monomer,
-                0,
-                fit_slopes=fit_slopes_dic)
+                list_of_temperatures=[t],
+                list_of_signals=[s],
+                initial_parameters=p0,
+                low_bounds=low_bounds,
+                high_bounds=high_bounds,
+                signal_fx=signal_two_state_t_unfolding,
+                baseline_native_fx=baseline_native_fx,
+                baseline_unfolded_fx=baseline_unfolded_fx,
+                Cp=0)
 
             rel_errors = relative_errors(params, cov)
 
@@ -464,74 +471,6 @@ def fit_local_thermal_unfolding_to_signal_lst(
 
     return Tms, dHs, predicted_lst
 
-
-def fit_local_thermal_unfolding_to_signal_lst_exponential(
-        signal_lst,
-        temp_lst,
-        t_melting_init,
-        aNs,
-        aUs,
-        cNs,
-        cUs,
-        alphaNs,
-        alphaUs):
-
-    predicted_lst = []
-    Tms = []
-    dHs = []
-
-    i = 0
-    for s, t in zip(signal_lst, temp_lst):
-
-        p0 = np.array([
-            t_melting_init[i],
-            85.0,
-            aNs[i],
-            aUs[i],
-            cNs[i],
-            cUs[i],
-            alphaNs[i],
-            alphaUs[i]
-        ])
-
-        low_bounds = p0.copy()
-        high_bounds = p0.copy()
-
-        low_bounds[0] = np.min(t)
-        high_bounds[0] = np.max(t) + 15
-
-        low_bounds[1]  = 10
-        high_bounds[1] = 500
-
-        low_bounds[2:6] = -np.inf
-        low_bounds[6:]  = 0
-
-        high_bounds[2:] = np.inf
-
-        try:
-
-            params, cov, predicted = fit_thermal_unfolding_exponential(
-                [t], [s],
-                p0, low_bounds, high_bounds,
-                signal_two_state_t_unfolding_monomer_exponential,
-                0)
-
-            rel_errors = relative_errors(params, cov)
-
-            if rel_errors[0] < 50 and rel_errors[1] < 50:
-                Tms.append(params[0])
-                dHs.append(params[1])
-
-            predicted_lst.append(predicted[0])
-
-        except:
-
-
-            pass
-
-        i += 1
-
-    return Tms, dHs, predicted_lst
 
 def re_arrange_predictions(predicted_lst, n_signals, n_denaturants):
 

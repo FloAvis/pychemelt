@@ -10,7 +10,8 @@ from .utils.math import (
 )
 
 from .utils.signals import (
-    signal_two_state_tc_unfolding_monomer
+    signal_two_state_tc_unfolding,
+    signal_two_state_t_unfolding
 )
 
 from .utils.plotting import (

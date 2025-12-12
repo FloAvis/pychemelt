@@ -19,7 +19,10 @@ def test_plot_unfolding():
     assert isinstance(fig, go.Figure)
 
     sample.expand_multiple_signal()
-    sample.estimate_baseline_parameters(poly_order_native=2, poly_order_unfolded=2)
+    sample.estimate_baseline_parameters(
+        native_baseline_type='quadratic',
+        unfolded_baseline_type='quadratic'
+    )
     sample.estimate_derivative()
     sample.guess_Tm()
     sample.n_residues = 130
