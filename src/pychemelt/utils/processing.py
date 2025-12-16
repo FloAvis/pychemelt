@@ -49,9 +49,6 @@ def set_param_bounds(p0,param_names):
 
     for i,p in enumerate(param_names):
 
-        if 'intercept' in p:
-            low_bounds[i] = 0
-
         if 'exponential_coefficient' in p:
             low_bounds[i] = 0
 

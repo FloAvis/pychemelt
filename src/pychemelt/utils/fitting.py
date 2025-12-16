@@ -11,14 +11,8 @@ fit_exponential_robust - to fit an exponential to xy data
 fit_thermal_unfolding - to fit unfolding curves with a shared Tm, and DH but different baselines and slopes.
 No denaturant concentration is taken into account
 
-fit_thermal_unfolding_exponential - to fit unfolding curves with a shared Tm and DH, but different baselines and exponential terms.
-No denaturant concentration is taken into account
-
 fit_tc_unfolding_single_slopes - to fit unfolding curves with shared Tm, DH, Cp and m.
 The curves can still have different baseline and slopes
-
-fit_tc_unfolding_single_slopes_exponential - to fit unfolding curves with shared Tm, DH, Cp and m.
-The curves can still have different baselines
 
 fit_tc_unfolding_shared_slopes_many_signals - to fit unfolding curves with shared Tm, DH, Cp and m.
 The slope terms are shared. The intercepts can be different.
@@ -881,6 +875,25 @@ def fit_tc_unfolding_many_signals(
 
     def unfolding(dummyVariable, *args):
 
+        """
+        The parameters order is as follows:
+
+            Tm, Dh, Cp0 and m-value
+
+            Intercept folded
+            Intercept unfolded
+
+            Temperature slope or term pre-exponential factor folded
+            Temperature slope term or pre-exponential factor unfolded
+
+            Denaturant slope term folded
+            Denaturant slope term unfolded
+
+            Quadratic coefficient or exponential coefficient folded
+            Quadratic coefficient or exponential coefficient unfolded
+
+        """
+
         if cp_value is not None:
 
             Cp0 = cp_value
@@ -898,11 +911,13 @@ def fit_tc_unfolding_many_signals(
         else:
             m1 = 0
 
+        # Intercept parameters
         p2_Ns = args[id_param_init:id_param_init + n_signals]
         p2_Us = args[id_param_init + n_signals:id_param_init + 2 * n_signals]
 
         id_param_init = id_param_init + 2 * n_signals
 
+        # Temperature slope or pre-exponential parameters
         if baseline_native_params[1]:
 
             p3_Ns = args[id_param_init:id_param_init + n_signals]
@@ -919,6 +934,7 @@ def fit_tc_unfolding_many_signals(
         else:
             p3_Us = [0] * n_signals
 
+        # Denaturant slope parameters
         if baseline_native_params[0]:
 
             p1_Ns = args[id_param_init:id_param_init + n_signals]
@@ -937,6 +953,7 @@ def fit_tc_unfolding_many_signals(
 
             p1_Us = [0] * n_signals
 
+        # Temperature-dependent quadratic or exponential coefficients
         if baseline_native_params[2]:
 
             p4_Ns = args[id_param_init:id_param_init + n_signals]
@@ -1028,7 +1045,8 @@ def evaluate_need_to_refit(
         check_cp=True,
         check_dh=True,
         check_tm=True,
-        fixed_cp=False):
+        fixed_cp=False,
+        threshold=0.05):
 
     """
     Check and expand parameter bounds when fitted parameters are too close to boundaries.
@@ -1046,6 +1064,8 @@ def evaluate_need_to_refit(
     fit_m1 : bool, optional
     check_cp, check_dh, check_tm : bool, optional
     fixed_cp : bool, optional
+    threshold : float, optional
+        Threshold to compare if the fitted parameters are too close to the boundaries
 
     Returns
     -------
@@ -1133,18 +1153,123 @@ def evaluate_need_to_refit(
 
         id_start += 1
 
+    difference_to_upper = np.array([np.abs((a-b)/a) if a != np.inf and a != 0  else np.inf for a, b in zip(high_bounds[id_start:], global_fit_params[id_start:])])
+    difference_to_lower = np.array([np.abs((a-b)/a) if b != -np.inf and a != 0 else np.inf for a, b in zip(global_fit_params[id_start:], low_bounds[id_start:])])
+
     # Evaluate all the other parameters
-    for i in range(id_start,len(global_fit_params)):
+    for i in (range(len(global_fit_params)-id_start)):
 
-        diff_to_high = high_bounds[i] - global_fit_params[i]
-        diff_to_low  = global_fit_params[i] - low_bounds[i]
+        diff_to_high_i = difference_to_upper[i]
+        diff_to_low_i = difference_to_lower[i]
 
-        if diff_to_high < 0.5:
-            high_bounds[i] = high_bounds[i] + 50
+        if diff_to_high_i < threshold:
+
+            value = high_bounds[i+id_start]
+
+            high_bounds[i+id_start] = value * 50 if value > 0 else value / 50
             re_fit = True
 
-        if diff_to_low < 0.5:
-            low_bounds[i] = low_bounds[i] - 50
+        if diff_to_low_i < threshold:
+
+            value = low_bounds[i+id_start]
+            low_bounds[i+id_start] = value * 50 if value < 0 else value / 50
             re_fit = True
 
     return re_fit, p0, low_bounds, high_bounds
+
+def evaluate_fitting_and_refit(
+        global_fit_params,
+        cov,
+        predicted,
+        high_bounds,
+        low_bounds,
+        p0,
+        fit_m_dep,
+        limited_cp,
+        limited_dh,
+        limited_tm,
+        fixed_cp,
+        kwargs,
+        fit_fx,
+        n = 3):
+
+    """
+    Evaluate if the fitted parameters are too close to the fitting boundaries.
+    If they are, re-fit with new expanded boundaries
+
+    Parameters
+    ----------
+    global_fit_params: array-like
+        fitted parameters
+    cov: array-like
+        covariance matrix of the fitted parameters
+    predicted: list
+        list of lists with the fitted values
+    high_bounds: array-like
+        upper bounds of the fitting parameters
+    low_bounds: array-like
+        lower bounds of the fitting parameters
+    p0: array-like
+        initial guess for the fitting parameters
+    fit_m_dep: boolean
+        if the m-dependence on temperature is fitted
+    limited_cp: boolean
+        if the cp bounds are user-defined
+    limited_dh: boolean
+        if the DH bounds are user-defined
+    limited_tm: boolean
+        if the Tm values are user-defined
+    fixed_cp: boolean
+        if the cp value is fixed
+    kwargs: dict
+        dictionary with the arguments for the fitting function
+    fit_fx: callable
+        function to perform the fitting
+    n: int, optional
+        number of times to re-fit
+
+    Returns
+    -------
+    global_fit_params: array-like
+        fitted parameters
+    cov: array-like
+        covariance matrix of the fitted parameters
+    predicted: list
+        list of lists with the fitted values
+    p0: array-like
+        initial guess for the fitting parameters
+    low_bounds: array-like
+        lower bounds of the fitting parameters
+    high_bounds: array-like
+        higher bounds of the fitting parameters
+    """
+
+    for _ in range(n):
+
+        re_fit, p0_new, low_bounds_new, high_bounds_new = evaluate_need_to_refit(
+            global_fit_params,
+            high_bounds,
+            low_bounds,
+            p0,
+            fit_m1=fit_m_dep,
+            check_cp=not limited_cp,
+            check_dh=not limited_dh,
+            check_tm=not limited_tm,
+            fixed_cp=fixed_cp
+        )
+
+        if re_fit:
+
+            p0, low_bounds, high_bounds = p0_new, low_bounds_new, high_bounds_new
+
+            kwargs['initial_parameters'] = p0
+            kwargs['low_bounds'] = low_bounds
+            kwargs['high_bounds'] = high_bounds
+
+            global_fit_params, cov, predicted = fit_fx(**kwargs)
+
+        else:
+
+            break
+
+    return global_fit_params, cov, predicted, p0, low_bounds, high_bounds

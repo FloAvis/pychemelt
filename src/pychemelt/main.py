@@ -907,6 +907,7 @@ class Sample:
         if self.limited_tm:
 
             tm_lower, tm_upper = tm_limits
+
         else:
 
             tm_lower = p0[0] - 12
@@ -1029,33 +1030,21 @@ class Sample:
 
             global_fit_params, cov, predicted = fit_fx(**kwargs)
 
-        for _ in range(3):
-
-            re_fit, p0_new, low_bounds_new, high_bounds_new = evaluate_need_to_refit(
-                global_fit_params,
-                high_bounds,
-                low_bounds,
-                p0,
-                fit_m1=fit_m_dep,
-                check_cp=not self.limited_cp,
-                check_dh=not self.limited_dh,
-                check_tm=not self.limited_tm,
-                fixed_cp=self.fixed_cp
-            )
-
-            if re_fit:
-
-                p0, low_bounds, high_bounds = p0_new, low_bounds_new, high_bounds_new
-
-                kwargs['initial_parameters'] = p0
-                kwargs['low_bounds'] = low_bounds
-                kwargs['high_bounds'] = high_bounds
-
-                global_fit_params, cov, predicted = fit_fx(**kwargs)
-
-            else:
-
-                break
+        global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
+            global_fit_params,
+            cov,
+            predicted,
+            high_bounds,
+            low_bounds,
+            p0,
+            fit_m_dep,
+            self.limited_cp,
+            self.limited_dh,
+            self.limited_tm,
+            self.fixed_cp,
+            kwargs,
+            fit_fx,
+        )
 
         rel_errors = relative_errors(global_fit_params, cov)
 
@@ -1240,33 +1229,21 @@ class Sample:
 
         global_fit_params, cov, predicted = fit_fx(**kwargs)
 
-        for _ in range(3):
-
-            re_fit, p0_new, low_bounds_new, high_bounds_new = evaluate_need_to_refit(
-                global_fit_params,
-                high_bounds,
-                low_bounds,
-                p0,
-                fit_m1=self.fit_m_dep,
-                check_cp=not self.limited_cp,
-                check_dh=not self.limited_dh,
-                check_tm=not self.limited_tm,
-                fixed_cp=self.fixed_cp
-            )
-
-            if re_fit:
-
-                p0, low_bounds, high_bounds = p0_new, low_bounds_new, high_bounds_new
-
-                kwargs['initial_parameters'] = p0
-                kwargs['low_bounds'] = low_bounds
-                kwargs['high_bounds'] = high_bounds
-
-                global_fit_params, cov, predicted = fit_fx(**kwargs)
-
-            else:
-
-                break
+        global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
+            global_fit_params,
+            cov,
+            predicted,
+            high_bounds,
+            low_bounds,
+            p0,
+            self.fit_m_dep,
+            self.limited_cp,
+            self.limited_dh,
+            self.limited_tm,
+            self.fixed_cp,
+            kwargs,
+            fit_fx,
+        )
 
         rel_errors = relative_errors(global_fit_params, cov)
 
@@ -1517,54 +1494,6 @@ class Sample:
         kwargs['list_of_temperatures'] = self.temp_lst_expanded
 
         global_fit_params, cov, predicted = fit_fx(**kwargs)
-
-        """
-        n_correction_params = self.nr_den - 1
-        
-        if model_scale_factor:
-            last_id = -n_correction_params
-        else:
-            last_id = len(global_fit_params)
-
-        for _ in range(3):
-
-            if model_scale_factor:
-                cf_guess = global_fit_params[-n_correction_params:]
-                low_bounds_cf = low_bounds[-n_correction_params:]
-                high_bounds_cf = high_bounds[-n_correction_params:]
-
-            re_fit, p0_new, low_bounds_new, high_bounds_new = evaluate_need_to_refit(
-                global_fit_params[:last_id],
-                high_bounds[:last_id],
-                low_bounds[:last_id],
-                p0[:last_id],
-                fit_m1=self.fit_m_dep,
-                check_cp=not self.limited_cp,
-                check_dh=not self.limited_dh,
-                check_tm=not self.limited_tm,
-                fixed_cp=self.fixed_cp
-            )
-
-            if model_scale_factor:
-
-                p0_new = np.concatenate((p0_new, cf_guess))
-                low_bounds_new = np.concatenate((low_bounds_new, low_bounds_cf))
-                high_bounds_new = np.concatenate((high_bounds_new, high_bounds_cf))
-
-            if re_fit:
-
-                p0, low_bounds, high_bounds = p0_new, low_bounds_new, high_bounds_new
-
-                kwargs['initial_parameters'] = p0
-                kwargs['low_bounds'] = low_bounds
-                kwargs['high_bounds'] = high_bounds
-
-                global_fit_params, cov, predicted = fit_fx(**kwargs)
-
-            else:
-
-                break
-        """
 
         # Remove scale factors that are not significant
         if model_scale_factor:

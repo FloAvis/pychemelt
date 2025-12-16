@@ -11,11 +11,11 @@ M1_VAL = 0
 
 INTERCEPT_N = 100
 PRE_EXP_N = 1
-C_N_VAL = 0
+C_N_VAL = 1
 ALPHA_N_VAL = 0.1
 INTERCEPT_U = 110
 PRE_EXP_U = 1
-C_U_VAL = 0
+C_U_VAL = 1
 ALPHA_U_VAL = 0.2
 
 PARAMS = [Tm_VAL,DHm_VAL,CP0_VAL,M0_VAL,M1_VAL,INTERCEPT_N,INTERCEPT_U,C_N_VAL,C_U_VAL,ALPHA_N_VAL,ALPHA_U_VAL,PRE_EXP_N,PRE_EXP_U]
@@ -187,10 +187,10 @@ def test_evaluate_need_to_refit_m1():
 def test_evaluate_need_to_refit_other_params():
 
     upp_bounds_in = UPP_BOUNDS.copy()
-    upp_bounds_in[6:] = [x + 0.1 for x in PARAMS[6:]]
+    upp_bounds_in[6:] = [x + 0.001 for x in PARAMS[6:]]
 
     low_bounds_in = LOW_BOUNDS.copy()
-    low_bounds_in[6:] = [x - 0.1 for x in PARAMS[6:]]
+    low_bounds_in[6:] = [x - 0.001 for x in PARAMS[6:]]
 
     re_fit, p0, low_bounds_out, upp_bounds_out = evaluate_need_to_refit(
         PARAMS,
@@ -208,6 +208,6 @@ def test_evaluate_need_to_refit_other_params():
 
     for i in range(6,len(PARAMS)):
 
-        assert low_bounds_out[i] == low_bounds_in[i] - 50
-        assert upp_bounds_out[i] == upp_bounds_in[i] + 50
+        assert low_bounds_out[i] == low_bounds_in[i] / 50
+        assert upp_bounds_out[i] == upp_bounds_in[i] * 50
 
