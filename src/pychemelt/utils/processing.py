@@ -49,10 +49,13 @@ def set_param_bounds(p0,param_names):
 
     for i,p in enumerate(param_names):
 
-        if 'exponential_coefficient' in p:
-            low_bounds[i] = 0
+        c1 = 'intercept' in p and 'native' in p
+        c2 = 'exponential_coefficient' in p
+        c3 = 'pre_exponential_factor' in p
+        c4 = low_bounds[i] < 0
 
-        if 'pre_exponential_factor' in p:
+        if (c1 or c2 or c3) and c4:
+
             low_bounds[i] = 0
 
     return low_bounds, high_bounds
