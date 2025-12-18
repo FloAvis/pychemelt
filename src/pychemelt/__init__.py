@@ -6,7 +6,11 @@ from .main import Sample
 
 from .utils.math import (
     get_rss,
-    shift_temperature
+    shift_temperature,
+    constant_baseline,
+    linear_baseline,
+    quadratic_baseline,
+    exponential_baseline
 )
 
 from .utils.signals import (
@@ -17,6 +21,7 @@ from .utils.signals import (
 from .utils.plotting import (
     plot_unfolding
 )
+
 
 from .utils.fitting import (
     fit_line_robust,
