@@ -924,10 +924,8 @@ class Sample:
         if self.limited_dh:
 
             dh_lower, dh_upper = dh_limits
-            # Verify that the initial guess is within the user-defined limits
-            if self.thermodynamic_params_guess is not None:
 
-                p0[1] = adjust_value_to_interval(p0[1], dh_lower, dh_upper, 1)
+            p0[1] = adjust_value_to_interval(p0[1], dh_lower, dh_upper, 1)
 
         else:
 
