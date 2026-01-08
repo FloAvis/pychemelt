@@ -1,7 +1,7 @@
 import plotly.graph_objs as go
 
 from pychemelt.utils.plotting import plot_unfolding
-from pychemelt import Sample
+from pychemelt import Monomer as Sample
 
 def test_plot_unfolding():
 

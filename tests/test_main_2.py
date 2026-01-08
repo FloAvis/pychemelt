@@ -4,7 +4,7 @@ The order of the tests is important, as some functions depend on the previous on
 """
 import numpy as np
 
-from pychemelt import Sample
+from pychemelt import Monomer as Sample
 from pychemelt.utils.signals import signal_two_state_tc_unfolding
 
 from pychemelt.utils.math import quadratic_baseline

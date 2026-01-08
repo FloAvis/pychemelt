@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import pytest
 
-from pychemelt import Sample
+from pychemelt import Monomer as Sample
 
 sample = Sample()
 

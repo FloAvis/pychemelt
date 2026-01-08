@@ -5,7 +5,7 @@ The order of the tests is important, as some functions depend on the previous on
 import numpy as np
 import pytest
 
-from pychemelt import Sample
+from pychemelt import Monomer as Sample
 
 sample = Sample()
 
