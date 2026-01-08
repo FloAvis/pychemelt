@@ -3,14 +3,74 @@ This module contains helper functions for mathematical operations
 Author: Osvaldo Burastero
 """
 
+
 import numpy as np
 
 from .constants  import Tref_cst
-from scipy.signal       import savgol_filter
+from scipy.signal  import savgol_filter
 
-temperature_to_kelvin  = lambda T: T + 273.15 if np.max(T) < 270 else T
-temperature_to_celsius = lambda T: T - 273.15 if np.max(T) > 270 else T
-shift_temperature      = lambda T: temperature_to_kelvin(T) - Tref_cst
+__all__ = [
+    "temperature_to_kelvin",
+    "temperature_to_celsius",
+    "shift_temperature",
+    "constant_baseline",
+    "linear_baseline",
+    "quadratic_baseline",
+    "exponential_baseline",
+    "is_evenly_spaced",
+    "first_derivative_savgol",
+    "relative_errors",
+    "find_line_outliers",
+    "get_rss"
+]
+
+def temperature_to_kelvin(T):
+    """
+    Convert temperature from Celsius to Kelvin if necessary.
+
+    Parameters
+    ----------
+    T : array-like
+        Temperature values
+
+    Returns
+    -------
+    array-like
+        Temperature values in Kelvin
+    """
+    return T + 273.15 if np.max(T) < 270 else T
+
+def temperature_to_celsius(T):
+    """
+    Convert temperature from Kelvin to Celsius if necessary.
+
+    Parameters
+    ----------
+    T : array-like
+        Temperature values
+
+    Returns
+    -------
+    array-like
+        Temperature values in Celsius
+    """
+    return T - 273.15 if np.max(T) > 270 else T
+
+def shift_temperature(T):
+    """
+    Shift temperature to be relative to Tref_cst in Kelvin.
+
+    Parameters
+    ----------
+    T : array-like
+        Temperature values
+
+    Returns
+    -------
+    array-like
+        Shifted temperature values
+    """
+    return temperature_to_kelvin(T) - Tref_cst
 
 def constant_baseline(dt,d,den_slope,a,*args):
 

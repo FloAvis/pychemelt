@@ -11,6 +11,14 @@ from .processing import (
     combine_sequences
 )
 
+__all__ = [
+    "PlotConfig",
+    "AxisConfig",
+    "LayoutConfig",
+    "LegendConfig",
+    "plot_unfolding"
+]
+
 @dataclass
 class PlotConfig:
     """General plot configuration"""

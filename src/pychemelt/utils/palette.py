@@ -5,6 +5,8 @@ A perceptually uniform color map that is readable by those with colorblindness.
 Contains hex color values transitioning from dark purple to yellow.
 """
 
+__all__ = ['VIRIDIS']
+
 VIRIDIS = [
      '#440154', '#450457', '#46085c', '#460b5e', '#471063', '#471365', '#481769', '#481b6d', '#481d6f', '#482173',
      '#482475', '#482878', '#472c7a', '#472e7c', '#46327e', '#463480', '#453882', '#443a83', '#433e85', '#424186',

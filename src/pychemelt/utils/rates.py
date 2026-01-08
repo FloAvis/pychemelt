@@ -14,8 +14,14 @@ This is because unfolding functions for oligomers require the protein concentrat
 
 """
 
-from ..utils.math import *
-from ..utils.constants    import *
+import numpy as np
+
+from .math import (
+    temperature_to_kelvin,
+    shift_temperature
+)
+
+from .constants import R_gas
 
 def eq_constant_thermo(T,DH1,T1,Cp):
 

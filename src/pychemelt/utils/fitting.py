@@ -1,25 +1,6 @@
 """
 This module contains helper functions to fit unfolding data
 Author: Osvaldo Burastero
-
-The functions description is below:
-
-fit_line_robust - to fit a line to xy data
-fit_line_robust_quadratic - to fit a quadratic to xy data
-fit_exponential_robust - to fit an exponential to xy data
-
-fit_thermal_unfolding - to fit unfolding curves with a shared Tm, and DH but different baselines and slopes.
-No denaturant concentration is taken into account
-
-fit_tc_unfolding_single_slopes - to fit unfolding curves with shared Tm, DH, Cp and m.
-The curves can still have different baseline and slopes
-
-fit_tc_unfolding_shared_slopes_many_signals - to fit unfolding curves with shared Tm, DH, Cp and m.
-The slope terms are shared. The intercepts can be different.
-
-fit_tc_unfolding_many_signals - to fit unfolding curves with shared Tm, DH, Cp and m.
-The slope terms are shared. The intercepts are defined by global parameters.
-
 """
 
 import numpy as np
@@ -27,6 +8,16 @@ from scipy.optimize     import curve_fit
 from scipy.optimize     import least_squares
 
 from .math import get_rss
+
+__all__ = [
+    "fit_line_robust",
+    "fit_quadratic_robust",
+    "fit_exponential_robust",
+    "fit_thermal_unfolding",
+    "fit_tc_unfolding_single_slopes",
+    "fit_tc_unfolding_shared_slopes_many_signals",
+    "fit_tc_unfolding_many_signals"
+]
 
 def baseline_fx_name_to_req_params(baseline_fx_name):
 
