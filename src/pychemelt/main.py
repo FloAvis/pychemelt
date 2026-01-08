@@ -6,15 +6,66 @@ The current model assumes the protein is a monomer and that the unfolding is rev
 import pandas as pd
 import numpy as np
 
-from .utils.signals import *
-from .utils.fitting import *
-from .utils.files import *
-from .utils.math import *
-
 from itertools import chain
-
 from copy import deepcopy
 
+from .utils.files  import (
+
+    detect_file_type,
+    load_nanoDSF_xlsx,
+    load_panta_xlsx,
+    load_uncle_multi_channel,
+    load_thermofluor_xlsx,
+    load_quantstudio_txt,
+    load_mx3005p_txt,
+    load_supr_dsf,
+    load_csv_file,
+    load_aunty_xlsx
+
+)
+
+from .utils.math  import (
+    temperature_to_celsius,
+    is_evenly_spaced,
+    first_derivative_savgol,
+    constant_baseline,
+    linear_baseline,
+    quadratic_baseline,
+    exponential_baseline
+)
+
+from .utils.processing import (
+    subset_data,
+    guess_Tm_from_derivative,
+    clean_conditions_labels,
+    subset_signal_by_temperature,
+    estimate_signal_baseline_params
+)
+
+from .utils.signals import signal_two_state_tc_unfolding
+
+from .utils.math    import (
+    temperature_to_kelvin,
+    relative_errors,
+    find_line_outliers
+)
+
+from .utils.processing import (
+    fit_local_thermal_unfolding_to_signal_lst,
+    set_param_bounds,
+    adjust_value_to_interval,
+    re_arrange_params,
+    re_arrange_predictions
+)
+
+from .utils.fitting import (
+    fit_line_robust,
+    fit_tc_unfolding_single_slopes,
+    fit_tc_unfolding_shared_slopes_many_signals,
+    fit_tc_unfolding_many_signals,
+    evaluate_fitting_and_refit,
+    baseline_fx_name_to_req_params
+)
 
 class Sample:
     """
@@ -100,7 +151,8 @@ class Sample:
             'quantstudio': load_quantstudio_txt,
             'mx3005p': load_mx3005p_txt,
             'supr': load_supr_dsf,
-            'csv': load_csv_file
+            'csv': load_csv_file,
+            'aunty': load_aunty_xlsx
         }
 
         read_fx = read_fx_map.get(file_type)

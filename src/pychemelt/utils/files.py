@@ -21,7 +21,22 @@ import json
 from openpyxl import load_workbook
 from xlrd     import open_workbook
 
-from ..utils.processing import *
+from collections import Counter
+
+from .processing import *
+
+__all__ = [
+    "load_csv_file",
+    "load_aunty_xlsx",
+    "load_quantstudio_txt",
+    "load_thermofluor_xlsx",
+    "load_nanoDSF_xlsx",
+    "load_panta_xlsx",
+    "load_uncle_multi_channel",
+    "load_mx3005p_txt",
+    "detect_file_type",
+    "detect_encoding"
+]
 
 def get_sheet_names_of_xlsx(filepath):
     """
@@ -50,6 +65,61 @@ def get_sheet_names_of_xlsx(filepath):
         sheetnames = xls.sheet_names()
 
     return sheetnames
+
+def file_is_of_type_aunty(file_path):
+
+    """
+    Detect if file is an AUNTY xlsx file.
+
+    The AUNTY format contains multiple sheets where the first column is
+    temperatures and subsequent columns are fluorescence values. The first
+    row contains the word 'wavelength' and the second row contains the word
+    'temperature' in the first column.
+
+    Args:
+        file_path (str): Path to the .xls or .xlsx file to test.
+
+    Returns:
+        bool: True if the file matches the AUNTY format heuristic, False otherwise.
+    """
+
+    if not (file_path.endswith('.xls') or file_path.endswith('.xlsx')):
+        return False
+
+    sheet_names = get_sheet_names_of_xlsx(file_path)
+
+    for sheet_name in sheet_names:
+
+        # Load the data
+        data = pd.read_excel(
+            file_path, sheet_name=sheet_name,
+            header=None,skiprows=0)
+
+        try:
+
+            wavelength_cell = data.iloc[0, 1]
+            temperature_cell = data.iloc[1, 0]
+            corner_cell = data.iloc[0, 0]
+
+            # Verify that the word wavelength is in the first row, second column
+            condition1 = isinstance(wavelength_cell, str) and 'wavelength' in wavelength_cell.lower()
+
+            # Verify that the word temperature is in the second row, first column
+            condition2 = isinstance(temperature_cell, str) and 'temperature' in temperature_cell.lower()
+
+            # Verify that the corner cell is empty (NaN)
+            condition3 = np.isnan(corner_cell)
+
+            if not (condition1 and condition2 and condition3):
+                continue
+
+            return True
+
+        except:
+
+            file_is_aunty = False
+
+    return file_is_aunty
 
 def file_is_of_type_uncle(xlsx_file):
 
@@ -124,6 +194,8 @@ def detect_file_type(file):
             return 'panta'
         elif file_is_of_type_uncle(file):
             return 'uncle'
+        elif file_is_of_type_aunty(file):
+            return 'aunty'
         else:
             return 'prometheus'
 
@@ -141,6 +213,80 @@ def detect_file_type(file):
     # Return an error if no extension is found
     raise ValueError(f'File extension not recognized: {file_extension}')
 
+def load_aunty_xlsx(file_path):
+
+    """
+    Load AUNTY-format multi-sheet Excel file where each sheet is a condition.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the AUNTY xlsx file
+    """
+    # Get the names of the sheets
+    sheet_names = get_sheet_names_of_xlsx(file_path)
+
+    wavelengths       = None
+    temperatures      = []
+
+    conditions        = []
+    signals_data      = []
+
+    signal_data_dic = {}
+    temp_data_dic   = {}
+
+    for sheet_name in sheet_names:
+
+        # Load the data
+        data = pd.read_excel(
+            file_path, sheet_name=sheet_name,
+            header=None,skiprows=0
+            )
+
+        wavelength_cell = data.iloc[0, 1]
+        temperature_cell = data.iloc[1, 0]
+        corner_cell = str(data.iloc[0, 0])
+
+        # Verify that the word wavelength is in the first row, second column
+        condition1 = isinstance(wavelength_cell, str) and 'wavelength' in wavelength_cell.lower()
+
+        # Verify that the word temperature is in the second row, first column
+        condition2 = isinstance(temperature_cell, str) and 'temperature' in temperature_cell.lower()
+        
+        # Verify that the corner cell is empty (NaN)
+        condition3 = corner_cell == '' or corner_cell.lower() == 'nan'
+
+        if not (condition1 and condition2 and condition3):
+            continue
+
+        signal_data  = np.array(data.iloc[2:, 1:]).astype(float)
+
+        if wavelengths is None:
+
+            wavelengths    = np.round(np.array(data.iloc[1, 1:]).astype(float),2)
+
+        temperature_data   = np.round(np.array(data.iloc[2:, 0]).astype(float), 2)
+
+        signals_data.append(signal_data)
+        temperatures.append(temperature_data)
+        conditions.append(sheet_name)
+
+
+    # Now we have one signal matrix per condition, but we need one signal matrix per wavelength, with
+    # the conditions as columns
+    # Therefore, for each wavelength, we create one dataframe per condition and then merge them
+
+    named_wls = [str(wl) + ' nm' for wl in wavelengths]
+
+    for i, named_wl in enumerate(named_wls):
+
+        signal_data_as_list = [arr[:,i] for arr in signals_data]
+
+        signal_data_dic[named_wl] = signal_data_as_list
+        temp_data_dic[named_wl]   = temperatures
+
+    return signal_data_dic, temp_data_dic, conditions, named_wls   
+
 def detect_encoding(file_path):
 
     """
@@ -157,16 +303,15 @@ def detect_encoding(file_path):
         Detected encoding or the string 'Unknown encoding'
     """
 
-    encodings = ["utf-8", "latin1", "iso-8859-1", "cp1252"]
-    for enc in encodings:
-        try:
-            with codecs.open(file_path, encoding=enc, errors="strict") as f:
-                f.read()
-            return enc
-        except UnicodeDecodeError:
-            continue
-
-    return "Unknown encoding"
+    try:
+        with codecs.open(file_path, encoding="utf-8", errors="strict") as f:
+            f.read()
+        return 'utf-8'
+    
+    except:
+        with codecs.open(file_path, encoding="latin1", errors="strict") as f:
+            f.read()
+        return 'latin1'
 
 def find_indexes_of_non_signal_conditions(signal_data,conditions):
 

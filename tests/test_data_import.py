@@ -16,7 +16,9 @@ from pychemelt.utils.files import (
     load_panta_xlsx,
     load_uncle_multi_channel,
     load_mx3005p_txt,
-    load_supr_dsf
+    load_supr_dsf,
+    load_aunty_xlsx,
+    file_is_of_type_aunty
 )
 
 nDSF_file = "./test_files/nDSFdemoFile.xlsx"
@@ -30,6 +32,9 @@ quantStudio_file = "./test_files/quantStudio.txt"
 MX3005P_file = "./test_files/MX3005P.txt"
 csv_file = "./test_files/melting-scan.csv"
 csv_file_2 = "./test_files/melting-scan_format_2.csv"
+
+aunty_file = "./test_files/AUNTY_multi_channel.xlsx"
+
 
 def test_get_sheet_names_of_xlsx():
     sheet_names = get_sheet_names_of_xlsx(nDSF_file)
@@ -65,6 +70,7 @@ def test_detect_file_type():
     assert detect_file_type(supr_file) == 'supr'
     assert detect_file_type(panta_file) == 'panta'
     assert detect_file_type(nDSF_file) == 'prometheus'
+    assert detect_file_type(aunty_file) == 'aunty'
     assert detect_file_type('file.csv') == 'csv'
 
 def test_error_on_unknown_file_type():
@@ -73,17 +79,20 @@ def test_error_on_unknown_file_type():
         detect_file_type('./test_files/empty_file.noformat')
 
 def test_detect_encoding():
+
     assert detect_encoding(MX3005P_file) == 'utf-8'
+
+    assert detect_encoding('./test_files/test_latin1.bin') == 'latin1'
 
 def test_load_two_cols_csv():
 
-    signal_data_dic, temp_data_dic, conditions, signals = load_csv_file('./test_files/two_cols.csv')
+    _, _, conditions, _ = load_csv_file('./test_files/two_cols.csv')
 
     assert len(conditions) == 1
 
 def test_load_many_cols_csv():
 
-    signal_data_dic, temp_data_dic, conditions, signals = load_csv_file('./test_files/many_cols.csv')
+    _, _, conditions, _ = load_csv_file('./test_files/many_cols.csv')
 
     assert len(conditions) > 1
 
@@ -158,7 +167,7 @@ def test_load_nanoDSF_xlsx():
 
 def test_load_pant_xlsx_format_2():
 
-    signal_data_dic, temp_data_dic, conditions, signals = load_panta_xlsx(panta_file_2)
+    _, _, _, signals = load_panta_xlsx(panta_file_2)
 
     assert signals[0] == 'Ratio'
 
@@ -202,3 +211,18 @@ def test_load_supr_dsf():
     assert len(signal_data_dic['310.5 nm']) == 384
     assert len(temp_data_dic['310.5 nm']) == 384
 
+def test_load_aunty_multi_channel():
+
+    assert not file_is_of_type_aunty(MX3005P_file)
+    assert not file_is_of_type_aunty(uncle_file)
+    assert not file_is_of_type_aunty(nDSF_file)
+
+
+    signal_data_dic, temp_data_dic, conditions, signals = load_aunty_xlsx(aunty_file)
+
+    assert signals[0] == '250.0 nm'
+    assert conditions[0] == 'E2'
+    assert len(conditions) == 1
+
+    assert len(temp_data_dic['250.0 nm'][0]) == 31 # there are 31 temperature points
+    assert len(signal_data_dic['250.0 nm'][-1]) == 31 # there are 31 temperature points
