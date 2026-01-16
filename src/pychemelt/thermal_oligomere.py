@@ -1,6 +1,10 @@
 """
 Main class to handle thermal denaturation data of mono- and oligomeres
 The current model assumes the proteins' unfolding is reversible
+TODO: 
+- check out necessary data loading and if it fits, need to know data shape for adjustment
+- adjust ThermalOligomere to its new purpose
+- implement new fittings inspired by chirakit structure
 """
 
 import pandas as pd
@@ -37,9 +41,9 @@ from .utils.fitting import (
     baseline_fx_name_to_req_params
 )
 
-class Monomer(Sample):
+class ThermalOligomere(Sample):
     """
-    Class to hold the data of a single sample and fit it
+    Class to hold the data of a DSF experiment of themal unfoldign with different concentrations of oligomeres
     """
 
     def __init__(self, name='Test'):
@@ -50,10 +54,10 @@ class Monomer(Sample):
         self.thermodynamic_params_guess = None
         self.nr_den = 0  # Number of denaturant concentrations
 
-    def set_denaturant_concentrations(self, concentrations=None):
+    def set_concentrations(self, concentrations=None):
 
         """
-        Set the denaturant concentrations for the sample
+        Set the oligomere concentrations for the sample 
 
         Parameters
         ----------
