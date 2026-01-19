@@ -52,7 +52,7 @@ class ThermalOligomere(Sample):
 
         self.fit_m_dep = False  # Fit the temperature dependence of the m-value
         self.thermodynamic_params_guess = None
-        self.nr_den = 0  # Number of denaturant concentrations
+        self.nr_den = 0  # Number of oligomere concentrations
 
     def set_concentrations(self, concentrations=None):
 
@@ -62,17 +62,17 @@ class ThermalOligomere(Sample):
         Parameters
         ----------
         concentrations : list, optional
-            List of denaturant concentrations. If None, use the sample conditions
+            List of oligomere concentrations. If None, use the sample conditions
 
         Notes
         -----
-        Creates/updates attribute `denaturant_concentrations_pre` (numpy.ndarray)
+        Creates/updates attribute `oligomere_concentrations_pre` (numpy.ndarray)
         """
 
         if concentrations is None:
             concentrations = self.conditions
 
-        self.denaturant_concentrations_pre = np.array(concentrations)
+        self.oligomere_concentrations_pre = np.array(concentrations)
 
         return None
 
@@ -95,15 +95,15 @@ class ThermalOligomere(Sample):
         -----
         Creates/updates several attributes used by downstream fitting:
         - signal_lst_multiple, temp_lst_multiple : lists of lists with selected data
-        - denaturant_concentrations : list of selected denaturant concentrations
-        - denaturant_concentrations_expanded : flattened numpy array matching expanded signals
+        - oligomere_concentrations : list of selected oligomere concentrations
+        - oligomere_concentrations_expanded : flattened numpy array matching expanded signals
         - boolean_lst, normalise_to_global_max, nr_den : control flags/values
         """
 
         if boolean_lst is None:
             self.signal_lst_multiple = self.signal_lst_pre_multiple
             self.temp_lst_multiple = self.temp_lst_pre_multiple
-            self.denaturant_concentrations = self.denaturant_concentrations_pre
+            self.oligomere_concentrations = self.oligomere_concentrations_pre
         else:
 
             self.signal_lst_multiple = [None for _ in range(len(self.signal_lst_pre_multiple))]
@@ -114,7 +114,7 @@ class ThermalOligomere(Sample):
                                                boolean_lst[j]]
                 self.temp_lst_multiple[i] = [x for j, x in enumerate(self.temp_lst_pre_multiple[i]) if boolean_lst[j]]
 
-            self.denaturant_concentrations = [x for i, x in enumerate(self.denaturant_concentrations_pre) if
+            self.oligomere_concentrations = [x for i, x in enumerate(self.oligomere_concentrations_pre) if
                                               boolean_lst[i]]
 
         if normalise_to_global_max:
@@ -125,20 +125,64 @@ class ThermalOligomere(Sample):
             for i in range(len(self.signal_lst_multiple)):
                 self.signal_lst_multiple[i] = [x / global_max * 100 for x in self.signal_lst_multiple[i]]
 
-        self.nr_den = len(self.denaturant_concentrations)
+        self.nr_den = len(self.oligomere_concentrations)
 
-        # Expand the number of denaturant concentrations to match the number of signals
-        denaturant_concentrations = [self.denaturant_concentrations for _ in range(self.nr_signals)]
+        # Expand the number of oligomere concentrations to match the number of signals
+        oligomere_concentrations = [self.oligomere_concentrations for _ in range(self.nr_signals)]
 
-        self.denaturant_concentrations_expanded = np.concatenate(denaturant_concentrations, axis=0)
+        self.oligomere_concentrations_expanded = np.concatenate(oligomere_concentrations, axis=0)
 
         self.boolean_lst = boolean_lst
         self.normalise_to_global_max = normalise_to_global_max
 
-        self.denaturant_concentrations = np.array(self.denaturant_concentrations)
+        self.oligomere_concentrations = np.array(self.oligomere_concentrations)
 
         return None
 
+    def guess_Tm(self, x1=6, x2=11):
+
+        """
+        Guess the Tm of the sample using the derivative of the signal
+
+        Parameters
+        ----------
+        x1 : float, optional
+            Shift from the minimum and maximum temperature to estimate the median of the initial and final baselines
+        x2 : float, optional
+            Shift from the minimum and maximum temperature to estimate the median of the initial and final baselines
+
+        Notes
+        -----
+        Method was overwritten from parent class Sample
+
+        x2 must be greater than x1.
+
+        This method creates/updates attributes:
+        - t_melting_init_multiple : list of initial Tm guesses per signal
+        - t_melting_df_multiple : list of pandas.DataFrame objects with Tm vs Oligomere concentration
+        """
+
+        self.t_melting_init_multiple = []
+        self.t_melting_df_multiple = []
+
+        for i in range(len(self.signal_lst_multiple)):
+            t_melting_init = guess_Tm_from_derivative(
+                self.temp_deriv_lst_multiple[i],
+                self.deriv_lst_multiple[i],
+                x1,
+                x2
+            )
+            # Create a dataframe of the Tm values versus the oligomere concentrations
+            t_melting_df = pd.DataFrame({
+                'Tm': t_melting_init,
+                'Oligomere Concentration': self.oligomere_concentrations
+            })
+
+            self.t_melting_df_multiple.append(t_melting_df)
+
+            self.t_melting_init_multiple.append(t_melting_init)
+
+        return None
 
     def fit_thermal_unfolding_local(self):
 
@@ -385,16 +429,16 @@ class ThermalOligomere(Sample):
 
         p0 = np.concatenate([p0, self.first_param_Ns_expanded, self.first_param_Us_expanded])
 
-        # We need to append as many bN and bU as the number of denaturant concentrations
+        # We need to append as many bN and bU as the number of oligomere concentrations
         # times the number of signal types
         for signal in self.signal_names:
 
-            params_names += (['intercept_native - ' + str(self.denaturant_concentrations[i]) +
+            params_names += (['intercept_native - ' + str(self.oligomere_concentrations[i]) +
                               ' - ' + str(signal) for i in range(self.nr_den)])
 
         for signal in self.signal_names:
 
-            params_names += (['intercept_unfolded - ' + str(self.denaturant_concentrations[i]) +
+            params_names += (['intercept_unfolded - ' + str(self.oligomere_concentrations[i]) +
                               ' - ' + str(signal) for i in range(self.nr_den)])
 
         if self.native_baseline_type in ['linear', 'quadratic','exponential']:
@@ -404,7 +448,7 @@ class ThermalOligomere(Sample):
             p0 = np.concatenate([p0, self.second_param_Ns_expanded])
 
             for signal in self.signal_names:
-                params_names += ([param_name + ' - ' + str(self.denaturant_concentrations[i]) +
+                params_names += ([param_name + ' - ' + str(self.oligomere_concentrations[i]) +
                                   ' - ' + str(signal) for i in range(self.nr_den)])
 
         if self.unfolded_baseline_type in ['linear', 'quadratic','exponential']:
@@ -414,7 +458,7 @@ class ThermalOligomere(Sample):
             p0 = np.concatenate([p0, self.second_param_Us_expanded])
 
             for signal in self.signal_names:
-                params_names += ([param_name + ' - ' + str(self.denaturant_concentrations[i]) +
+                params_names += ([param_name + ' - ' + str(self.oligomere_concentrations[i]) +
                                   ' - ' + str(signal) for i in range(self.nr_den)])
 
         if self.native_baseline_type in ['quadratic', 'exponential']:
@@ -424,7 +468,7 @@ class ThermalOligomere(Sample):
             p0 = np.concatenate([p0, self.third_param_Ns_expanded])
             for signal in self.signal_names:
 
-                params_names += ([param_name + ' - ' + str(self.denaturant_concentrations[i]) +
+                params_names += ([param_name + ' - ' + str(self.oligomere_concentrations[i]) +
                                   ' - ' + str(signal) for i in range(self.nr_den)])
 
         if self.unfolded_baseline_type in ['quadratic', 'exponential']:
@@ -435,7 +479,7 @@ class ThermalOligomere(Sample):
 
             for signal in self.signal_names:
 
-                params_names += ([param_name + ' - ' + str(self.denaturant_concentrations[i]) +
+                params_names += ([param_name + ' - ' + str(self.oligomere_concentrations[i]) +
                                   ' - ' + str(signal) for i in range(self.nr_den)])
 
         low_bounds = (p0.copy())
@@ -522,7 +566,7 @@ class ThermalOligomere(Sample):
         self.expand_multiple_signal()
 
         kwargs = {
-            'denaturant_concentrations' : self.denaturant_concentrations_expanded,
+            'oligomere_concentrations' : self.oligomere_concentrations_expanded,
             'initial_parameters': p0,
             'low_bounds' : low_bounds,
             'high_bounds' : high_bounds,
@@ -690,7 +734,7 @@ class ThermalOligomere(Sample):
         low_bounds = np.concatenate([low_bounds, low_bounds_p1Ns, low_bounds_p1Us])
         high_bounds = np.concatenate([high_bounds, high_bounds_p1Ns, high_bounds_p1Us])
 
-        # Baselines are still independent for each signal and denaturant concentration
+        # Baselines are still independent for each signal and oligomere concentration
         # Slopes and quadratic terms are shared - per signal only
 
         if self.native_baseline_type in ['linear', 'quadratic','exponential']:
@@ -739,7 +783,7 @@ class ThermalOligomere(Sample):
 
         kwargs = {
 
-            'denaturant_concentrations': self.denaturant_concentrations_expanded,
+            'oligomere_concentrations': self.oligomere_concentrations_expanded,
             'list_of_temperatures': self.temp_lst_expanded_subset,
             'list_of_signals': self.signal_lst_expanded_subset,
             'initial_parameters': p0,
@@ -816,7 +860,7 @@ class ThermalOligomere(Sample):
         Parameters
         ----------
         model_scale_factor : bool, optional
-            If True, model a scale factor for each denaturant concentration
+            If True, model a scale factor for each oligomere concentration
 
         Notes
         -----
@@ -850,15 +894,15 @@ class ThermalOligomere(Sample):
 
         for p1Ns, p1Us in zip(p1Ns_per_signal, p1Us_per_signal):
 
-            # Estimate the slope of bNs versus denaturant concentration
-            m1, b1 = fit_line_robust(self.denaturant_concentrations, p1Ns)
+            # Estimate the slope of bNs versus oligomere concentration
+            m1, b1 = fit_line_robust(self.oligomere_concentrations, p1Ns)
             m1_low = m1 / 100 if m1 > 0 else 100 * m1
             m1_high = 100 * m1 if m1 > 0 else m1 / 100
             b1_low = b1 / 100 if b1 > 0 else 100 * b1
             b1_high = 100 * b1 if b1 > 0 else b1 / 100
 
-            # Estimate the slope of bUs versus denaturant concentration
-            m2, b2 = fit_line_robust(self.denaturant_concentrations, p1Us)
+            # Estimate the slope of bUs versus oligomere concentration
+            m2, b2 = fit_line_robust(self.oligomere_concentrations, p1Us)
             m2_low = m2 / 100 if m2 > 0 else 100 * m2
             m2_high = 100 * m2 if m2 > 0 else m2 / 100
             b2_low = b2 / 100 if b2 > 0 else 100 * b2
@@ -905,8 +949,8 @@ class ThermalOligomere(Sample):
             idx += self.nr_signals
             params_names += [param_name + ' - ' + signal_name for signal_name in self.signal_names]
 
-        params_names += ['denaturant_slope_term_native - ' + signal_name for signal_name in self.signal_names]
-        params_names += ['denaturant_slope_term_unfolded - ' + signal_name for signal_name in self.signal_names]
+        params_names += ['oligomere_slope_term_native - ' + signal_name for signal_name in self.signal_names]
+        params_names += ['oligomere_slope_term_unfolded - ' + signal_name for signal_name in self.signal_names]
 
         if self.native_baseline_type in ['quadratic', 'exponential']:
 
@@ -966,8 +1010,8 @@ class ThermalOligomere(Sample):
         # Find index in the param names
         for signal_name in self.signal_names:
 
-            c_N_name = 'denaturant_slope_term_native - ' + signal_name
-            c_U_name = 'denaturant_slope_term_unfolded - ' + signal_name
+            c_N_name = 'oligomere_slope_term_native - ' + signal_name
+            c_U_name = 'oligomere_slope_term_unfolded - ' + signal_name
 
             c_N_idx = params_names.index(c_N_name)
             c_U_idx = params_names.index(c_U_name)
@@ -978,9 +1022,9 @@ class ThermalOligomere(Sample):
             low_bounds[c_U_idx] -= 5
             high_bounds[c_U_idx] += 5
 
-        # If required, include a scale factor for each denaturant concentration
+        # If required, include a scale factor for each oligomere concentration
         if model_scale_factor:
-            # The last denaturant concentration is fixed to 1, the rest are fitted
+            # The last oligomere concentration is fixed to 1, the rest are fitted
             scale_factors = [1 for _ in range(self.nr_den - 1)]
             scale_factors_low = [0.5882 for _ in range(self.nr_den - 1)]
             scale_factors_high = [1.7 for _ in range(self.nr_den - 1)]
@@ -990,7 +1034,7 @@ class ThermalOligomere(Sample):
             high_bounds = np.concatenate([high_bounds, scale_factors_high])
 
             params_names += ['Scale factor - ' + str(d) + ' (M). ID: ' + str(i) for
-                             i, d in enumerate(self.denaturant_concentrations)]
+                             i, d in enumerate(self.oligomere_concentrations)]
 
             params_names.pop()  # Remove the last one, as it is fixed to 1
 
@@ -1002,7 +1046,7 @@ class ThermalOligomere(Sample):
             'list_of_temperatures' : self.temp_lst_expanded_subset,
             'list_of_signals' : self.signal_lst_expanded_subset,
             'signal_ids' : self.signal_ids,
-            'denaturant_concentrations': self.denaturant_concentrations_expanded,
+            'oligomere_concentrations': self.oligomere_concentrations_expanded,
             'initial_parameters': p0,
             'low_bounds': low_bounds,
             'high_bounds': high_bounds,
@@ -1149,7 +1193,7 @@ class ThermalOligomere(Sample):
 
     def signal_to_df(self, signal_type='raw', scaled=False):
         """
-        Create a dataframe with three columns: Temperature, Signal, and Denaturant.
+        Create a dataframe with three columns: Temperature, Signal, and Oligomere.
         Optimized for speed by avoiding per-curve DataFrame creation.
 
         Parameters
@@ -1161,7 +1205,7 @@ class ThermalOligomere(Sample):
             If True and signal_type == 'fitted' or 'raw', use the scaled versions if available.
         """
 
-        # Flatten all arrays and repeat denaturant values accordingly
+        # Flatten all arrays and repeat oligomere values accordingly
 
         if signal_type == 'derivative':
 
@@ -1212,11 +1256,11 @@ class ThermalOligomere(Sample):
                 signal_all = np.concatenate(signal_lst)
 
         denat_all = np.concatenate([
-            np.full_like(temp_lst[i], self.denaturant_concentrations[i], dtype=np.float64)
+            np.full_like(temp_lst[i], self.oligomere_concentrations[i], dtype=np.float64)
             for i in range(len(temp_lst))
         ])
 
-        # Add an ID column, so we can identify the curves, even with the same denaturant concentration
+        # Add an ID column, so we can identify the curves, even with the same oligomere concentration
         id_all = np.concatenate([
             np.full_like(temp_lst[i], i, dtype=np.int32)
             for i in range(len(temp_lst))
@@ -1225,7 +1269,7 @@ class ThermalOligomere(Sample):
         signal_df = pd.DataFrame({
             'Temperature': temp_all,
             'Signal': signal_all,
-            'Denaturant': denat_all,
+            'Oligomere': denat_all,
             'ID': id_all
         })
 
