@@ -15,7 +15,13 @@ from copy import deepcopy
 
 from .main import Sample
 
-from .utils.signals import signal_two_state_tc_unfolding
+from .utils.signals import (
+    signal_two_state_t_unfolding,
+    two_state_thermal_unfold_curve_dimer,
+    two_state_thermal_unfold_curve_trimer,
+    two_state_thermal_unfold_curve_tetramer,
+    map_two_state_model_to_signal_fx,
+)
 
 from .utils.math import (
     temperature_to_kelvin,
@@ -24,7 +30,7 @@ from .utils.math import (
 )
 
 from .utils.processing import (
-    fit_local_thermal_unfolding_to_signal_lst,
+    fit_oligomere_local_thermal_unfolding_to_signal_lst,
     set_param_bounds,
     adjust_value_to_interval,
     re_arrange_params,
@@ -34,12 +40,14 @@ from .utils.processing import (
 
 from .utils.fitting import (
     fit_line_robust,
-    fit_tc_unfolding_single_slopes,
+    fit_oligomere_unfolding_single_slopes,
     fit_tc_unfolding_shared_slopes_many_signals,
     fit_tc_unfolding_many_signals,
     evaluate_fitting_and_refit,
     baseline_fx_name_to_req_params
 )
+
+
 
 class ThermalOligomere(Sample):
     """
@@ -53,6 +61,40 @@ class ThermalOligomere(Sample):
         self.fit_m_dep = False  # Fit the temperature dependence of the m-value
         self.thermodynamic_params_guess = None
         self.nr_den = 0  # Number of oligomere concentrations
+        self.model = None
+
+    def set_model(self, model_name):
+
+        """
+        Set thermodynamic model of oligomere used for the analysis.
+        Currently supported are 2 state models of monomeres, dimers, trimeres and tetrameres
+
+        Parameters
+        ----------
+        model_name : str
+            name of the used model. Can be: "Monomer", "Dimer", "Trimer", "Tetramer".
+            Case insensitive
+
+        Notes
+        -----
+        This method creates/updates the following attributes on the instance:
+        - self.model: oligomeric model used for analysis
+        """
+
+        allowed_models = ["monomer", "dimer", "trimer", "tetramer"]
+
+        model = model_name.lower()
+
+        if model not in allowed_models:
+            raise ValueError(
+            f"Invalid model '{model_name}'. "
+            f"Allowed models are: {', '.join(m.capitalize() for m in allowed_models)}."
+        )
+
+        # Save model with first letter uppercase
+        self.model = model.capitalize()
+
+        return None
 
     def set_concentrations(self, concentrations=None):
 
@@ -203,9 +245,10 @@ class ThermalOligomere(Sample):
 
         for i in range(len(self.signal_lst_multiple)):
 
-            Tms, dHs, predicted_lst = fit_local_thermal_unfolding_to_signal_lst(
+            Tms, dHs, predicted_lst = fit_oligomere_local_thermal_unfolding_to_signal_lst(
                 self.signal_lst_multiple[i],
                 self.temp_lst_multiple[i],
+                self.oligomere_concentrations[i],
                 self.t_melting_init_multiple[i],
                 self.first_param_Ns_per_signal[i],
                 self.first_param_Us_per_signal[i],
@@ -214,7 +257,8 @@ class ThermalOligomere(Sample):
                 self.third_param_Ns_per_signal[i],
                 self.third_param_Us_per_signal[i],
                 baseline_native_fx=self.baseline_N_fx,
-                baseline_unfolded_fx=self.baseline_U_fx
+                baseline_unfolded_fx=self.baseline_U_fx,
+                model=self.model
             )
 
             self.Tms_multiple.append(Tms)
@@ -296,6 +340,9 @@ class ThermalOligomere(Sample):
         self.Cp0 = Cp0
 
         return None
+    
+    """
+    Not currently necessary and so not adjusted for oligomere use
 
     def guess_initial_parameters(
             self,
@@ -340,6 +387,7 @@ class ThermalOligomere(Sample):
             self.set_temperature_range(self.user_min_temp, self.user_max_temp)
 
         return None
+    """
 
     def create_dg_df(self):
 
@@ -565,6 +613,8 @@ class ThermalOligomere(Sample):
         # Populate the expanded signal and temperature lists
         self.expand_multiple_signal()
 
+        signal_fx = map_two_state_model_to_signal_fx(self.model)
+
         kwargs = {
             'oligomere_concentrations' : self.oligomere_concentrations_expanded,
             'initial_parameters': p0,
@@ -573,10 +623,10 @@ class ThermalOligomere(Sample):
             'cp_value' : cp_value,
             'baseline_native_fx' : self.baseline_N_fx,
             'baseline_unfolded_fx' : self.baseline_U_fx,
-            'signal_fx' : signal_two_state_tc_unfolding
+            'signal_fx' : signal_fx
         }
 
-        fit_fx = fit_tc_unfolding_single_slopes
+        fit_fx = fit_oligomere_unfolding_single_slopes
 
         # Do a quick prefit with a reduced data set
         if self.pre_fit:
@@ -594,24 +644,6 @@ class ThermalOligomere(Sample):
 
         # First fit without m-value dependence on temperature
         global_fit_params, cov, predicted = fit_fx(**kwargs)
-
-        # Insert the initial estimate for the m-value dependence of temperature, in the position 4
-        if fit_m_dep:
-
-            kwargs['fit_m1'] = fit_m_dep
-
-            p0 = global_fit_params
-            p0 = np.insert(p0, id_m+1, 0)
-            low_bounds = np.insert(low_bounds, id_m+1, -0.5)
-            high_bounds = np.insert(high_bounds, id_m+1, 0.5)
-
-            kwargs['initial_parameters'] = p0
-            kwargs['low_bounds'] = low_bounds
-            kwargs['high_bounds'] = high_bounds
-
-            params_names.insert(id_m+1, 'm - T dependence')
-
-            global_fit_params, cov, predicted = fit_fx(**kwargs)
 
         global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
             global_fit_params,

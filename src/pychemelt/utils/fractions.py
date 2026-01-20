@@ -3,8 +3,28 @@ This module contains helper functions to obtain the amount of folded/intermediat
 Author: Osvaldo Burastero
 """
 
+import numpy as np
+
+from .math import (
+    solve_one_root_quadratic,
+    solve_one_root_depressed_cubic,
+)
+
+from .rates import (
+    eq_constant_thermo,
+    eq_constant_termochem,
+)
+
 __all__ = [
-    "fn_two_state_monomer"
+    "fn_two_state_monomer",
+    "fu_two_state_dimer",
+    "fu_two_state_trimer",
+    "fu_two_state_tetramere",
+    "two_state_rev_unfolding_fractions",
+    "two_state_dimer_unfolding_fractions",
+    "two_state_trimer_unfolding_fractions",
+    "two_state_tetramer_unfolding_fractions",
+    "map_two_state_model_to_fractions_fx",
 ]
 
 def fn_two_state_monomer(K):
@@ -67,3 +87,57 @@ def fu_two_state_tetramer(K,C):
     fu = x4_sel*np.nan_to_num(x4,nan=0.0)
 
     return fu
+
+
+def two_state_rev_unfolding_fractions(T,DHm,Tm,extra_arg,Cp=0):
+
+    K  = eq_constant_thermo(T,DHm,Tm,Cp) 
+    fn = fn_two_state_monomer(K)
+
+    return {'Native': fn, 'Unfolded': (1-fn)}
+
+def two_state_dimer_unfolding_fractions(T,DH1,T1,C,Cp=0):
+
+    """
+    N2 ⇔ 2U   where C is the total concentration (M) of the protein in dimer equivalent.
+    """
+
+    K  = eq_constant_thermo(T,DH1,T1,Cp)
+    fu = fu_two_state_dimer(K,C)
+
+    return {'Native dimer':(1-fu), 'Unfolded monomer':fu}
+
+def two_state_trimer_unfolding_fractions(T,DH1,T1,C,Cp=0):
+
+    """
+    N3 ⇔ 3U   
+    C is the total concentration (M) of the protein in trimer equivalent.
+    """
+
+    K  = eq_constant_thermo(T,DH1,T1,Cp)
+    fu = fu_two_state_trimer(K,C)
+
+    return {'Native trimer':(1-fu), 'Unfolded monomer':fu}
+
+def two_state_tetramer_unfolding_fractions(T,DH1,T1,C,Cp=0):
+
+    """
+    N4 ⇔ 4U   C is the total concentration (M) of the protein in tetramer equivalent.
+    """
+
+    K  = eq_constant_thermo(T,DH1,T1,Cp)
+    fu = fu_two_state_tetramer(K,C)
+
+    return {'Native tetramer':(1-fu), 'Unfolded monomer':fu}
+
+
+def map_two_state_model_to_fractions_fx(model):
+
+    fractions_fx_map = {
+    'Monomer':  two_state_rev_unfolding_fractions,
+    'Dimer':    two_state_dimer_unfolding_fractions,
+    'Trimer':   two_state_trimer_unfolding_fractions,
+    'Tetramer': two_state_tetramer_unfolding_fractions
+    }
+
+    return fractions_fx_map.get(model)
