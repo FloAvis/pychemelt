@@ -41,7 +41,7 @@ rng = np.random.default_rng(RNG_SEED)
 
 def_params = {
     'DHm': DHm_VAL,
-    'Tm': Tm_VAL,
+    'Tm': Tm_VAL+273.15,
     'Cp0': CP0_VAL,
     'm0': M0_VAL,
     'm1': M1_VAL,
@@ -62,12 +62,13 @@ concs = CONCS
 
 # Calculate signal range for proper y-axis scaling
 temp_range  = np.linspace(TEMP_START, TEMP_STOP, N_TEMPS)
+temp_range_K = temp_range + 273.15
 signal_list = []
 temp_list   = []
 
 for D in concs:
 
-    y = signal_two_state_tc_unfolding(temp_range, D, **def_params)
+    y = signal_two_state_tc_unfolding(temp_range_K, D, **def_params)
 
     # Add gaussian error to signal
     y += rng.normal(0, 0.005, len(y))
@@ -243,4 +244,4 @@ def test_fit_tc_unfolding_many_signals_exponential():
         **kwargs
     )
 
-    np.testing.assert_allclose(global_fit_params[:4], p0[:4], rtol=0.1, atol=1e-2)
+    np.testing.assert_allclose(global_fit_params[:4], [Tm_VAL,DHm_VAL,M0_VAL,M1_VAL], rtol=0.1, atol=1e-2)

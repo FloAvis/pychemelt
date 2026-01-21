@@ -59,7 +59,7 @@ rng = np.random.default_rng(RNG_SEED)
 
 params = {
     'DHm': DHm_VAL,
-    'Tm': Tm_VAL,
+    'Tm': Tm_VAL+273.15,
     'Cp0': CP0_VAL,
     'm0': M0_VAL,
     'm1': M1_VAL,
@@ -89,6 +89,7 @@ concs = CONCS
 
 # Calculate signal range for proper y-axis scaling
 temp_range = np.linspace(TEMP_START, TEMP_STOP, N_TEMPS)
+temp_range_K = temp_range + 273.15
 signal_list = []
 signal_list_2 = [] # Signal where the temperature dependence is removed
 signal_list_3 = [] # Signal where the denaturant concentration dependence is removed
@@ -96,9 +97,9 @@ temp_list   = []
 
 for D in concs:
 
-    y = signal_two_state_tc_unfolding(temp_range, D, **params)
-    y2 = signal_two_state_tc_unfolding(temp_range,D,**params_no_temp_slopes)
-    y3 = signal_two_state_tc_unfolding(temp_range,D,**params_no_den_slopes)
+    y = signal_two_state_tc_unfolding(temp_range_K, D, **params)
+    y2 = signal_two_state_tc_unfolding(temp_range_K,D,**params_no_temp_slopes)
+    y3 = signal_two_state_tc_unfolding(temp_range_K,D,**params_no_den_slopes)
 
     # Add gaussian error to signal
     y += rng.normal(0, 0.01, len(y))
@@ -330,6 +331,47 @@ def test_fit_tc_unfolding_single_slopes():
     # Verify the fitting
     np.testing.assert_allclose(global_fit_params[:3], expected, rtol=0.1, atol=0)
 
+def test_compare_curve_fit_to_least_squares():
+
+    # Tm, Dh, Cp, m0
+    initial_parameters = [Tm_VAL,DHm_VAL,CP0_VAL,M0_VAL] + [1]*(len(concs)*6) # Times six, because of bN, bU, kN, kU, qN, qU
+    low_bounds = [TEMP_START,TEMP_START,0,0] + [-np.inf]*(len(concs)*6)
+    high_bounds = [TEMP_STOP,200,5,5] + [np.inf]*(len(concs)*6)
+
+    kwargs = {
+        'list_of_temperatures':temp_list,
+        'list_of_signals':signal_list,
+        'denaturant_concentrations':concs,
+        'signal_fx':signal_two_state_tc_unfolding,
+        'baseline_native_fx':quadratic_baseline,
+        'baseline_unfolded_fx':quadratic_baseline
+    }
+
+    global_fit_params_cf, cov_cf, predicted_lst = fit_tc_unfolding_single_slopes(
+            initial_parameters=initial_parameters,
+            low_bounds=low_bounds,
+            high_bounds=high_bounds,
+            method='curve_fit',
+            **kwargs
+    )
+
+    global_fit_params_sq, cov_sq, predicted_lst = fit_tc_unfolding_single_slopes(
+            initial_parameters=initial_parameters,
+            low_bounds=low_bounds,
+            high_bounds=high_bounds,
+            method='least_sq',
+            **kwargs
+    )
+
+    # Assert covariance matrix are close
+    np.testing.assert_allclose(global_fit_params_cf, global_fit_params_sq, rtol=0.01, atol=0)
+
+    stable_indices = [0,1,2,3]  # example: Tm, ΔH, m0
+    np.testing.assert_allclose(
+        np.sqrt(np.diag(cov_cf))[stable_indices],
+        np.sqrt(np.diag(cov_sq))[stable_indices],
+        rtol=0.1
+    )
 
 def test_fit_tc_unfolding_shared_slopes_many_signals():
 

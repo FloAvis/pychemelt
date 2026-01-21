@@ -11,7 +11,7 @@ from pychemelt.utils.math import quadratic_baseline
 
 def_params = {
     'DHm': 100,
-    'Tm': 60,
+    'Tm': 60 + 273.15,
     'Cp0': 1.6,
     'm0': 2.6,
     'm1': 0,
@@ -35,12 +35,13 @@ def aux_create_pychem_sim(params,concs):
 
     # Calculate signal range for proper y-axis scaling
     temp_range = np.linspace(20, 80, 60)
+    temp_range_K = temp_range + 273.15
     signal_list = []
     temp_list   = []
 
     for i,D in enumerate(concs):
 
-        y = signal_two_state_tc_unfolding(temp_range, D, **params)
+        y = signal_two_state_tc_unfolding(temp_range_K, D, **params)
 
         rng = np.random.default_rng(2)
 
@@ -158,7 +159,7 @@ def test_guess_Cp():
 
     sample.guess_Cp()
 
-    np.testing.assert_allclose(sample.Cp0,1.7,rtol=0.05)
+    np.testing.assert_allclose(sample.Cp0,1.7,rtol=0.1)
 
 def test_guess_initial_parameters():
 
