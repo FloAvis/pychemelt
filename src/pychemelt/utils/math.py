@@ -6,9 +6,8 @@ Author: Osvaldo Burastero
 
 import numpy as np
 
-from .constants  import Tref_cst
+from .constants    import Tref_cst
 from scipy.signal  import savgol_filter
-from numba import njit
 
 __all__ = [
     "temperature_to_kelvin",
@@ -89,7 +88,6 @@ def shift_temperature_K(T):
     """
     return T - Tref_cst
 
-@njit(cache=True)
 def constant_baseline(dt,d,den_slope,a,*args):
 
     """
@@ -114,7 +112,6 @@ def constant_baseline(dt,d,den_slope,a,*args):
 
     return a + den_slope * d
 
-@njit(cache=True)
 def linear_baseline(dt,d,den_slope,a,b,*args):
 
     """
@@ -141,7 +138,6 @@ def linear_baseline(dt,d,den_slope,a,b,*args):
 
     return a + b*dt + den_slope * d
 
-@njit(cache=True)
 def quadratic_baseline(dt,d,den_slope,a,b,c):
 
     """
@@ -170,7 +166,6 @@ def quadratic_baseline(dt,d,den_slope,a,b,c):
 
     return a + b*dt + c*dt**2 + den_slope * d
 
-@njit(cache=True)
 def exponential_baseline(dt,d,den_slope,a,c,alpha):
 
     """
