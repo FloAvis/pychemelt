@@ -527,12 +527,12 @@ def fit_thermal_unfolding_oligomere(
             p3_U = p3_Us[i]
 
             y = signal_fx(
-                T, Tm, dh,
-                p1_N, p2_N, p3_N,
-                p1_U, p2_U, p3_U,
+                T, oligo_conc, Tm, dh,
+                0, p1_N, p2_N, p3_N,
+                0, p1_U, p2_U, p3_U,
                 baseline_native_fx,
                 baseline_unfolded_fx,
-                Cp, C=oligo_conc,
+                Cp
             )
             signal.append(y)
 

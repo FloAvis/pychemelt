@@ -331,7 +331,7 @@ def get_rss(y, y_fit):
 
 def solve_one_root_quadratic(a,b,c):
     """
-    Solution to one root quadratic: a * X**2 + b * X + c
+    Solution to one root quadratic: a * X**2 + b * X + c = 0
     
     Parameters
     ----------
@@ -351,7 +351,7 @@ def solve_one_root_quadratic(a,b,c):
 
 def solve_one_root_depressed_cubic(p,q):
     """
-    Solution to one root depressed cubic: X**3 + pq + q = 0
+    Solution to one root depressed cubic: X**3 + p * X + q = 0
     
     Parameters
     ----------

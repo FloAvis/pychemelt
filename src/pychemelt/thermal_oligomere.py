@@ -16,10 +16,6 @@ from copy import deepcopy
 from .main import Sample
 
 from .utils.signals import (
-    signal_two_state_t_unfolding,
-    two_state_thermal_unfold_curve_dimer,
-    two_state_thermal_unfold_curve_trimer,
-    two_state_thermal_unfold_curve_tetramer,
     map_two_state_model_to_signal_fx,
 )
 
@@ -30,6 +26,7 @@ from .utils.math import (
 )
 
 from .utils.processing import (
+    guess_Tm_from_derivative,
     fit_oligomere_local_thermal_unfolding_to_signal_lst,
     set_param_bounds,
     adjust_value_to_interval,
@@ -51,7 +48,7 @@ from .utils.fitting import (
 
 class ThermalOligomere(Sample):
     """
-    Class to hold the data of a DSF experiment of themal unfoldign with different concentrations of oligomeres
+    Class to hold the data of a DSF experiment of themal unfolding with different concentrations of oligomeres
     """
 
     def __init__(self, name='Test'):
