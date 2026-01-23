@@ -22,12 +22,10 @@ from .utils.signals import (
 from .utils.math import (
     temperature_to_kelvin,
     relative_errors,
-    find_line_outliers
 )
 
 from .utils.processing import (
     guess_Tm_from_derivative,
-    fit_oligomere_local_thermal_unfolding_to_signal_lst,
     set_param_bounds,
     adjust_value_to_interval,
     re_arrange_params,
@@ -180,50 +178,7 @@ class ThermalOligomer(Sample):
 
         return None
 
-    '''
-    def fit_thermal_unfolding_local(self):
-
-        """
-        Fit the thermal unfolding of the sample using the signal and temperature data
-        We fit one curve at a time, with individual parameters
-        """
-
-        # Require self.t_melting_init_multiple
-        if self.t_melting_init_multiple is None:
-
-            self.estimate_derivative()
-            self.guess_Tm()
-
-        self.Tms_multiple = []
-        self.dHs_multiple = []
-        self.predicted_lst_multiple = []
-
-        for i in range(len(self.signal_lst_multiple)):
-
-            Tms, dHs, predicted_lst = fit_oligomere_local_thermal_unfolding_to_signal_lst(
-                self.signal_lst_multiple[i],
-                self.temp_lst_multiple[i],
-                self.oligomere_concentrations[i],
-                self.t_melting_init_multiple[i],
-                self.first_param_Ns_per_signal[i],
-                self.first_param_Us_per_signal[i],
-                self.second_param_Ns_per_signal[i],
-                self.second_param_Us_per_signal[i],
-                self.third_param_Ns_per_signal[i],
-                self.third_param_Us_per_signal[i],
-                baseline_native_fx=self.baseline_N_fx,
-                baseline_unfolded_fx=self.baseline_U_fx,
-                model=self.model
-            )
-
-            self.Tms_multiple.append(Tms)
-            self.dHs_multiple.append(dHs)
-            self.predicted_lst_multiple.append(predicted_lst)
-
-        self.single_fit_done = True
-
-        return None
-    '''
+    
     def guess_Cp(self):
 
         """
@@ -250,53 +205,7 @@ class ThermalOligomer(Sample):
 
         return None
     
-    """
-    Not currently necessary and so not adjusted for oligomere use
-
-    def guess_initial_parameters(
-            self,
-            native_baseline_type,
-            unfolded_baseline_type,
-            window_range_native=12,
-            window_range_unfolded=12
-    ):
-
-        # We will use the Ratio signal, if available, to estimate the initial parameters
-        use_ratio = 'Ratio' in self.signals and self.signal_names[0] != 'Ratio'
-
-        if use_ratio:
-
-            current_signal = self.signal_names[0]
-
-            # Extract temperature limits
-            self.set_signal('Ratio')
-            self.select_conditions(self.boolean_lst, normalise_to_global_max=True)
-            self.set_temperature_range(self.user_min_temp, self.user_max_temp)
-
-        # Fit the data using the linear - constant option
-        self.estimate_baseline_parameters(
-            native_baseline_type,
-            unfolded_baseline_type,
-            window_range_native,
-            window_range_unfolded
-        )
-
-        self.fit_thermal_unfolding_local()
-        self.guess_Cp()
-
-        # Apply a first fitting round to obtain initial estimates for the thermodynamic parameters
-        self.fit_thermal_unfolding_global()
-
-        self.thermodynamic_params_guess = self.global_fit_params[:4]
-
-        if use_ratio:
-            # Go back to the original signal
-            self.set_signal(current_signal)
-            self.select_conditions(self.boolean_lst, normalise_to_global_max=self.normalise_to_global_max)
-            self.set_temperature_range(self.user_min_temp, self.user_max_temp)
-
-        return None
-    """
+    
 
     def create_dg_df(self):
 
