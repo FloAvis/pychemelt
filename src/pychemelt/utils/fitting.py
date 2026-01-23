@@ -7,6 +7,8 @@ import numpy as np
 from scipy.optimize     import curve_fit
 from scipy.optimize     import least_squares
 
+from .math import temperature_to_kelvin
+
 from .math import get_rss
 
 __all__ = [
@@ -380,6 +382,8 @@ def fit_thermal_unfolding(
 
     return global_fit_params, cov, predicted_lst
 
+
+'''
 def fit_thermal_unfolding_oligomere(
     list_of_temperatures, 
     list_of_signals,
@@ -452,7 +456,6 @@ def fit_thermal_unfolding_oligomere(
 
             - Global melting temperature
             - Global enthalpy of unfolding
-            - Concentration of Oligomere
             - Single intercepts, folded
             - Single intercepts, unfolded
             - Single slopes or pre-exp terms, folded
@@ -469,12 +472,14 @@ def fit_thermal_unfolding_oligomere(
         """
 
         n_datasets = len(list_of_temperatures)
-        Tm, dh, oligo_conc     = args[:3]  # Temperature of melting, Enthalpy of unfolding
+        Tm, dh     = args[:2]  # Temperature of melting, Enthalpy of unfolding
 
-        intercepts_folded   = args[3:(3 + n_datasets)]
-        intercepts_unfolded = args[(3 + n_datasets):(3 + n_datasets * 2)]
+        Tm = temperature_to_kelvin(Tm)
 
-        id_param_init = (3 + n_datasets * 2)
+        intercepts_folded   = args[2:(2 + n_datasets)]
+        intercepts_unfolded = args[(2 + n_datasets):(2 + n_datasets * 2)]
+
+        id_param_init = (2 + n_datasets * 2)
         n_params      = n_datasets
 
         if baseline_native_params[0]:
@@ -516,6 +521,8 @@ def fit_thermal_unfolding_oligomere(
         signal = []
 
         for i, T in enumerate(list_of_temperatures):
+            
+            T = temperature_to_kelvin(T)
 
             p1_N = intercepts_folded[i]
             p1_U = intercepts_unfolded[i]
@@ -525,6 +532,8 @@ def fit_thermal_unfolding_oligomere(
 
             p3_N = p3_Ns[i]
             p3_U = p3_Us[i]
+
+            oligo_conc = oligomere_concentration
 
             y = signal_fx(
                 T, oligo_conc, Tm, dh,
@@ -555,6 +564,8 @@ def fit_thermal_unfolding_oligomere(
         init += n
 
     return global_fit_params, cov, predicted_lst
+'''
+
 
 def fit_tc_unfolding_single_slopes(
         list_of_temperatures,
@@ -852,6 +863,8 @@ def fit_oligomere_unfolding_single_slopes(
 
             Tm = tm_value
 
+        Tm = temperature_to_kelvin(Tm)
+
         if dh_value is None:
 
             DHm = args[id_param_init]  # Enthalpy of unfolding
@@ -896,6 +909,8 @@ def fit_oligomere_unfolding_single_slopes(
         signal = []
 
         for i, T in enumerate(list_of_temperatures):
+            
+            T = temperature_to_kelvin(T)
 
             p_1_N = param_1_folded[i]
             p_1_U = param_1_unfolded[i]
@@ -910,12 +925,12 @@ def fit_oligomere_unfolding_single_slopes(
 
 
             y = signal_fx(
-                T,Tm, DHm, Cp0,
-                p_1_N, p_2_N, p_3_N,
-                p_1_U, p_2_U, p_3_U,
+                T,C, Tm, DHm,
+                0, p_1_N, p_2_N, p_3_N,
+                0, p_1_U, p_2_U, p_3_U,
                 baseline_native_fx,
                 baseline_unfolded_fx,
-                C=C,
+                Cp0,
             )
 
             signal.append(y)

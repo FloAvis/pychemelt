@@ -77,7 +77,7 @@ def signal_two_state_tc_unfolding(
 
 
 def signal_two_state_t_unfolding(
-        T,Tm,dHm,
+        T,D,Tm,dHm,
         p1_N, p2_N, p3_N,
         p1_U, p2_U, p3_U,
         baseline_N_fx,

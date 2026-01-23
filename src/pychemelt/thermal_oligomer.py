@@ -46,7 +46,7 @@ from .utils.fitting import (
 
 
 
-class ThermalOligomere(Sample):
+class ThermalOligomer(Sample):
     """
     Class to hold the data of a DSF experiment of themal unfolding with different concentrations of oligomeres
     """
@@ -176,53 +176,11 @@ class ThermalOligomere(Sample):
 
         self.oligomere_concentrations = np.array(self.oligomere_concentrations)
 
-        return None
-
-    def guess_Tm(self, x1=6, x2=11):
-
-        """
-        Guess the Tm of the sample using the derivative of the signal
-
-        Parameters
-        ----------
-        x1 : float, optional
-            Shift from the minimum and maximum temperature to estimate the median of the initial and final baselines
-        x2 : float, optional
-            Shift from the minimum and maximum temperature to estimate the median of the initial and final baselines
-
-        Notes
-        -----
-        Method was overwritten from parent class Sample
-
-        x2 must be greater than x1.
-
-        This method creates/updates attributes:
-        - t_melting_init_multiple : list of initial Tm guesses per signal
-        - t_melting_df_multiple : list of pandas.DataFrame objects with Tm vs Oligomere concentration
-        """
-
-        self.t_melting_init_multiple = []
-        self.t_melting_df_multiple = []
-
-        for i in range(len(self.signal_lst_multiple)):
-            t_melting_init = guess_Tm_from_derivative(
-                self.temp_deriv_lst_multiple[i],
-                self.deriv_lst_multiple[i],
-                x1,
-                x2
-            )
-            # Create a dataframe of the Tm values versus the oligomere concentrations
-            t_melting_df = pd.DataFrame({
-                'Tm': t_melting_init,
-                'Oligomere Concentration': self.oligomere_concentrations
-            })
-
-            self.t_melting_df_multiple.append(t_melting_df)
-
-            self.t_melting_init_multiple.append(t_melting_init)
+        self.denaturant_concentrations = self.oligomere_concentrations
 
         return None
 
+    '''
     def fit_thermal_unfolding_local(self):
 
         """
@@ -265,7 +223,7 @@ class ThermalOligomere(Sample):
         self.single_fit_done = True
 
         return None
-
+    '''
     def guess_Cp(self):
 
         """
@@ -283,53 +241,7 @@ class ThermalOligomere(Sample):
 
         # Requires self.single_fit_done
 
-        expected_Cp0 = self.n_residues * 0.0148 - 0.1267
-
-        if not self.single_fit_done:
-            self.fit_thermal_unfolding_local()
-
-        try:
-
-            Tms = []
-            dHs = []
-
-            for i in range(len(self.Tms_multiple)):
-                Tms.extend(self.Tms_multiple[i])
-                dHs.extend(self.dHs_multiple[i])
-
-            self.Tms = Tms
-            self.dHs = dHs
-
-            tms = np.array(self.Tms)
-            dhs = np.array(self.dHs)
-
-            m, b = fit_line_robust(tms, dhs)
-
-            outliers = find_line_outliers(m, b, tms, dhs)
-
-            if len(outliers) > 0:
-                # Remove outliers
-                tms = np.delete(tms, outliers)
-                dhs = np.delete(dhs, outliers)
-
-                # Assign the new values
-                self.Tms = tms
-                self.dHs = dhs
-
-                m, b = fit_line_robust(self.Tms, self.dHs)
-
-            self.slope_dh_tm = m
-            self.intercept_dh_tm = b
-
-            Cp0 = m if m > 0 else -1
-
-            # Verify that the initial Cp is between the expected range
-            if Cp0 < expected_Cp0 / 1.5 or Cp0 > expected_Cp0 * 1.5:
-                Cp0 = expected_Cp0
-
-        except:
-
-            Cp0 = expected_Cp0
+        Cp0 = self.n_residues * 0.0148 - 0.1267
 
         # Cp0 needs to be positive
         Cp0 = max(Cp0, 0)
@@ -412,7 +324,6 @@ class ThermalOligomere(Sample):
 
     def fit_thermal_unfolding_global(
             self,
-            fit_m_dep=False,
             cp_limits=None,
             dh_limits=None,
             tm_limits=None,
@@ -425,8 +336,6 @@ class ThermalOligomere(Sample):
 
         Parameters
         ----------
-        fit_m_dep : bool, optional
-            If True, fit the temperature dependence of the m-value
         cp_limits : list, optional
             List of two values, the lower and upper bounds for the Cp value. If None, bounds set automatically
         dh_limits : list, optional
@@ -449,11 +358,23 @@ class ThermalOligomere(Sample):
         if self.Cp0 <= 0:
             raise ValueError('Cp0 must be positive. Please run guess_Cp before fitting globally.')
 
-        max_tm_id = np.argmax(self.Tms)
+        # Get Guess of Tm:
+        
+        tm_lst = []
+
+        for i in range(len(self.signal_lst_multiple)):
+            tm_lst.append(guess_Tm_from_derivative(
+                self.temp_deriv_lst_multiple[i],
+                self.deriv_lst_multiple[i],
+                x1,
+                x2
+            ))
+
+        Tm = np.average(tm_lst)
 
         if self.thermodynamic_params_guess is None:
 
-            p0 = [self.Tms[max_tm_id], np.max([self.dHs[max_tm_id], 40]), self.Cp0, 2.5]
+            p0 = [Tm, 40, self.Cp0]
 
         else:
 
@@ -462,8 +383,7 @@ class ThermalOligomere(Sample):
         params_names = [
             'Tm (°C)',
             'ΔH (kcal/mol)',
-            'Cp (kcal/mol/°C)',
-            'm-value (kcal/mol/M)']
+            'Cp (kcal/mol/°C)']
 
         self.first_param_Ns_expanded = np.concatenate(self.first_param_Ns_per_signal, axis=0)
         self.first_param_Us_expanded = np.concatenate(self.first_param_Us_per_signal, axis=0)
@@ -530,7 +450,7 @@ class ThermalOligomere(Sample):
         low_bounds = (p0.copy())
         high_bounds = (p0.copy())
 
-        low_bounds[4:], high_bounds[4:] = set_param_bounds(p0[4:],params_names[4:])
+        low_bounds[3:], high_bounds[3:] = set_param_bounds(p0[3:],params_names[3:])
 
         self.limited_tm = tm_limits is not None
 
@@ -601,11 +521,6 @@ class ThermalOligomere(Sample):
 
             # Verify that the Cp initial guess is within the user-defined limits
             p0[2] = adjust_value_to_interval(p0[2], cp_lower, cp_upper, 0.5)
-
-        id_m = 2 + (not self.fixed_cp)
-
-        low_bounds[id_m] = 0.5
-        high_bounds[id_m] = 9
 
         # Populate the expanded signal and temperature lists
         self.expand_multiple_signal()

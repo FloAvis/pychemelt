@@ -527,17 +527,26 @@ class Sample:
         self.signal_lst_expanded = []
         self.temp_lst_expanded = []
 
+        #Creating 
+        if hasattr(self, "deriv_lst_multiple"):
+            self.estimate_derivative()
+
+        self.deriv_lst_expanded = []
+
         for i in range(len(self.signal_lst_multiple)):
             self.signal_lst_expanded += self.signal_lst_multiple[i]
             self.temp_lst_expanded += self.temp_lst_multiple[i]
+            self.deriv_lst_expanded += self.deriv_lst_multiple[i]
 
         # Create a reduced dataset for faster fitting
         self.signal_lst_expanded_subset = [subset_data(x, 160) for x in self.signal_lst_expanded]
         self.temp_lst_expanded_subset = [subset_data(x, 160) for x in self.temp_lst_expanded]
+        self.deriv_lst_expanded_subset = [subset_data(x, 160) for x in self.deriv_lst_expanded]
 
         if self.max_points is not None:
             self.signal_lst_expanded = [subset_data(x, self.max_points) for x in self.signal_lst_expanded]
             self.temp_lst_expanded = [subset_data(x, self.max_points) for x in self.temp_lst_expanded]
+            self.deriv_lst_expanded = [subset_data(x, self.max_points) for x in self.deriv_lst_expanded]
 
         return None
 

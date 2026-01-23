@@ -523,7 +523,6 @@ def fit_oligomere_local_thermal_unfolding_to_signal_lst(
     dHs           = []
 
     signal_fx    = map_two_state_model_to_signal_fx(model)
-    fractions_fx = map_two_state_model_to_fractions_fx(model)
 
     # Obtain the name of the function baseline_native_fx and baseline_unfolded_fx
     baseline_native_fx_name = baseline_native_fx.__name__
@@ -535,7 +534,7 @@ def fit_oligomere_local_thermal_unfolding_to_signal_lst(
     i = 0
     for s,t in zip(signal_lst,temp_lst):
 
-        p0 = np.array([t_melting_init[i], 85, oligomere_concentration, p1_Ns[i], p1_Us[i]])
+        p0 = np.array([t_melting_init[i], 85, p1_Ns[i], p1_Us[i]])
 
         if baseline_native_params[0]:
             p0 = np.concatenate([p0, [p2_Ns[i]]])
