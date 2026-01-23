@@ -15,24 +15,12 @@ from .fitting import (
     fit_quadratic_robust,
     fit_exponential_robust,
     fit_thermal_unfolding,
-    fit_thermal_unfolding_oligomere,
     baseline_fx_name_to_req_params
 )
 
-from .fractions import (
-    two_state_rev_unfolding_fractions,
-    two_state_dimer_unfolding_fractions,
-    two_state_trimer_unfolding_fractions,
-    two_state_tetramer_unfolding_fractions,
-    map_two_state_model_to_fractions_fx,
-)
 
 from .signals import (
     signal_two_state_t_unfolding,
-    two_state_thermal_unfold_curve_dimer,
-    two_state_thermal_unfold_curve_trimer,
-    two_state_thermal_unfold_curve_tetramer,
-    map_two_state_model_to_signal_fx,
 )
 
 from .palette import VIRIDIS
@@ -45,7 +33,6 @@ __all__ = [
     'guess_Tm_from_derivative',
     'estimate_signal_baseline_params',
     'fit_local_thermal_unfolding_to_signal_lst',
-    'fit_oligomere_local_thermal_unfolding_to_signal_lst',
     're_arrange_predictions',
     're_arrange_params',
     'subset_data',
@@ -502,101 +489,6 @@ def fit_local_thermal_unfolding_to_signal_lst(
         i += 1
 
     return Tms, dHs, predicted_lst
-
-def fit_oligomere_local_thermal_unfolding_to_signal_lst(
-    signal_lst,
-    temp_lst,
-    oligomere_concentration,
-    t_melting_init,
-    p1_Ns,
-    p1_Us,
-    p2_Ns,
-    p2_Us,
-    p3_Ns,
-    p3_Us,
-    baseline_native_fx,
-    baseline_unfolded_fx,
-    model):
-    
-    predicted_lst = []
-    Tms           = []
-    dHs           = []
-
-    signal_fx    = map_two_state_model_to_signal_fx(model)
-
-    # Obtain the name of the function baseline_native_fx and baseline_unfolded_fx
-    baseline_native_fx_name = baseline_native_fx.__name__
-    baseline_unfolded_fx_name = baseline_unfolded_fx.__name__
-
-    baseline_native_params = baseline_fx_name_to_req_params(baseline_native_fx_name)
-    baseline_unfolded_params = baseline_fx_name_to_req_params(baseline_unfolded_fx_name)
-
-    i = 0
-    for s,t in zip(signal_lst,temp_lst):
-
-        p0 = np.array([t_melting_init[i], 85, p1_Ns[i], p1_Us[i]])
-
-        if baseline_native_params[0]:
-            p0 = np.concatenate([p0, [p2_Ns[i]]])
-        if baseline_unfolded_params[0]:
-            p0 = np.concatenate([p0, [p2_Us[i]]])
-
-        if baseline_native_params[1]:
-            p0 = np.concatenate([p0, [p3_Ns[i]]])
-        if baseline_unfolded_params[1]:
-            p0 = np.concatenate([p0, [p3_Us[i]]])
-
-        low_bounds  = p0.copy()
-        high_bounds = p0.copy()
-
-        minX = np.min(temp_lst)
-        maxX = np.max(temp_lst)
-
-        midX = p0[0]
-
-        t1_min = minX + 5 if model == 'Monomer' else minX + 15
-        t1_max = maxX - 5 if model == 'Monomer' else maxX + 25
-
-        if model in ['Trimer', 'Tetramer']:
-
-            t1_min, t1_max, midX = t1_min + 20, t1_max + 30, midX + 20
-
-            if model == 'Tetramer':
-                t1_min, t1_max, midX = t1_min + 10, t1_max + 30, midX + 20
-
-        low_bounds = [t1_min, 10] + [x / 50 if x > 0 else 50 * x for x in p0[2:]]
-        high_bounds = [t1_max, 600] + [50 * x if x > 0 else x / 50 for x in p0[2:]]
-
-        try:
-
-            params, cov, predicted = fit_thermal_unfolding_oligomere(
-                list_of_temperatures=[t],
-                list_of_signals=[s],
-                oligomere_concentration=oligomere_concentration,
-                initial_parameters=p0,
-                low_bounds=low_bounds,
-                high_bounds=high_bounds,
-                signal_fx=signal_fx,
-                baseline_native_fx=baseline_native_fx,
-                baseline_unfolded_fx=baseline_unfolded_fx,
-                Cp=0)
-
-            rel_errors = relative_errors(params, cov)
-
-            if rel_errors[0] < 50 and rel_errors[1] < 50:
-                Tms.append(params[0])
-                dHs.append(params[1])
-
-            predicted_lst.append(predicted[0])
-
-        except:
-
-            pass
-
-        i += 1
-
-    return Tms, dHs, predicted_lst
-
 
 def re_arrange_predictions(predicted_lst, n_signals, n_denaturants):
 
