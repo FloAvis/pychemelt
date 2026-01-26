@@ -284,13 +284,10 @@ class ThermalOligomer(Sample):
 
         Tm = np.average(tm_lst)
 
-        if self.thermodynamic_params_guess is None:
 
-            p0 = [Tm, 40, self.Cp0]
 
-        else:
+        p0 = [Tm, 40, self.Cp0]
 
-            p0 = self.thermodynamic_params_guess
 
         params_names = [
             'Tm (°C)',
@@ -390,16 +387,9 @@ class ThermalOligomer(Sample):
             p0[1] = adjust_value_to_interval(p0[1], dh_lower, dh_upper, 1)
 
         else:
+            dh_lower = 10
+            dh_upper = 500
 
-            if self.thermodynamic_params_guess is None:
-
-                dh_lower = 10
-                dh_upper = 500
-
-            else:
-
-                dh_lower = self.thermodynamic_params_guess[1] / 5
-                dh_upper = self.thermodynamic_params_guess[1] * 5
 
         low_bounds[1] = dh_lower
         high_bounds[1] = dh_upper

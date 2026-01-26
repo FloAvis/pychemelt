@@ -168,7 +168,7 @@ def two_state_thermal_unfold_curve(
     fn  = fn_two_state_monomer(K)
     fu  = 1 - fn
 
-    dT  = shift_temperature(T)
+    dT  = shift_temperature_K(T)
 
     S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
     S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
@@ -197,7 +197,7 @@ def two_state_thermal_unfold_curve_dimer(
     fu = fu_two_state_dimer(K,C)
     fn = 1 - fu
 
-    dT  = shift_temperature(T)
+    dT  = shift_temperature_K(T)
 
     S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
     S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
@@ -221,7 +221,7 @@ def two_state_thermal_unfold_curve_trimer(
     fu = fu_two_state_trimer(K,C)
     fn = 1 - fu
 
-    dT  = shift_temperature(T)
+    dT  = shift_temperature_K(T)
 
     S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
     S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
@@ -246,7 +246,7 @@ def two_state_thermal_unfold_curve_tetramer(
     fu = fu_two_state_tetramer(K,C)
     fn = 1 - fu
 
-    dT  = shift_temperature(T)
+    dT  = shift_temperature_K(T)
 
     S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
     S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
