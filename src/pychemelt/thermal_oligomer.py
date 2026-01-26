@@ -260,7 +260,7 @@ class ThermalOligomer(Sample):
         - bNs_expanded, bUs_expanded, kNs_expanded, kUs_expanded, qNs_expanded, qUs_expanded
         - p0, low_bounds, high_bounds, global_fit_params, rel_errors
         - predicted_lst_multiple, params_names, params_df, dg_df
-        - flags: global_fit_done, fit_m_dep, limited_tm, limited_dh, limited_cp, fixed_cp
+        - flags: global_fit_done, limited_tm, limited_dh, limited_cp, fixed_cp
         """
 
         # Requires Cp0
@@ -270,6 +270,9 @@ class ThermalOligomer(Sample):
         # Get Guess of Tm:
         
         tm_lst = []
+
+        x1 = 6
+        x2 = 11
 
         for i in range(len(self.signal_lst_multiple)):
             tm_lst.append(guess_Tm_from_derivative(
@@ -465,6 +468,8 @@ class ThermalOligomer(Sample):
 
         # First fit without m-value dependence on temperature
         global_fit_params, cov, predicted = fit_fx(**kwargs)
+
+        fit_m_dep = False
 
         global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
             global_fit_params,

@@ -368,6 +368,31 @@ class Sample:
 
             self.temp_deriv_lst_multiple.append(temp_deriv_lst)
             self.deriv_lst_multiple.append(deriv_lst)
+        
+        if hasattr(self, "predicted_lst_multiple"):
+            # Calculate derivative of fitted function
+            predicted_deriv_lst = []
+
+            for i in range(self.nr_signals):
+                signal_deriv = []
+
+                for j in range(self.nr_den):
+                    # Get fitted values and temperature
+                    idx = i * self.nr_den + j
+                    x = self.temp_lst_expanded[idx]
+                    y_fit = self.predicted_lst_multiple[i][j]
+
+                    # Calculate derivative using Savitzky-Golay filter
+                    # window_length should be odd and >= 3
+                    window = 9
+                    deriv = first_derivative_savgol(x, y_fit, window_length)
+
+                    signal_deriv.append(deriv)
+
+                predicted_deriv_lst.append(signal_deriv)
+
+            # Store in the object for plotting
+            self.predicted_deriv_lst_multiple = predicted_deriv_lst
 
         return None
 
@@ -528,7 +553,7 @@ class Sample:
         self.temp_lst_expanded = []
 
         #Creating 
-        if hasattr(self, "deriv_lst_multiple"):
+        if not hasattr(self, "deriv_lst_multiple"):
             self.estimate_derivative()
 
         self.deriv_lst_expanded = []
