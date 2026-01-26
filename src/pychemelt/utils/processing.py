@@ -10,7 +10,7 @@ from collections import Counter
 
 from .math import shift_temperature, relative_errors
 
-from ..utils.fitting import (
+from .fitting import (
     fit_line_robust,
     fit_quadratic_robust,
     fit_exponential_robust,
@@ -18,7 +18,10 @@ from ..utils.fitting import (
     baseline_fx_name_to_req_params
 )
 
-from .signals import signal_two_state_t_unfolding
+
+from .signals import (
+    signal_two_state_t_unfolding,
+)
 
 from .palette import VIRIDIS
 
@@ -491,7 +494,6 @@ def fit_local_thermal_unfolding_to_signal_lst(
         i += 1
 
     return Tms, dHs, predicted_lst
-
 
 def re_arrange_predictions(predicted_lst, n_signals, n_denaturants):
 
