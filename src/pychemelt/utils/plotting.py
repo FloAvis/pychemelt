@@ -114,6 +114,7 @@ def config_fig(fig,
 
 def plot_unfolding(
         pychemelt_sample,
+        plot_derivative = False,
         plot_config: PlotConfig = None,
         axis_config: AxisConfig = None,
         layout_config: LayoutConfig = None,
@@ -144,8 +145,13 @@ def plot_unfolding(
     layout_config = layout_config or LayoutConfig()
     legend_config = legend_config or LegendConfig()
 
-    # Extract the minimum and maximum denaturation concentration
+    fittings_done = pychemelt_sample.global_fit_params is not None
 
+    # If derivative is plotted and not present, get derivative
+    if plot_derivative and not hasattr(pychemelt_sample, "deriv_lst_multiple") or fittings_done and not hasattr(pychemelt_sample, "predicted_deriv_lst_multiple"):
+        pychemelt_sample.estimate_derivative()
+
+    # Extract the minimum and maximum denaturation concentration
     concs = pychemelt_sample.denaturant_concentrations
 
 
@@ -179,8 +185,6 @@ def plot_unfolding(
 
     subplot_idx = 0
 
-    fittings_done = pychemelt_sample.global_fit_params is not None
-
     ys_fit = None
 
     nr_den = pychemelt_sample.nr_den
@@ -192,14 +196,21 @@ def plot_unfolding(
 
         if fittings_done:
             # Reduced dataset if fittings were done
-            ys_fit = pychemelt_sample.predicted_lst_multiple[i]
             xs     = pychemelt_sample.temp_lst_expanded[i*nr_den:(i+1)*nr_den]
-            ys     = pychemelt_sample.signal_lst_expanded[i*nr_den:(i+1)*nr_den]
+            if plot_derivative:
+                ys = pychemelt_sample.deriv_lst_expanded[i*nr_den:(i+1)*nr_den]
+                ys_fit = pychemelt_sample.predicted_deriv_lst_multiple[i]
+            else:
+                ys_fit = pychemelt_sample.predicted_lst_multiple[i]
+                ys = pychemelt_sample.signal_lst_expanded[i*nr_den:(i+1)*nr_den]
 
         else:
             # Full dataset if no fittings were done
             xs = pychemelt_sample.temp_lst_multiple[i]
-            ys = pychemelt_sample.signal_lst_multiple[i]
+            if plot_derivative:
+                ys = pychemelt_sample.deriv_lst_multiple[i]
+            else:
+                ys = pychemelt_sample.signal_lst_multiple[i]
 
         for j,conc in enumerate(concs):
 
