@@ -36,7 +36,7 @@ from .utils.processing import (
 from .utils.fitting import (
     fit_line_robust,
     fit_oligomere_unfolding_single_slopes,
-    fit_tc_unfolding_shared_slopes_many_signals,
+    fit_oligomere_unfolding_shared_slopes_many_signals,
     fit_tc_unfolding_many_signals,
     evaluate_fitting_and_refit,
     baseline_fx_name_to_req_params
@@ -518,7 +518,7 @@ class ThermalOligomer(Sample):
         if self.signal_ids is None:
             self.set_signal_id()
 
-        param_init = 3 + self.fit_m_dep + (self.cp_value is None)
+        param_init = 2 + (self.cp_value is None)
 
         p0 = self.global_fit_params[:param_init]
         low_bounds = self.low_bounds[:param_init]
@@ -629,23 +629,25 @@ class ThermalOligomer(Sample):
                 low_bounds = np.append(low_bounds, np.min(low_bounds_qUs_i))
                 high_bounds = np.append(high_bounds, np.max(high_bounds_qUs_i))
 
+        signal_fx = map_two_state_model_to_signal_fx(self.model)
+
         kwargs = {
 
-            'oligomere_concentrations': self.oligomere_concentrations_expanded,
+            'oligomer_concentrations': self.oligomere_concentrations_expanded,
             'list_of_temperatures': self.temp_lst_expanded_subset,
             'list_of_signals': self.signal_lst_expanded_subset,
             'initial_parameters': p0,
             'low_bounds': low_bounds,
             'high_bounds': high_bounds,
             'cp_value': self.cp_value,
-            'fit_m1': self.fit_m_dep,
+            'fit_m1': False,
             'signal_ids':self.signal_ids,
             'baseline_native_fx': self.baseline_N_fx,
             'baseline_unfolded_fx': self.baseline_U_fx,
-            'signal_fx' : signal_two_state_tc_unfolding
+            'signal_fx' : signal_fx
         }
 
-        fit_fx = fit_tc_unfolding_shared_slopes_many_signals
+        fit_fx = fit_oligomere_unfolding_shared_slopes_many_signals
 
         if self.pre_fit:
             # Do a pre-fit with a reduced data set

@@ -128,6 +128,8 @@ def plot_unfolding(
 
     pychemelt_sample:
         pychemelt.Sample object
+    plot_derivative: bool
+        Whether to plot the derivative of the signal
     plot_config : PlotConfig, optional
         Configuration for the overall plot
     axis_config : AxisConfig, optional

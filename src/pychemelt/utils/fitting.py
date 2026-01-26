@@ -696,7 +696,8 @@ def fit_oligomere_unfolding_single_slopes(
 
         Requires:
 
-            - The 'listOfTemperatures' containing each of them a single dataset
+            - The 'T_all' containing the temperatures as a single dataset
+            - The 'C_all' containing the concentrations as a single dataset
 
         The other arguments have to be in the following order:
 
@@ -964,6 +965,187 @@ def fit_tc_unfolding_shared_slopes_many_signals(
 
     return global_fit_params, cov, predicted_lst
 
+def fit_oligomere_unfolding_shared_slopes_many_signals(
+    list_of_temperatures,
+    list_of_signals,
+    signal_ids,
+    oligomer_concentrations,
+    initial_parameters,
+    low_bounds,
+    high_bounds,
+    signal_fx,
+    baseline_native_fx,
+    baseline_unfolded_fx,
+    list_of_oligomer_conc=None,
+    fit_m1=False,
+    cp_value=None,
+    tm_value=None,
+    dh_value=None
+):
+    """
+    Vectorized fitting of thermochemical unfolding curves for multiple signal types
+    sharing thermodynamic parameters and slopes, using least_squares.
+
+    Parameters
+    ----------
+    list_of_temperatures : list of array-like
+    list_of_signals : list of array-like
+    signal_ids : list of int
+        Signal-type id for each dataset (0..n_signals-1)
+    oligomer_concentrations : list
+        Oligomer concentrations for each dataset (flattened across signals)
+    initial_parameters : array-like
+        Initial guess for the parameters
+    low_bounds : array-like
+        Lower bounds for the parameters
+    high_bounds : array-like
+        Upper bounds for the parameters
+    signal_fx : callable
+        Signal model function
+     baseline_native_fx : callable
+        function to calculate the baseline for the native state
+    baseline_unfolded_fx : callable
+        function to calculate the baseline for the unfolded state
+    list_of_oligomer_conc : list, optional
+        Oligomer concentrations per dataset
+    fit_m1 : bool, optional
+        Whether to fit temperature dependence of m-value
+    cp_value, tm_value, dh_value : float or None, optional
+        Optional fixed thermodynamic parameters
+
+    Returns
+    -------
+    global_fit_params : numpy.ndarray
+    cov : numpy.ndarray
+    predicted_lst : list of numpy.ndarray
+
+    """
+
+    # Flatten all signals
+    all_signal = np.concatenate(list_of_signals, axis=0)
+    n_signals = np.max(signal_ids) + 1
+    n_datasets = len(list_of_temperatures)
+
+    list_of_temperatures = [temperature_to_kelvin(T) for T in list_of_temperatures]
+
+    baseline_native_params = baseline_fx_name_to_req_params(baseline_native_fx)
+    baseline_unfolded_params = baseline_fx_name_to_req_params(baseline_unfolded_fx)
+
+    # Precompute indices for slicing the flattened concatenated arrays
+    dataset_starts = np.cumsum([0] + [len(T) for T in list_of_temperatures][:-1])
+    dataset_ends = np.cumsum([len(T) for T in list_of_temperatures])
+
+    # Convert the Tm to kelvin
+    if tm_value is None:
+        initial_parameters[0] = temperature_to_kelvin(initial_parameters[0])
+        low_bounds[0] = temperature_to_kelvin(low_bounds[0])
+        high_bounds[0] = temperature_to_kelvin(high_bounds[0])
+    else:
+        tm_value = temperature_to_kelvin(tm_value)
+
+    # Vectorized residuals function for least_squares
+    def residuals(params):
+        """
+        Calculate the thermal unfolding profile of many curves at the same time
+
+        Requires:
+
+            - The 'listOfTemperatures' containing each of them a single dataset
+
+        The other arguments have to be in the following order:
+
+            - Global melting temperature
+            - Global enthalpy of unfolding
+            - Global Cp0
+            - Single intercepts, folded
+            - Single intercepts, unfolded
+            - Single slopes or pre-exp terms, folded
+            - Single slopes or pre-exp terms, unfolded
+            - Single quadratic or exponential coefficients, folded
+            - Single quadratic or exponential coefficients, unfolded
+
+        Returns:
+
+            The melting curves based on the parameters Temperature of melting, enthalpy of unfolding,
+                slopes and intercept of the folded and unfolded states
+
+        """
+        id_param = 0
+
+        Tm = params[id_param] if tm_value is None else tm_value
+        if tm_value is None:
+            id_param += 1
+
+        DHm = params[id_param] if dh_value is None else dh_value
+        if dh_value is None:
+            id_param += 1
+
+        Cp0 = params[id_param] if cp_value is None else cp_value
+        if cp_value is None:
+            id_param += 1
+
+
+        intercepts_folded = params[id_param:id_param + n_datasets]
+        intercepts_unfolded = params[id_param + n_datasets:id_param + n_datasets * 2]
+        id_param += n_datasets * 2
+
+        # Shared slopes / coefficients per signal type
+        p2_n_s = params[id_param:id_param + n_signals] if baseline_native_params[0] else np.zeros(n_signals)
+        id_param += n_signals if baseline_native_params[0] else 0
+
+        p2_u_s = params[id_param:id_param + n_signals] if baseline_unfolded_params[0] else np.zeros(n_signals)
+        id_param += n_signals if baseline_unfolded_params[0] else 0
+
+        p3_n_s = params[id_param:id_param + n_signals] if baseline_native_params[1] else np.zeros(n_signals)
+        id_param += n_signals if baseline_native_params[1] else 0
+
+        p3_u_s = params[id_param:id_param + n_signals] if baseline_unfolded_params[1] else np.zeros(n_signals)
+        id_param += n_signals if baseline_unfolded_params[1] else 0
+
+        # Vectorized evaluation for all datasets
+        predicted_all = np.zeros_like(all_signal)
+        for i, T in enumerate(list_of_temperatures):
+            start, end = dataset_starts[i], dataset_ends[i]
+            c = oligomer_concentrations[i]
+            sig_id = signal_ids[i]
+
+            predicted_all[start:end] = signal_fx(
+                T, c, Tm, DHm,
+                0, intercepts_folded[i], p2_n_s[sig_id], p3_n_s[sig_id],
+                0, intercepts_unfolded[i], p2_u_s[sig_id], p3_u_s[sig_id],
+                baseline_native_fx,
+                baseline_unfolded_fx,
+                Cp0
+            )
+
+        return predicted_all - all_signal
+
+    # Run least_squares fit
+    res = least_squares(
+        residuals,
+        x0=initial_parameters,
+        bounds=(low_bounds, high_bounds),
+        method="trf",
+        max_nfev=2000
+    )
+
+    global_fit_params = res.x
+
+    # Compute robust covariance using pseudo-inverse
+    J = res.jac
+    dof = len(all_signal) - len(global_fit_params)
+    residual_variance = np.sum(res.fun**2) / dof
+    cov = np.linalg.pinv(J.T @ J) * residual_variance
+
+    # Convert predicted signal into list of arrays per dataset
+    predicted = res.fun + all_signal
+    predicted_lst = [predicted[start:end] for start, end in zip(dataset_starts, dataset_ends)]
+
+    # Convert the Tm back to Celsius
+    if tm_value is None:
+        global_fit_params[0] = temperature_to_celsius(global_fit_params[0])
+
+    return global_fit_params, cov, predicted_lst
 
 def fit_tc_unfolding_many_signals(
         list_of_temperatures,

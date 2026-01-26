@@ -18,6 +18,11 @@ def test_plot_unfolding():
     assert fig is not None
     assert isinstance(fig, go.Figure)
 
+    fig = plot_unfolding(sample, plot_derivative=True)
+
+    assert fig is not None
+    assert isinstance(fig, go.Figure)
+
     sample.expand_multiple_signal()
     sample.estimate_baseline_parameters(
         native_baseline_type='quadratic',
@@ -32,6 +37,11 @@ def test_plot_unfolding():
     sample.fit_thermal_unfolding_global()
 
     fig = plot_unfolding(sample)
+
+    assert fig is not None
+    assert isinstance(fig, go.Figure)
+
+    fig = plot_unfolding(sample, plot_derivative=True)
 
     assert fig is not None
     assert isinstance(fig, go.Figure)
