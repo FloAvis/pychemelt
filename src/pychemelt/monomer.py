@@ -360,7 +360,7 @@ class Monomer(Sample):
 
         if self.thermodynamic_params_guess is None:
 
-            p0 = [self.Tms[max_tm_id], np.max([self.dHs[max_tm_id], 40]), self.Cp0, 2.5]
+            p0 = [self.Tms[max_tm_id], np.max([self.dHs[max_tm_id], 80]), self.Cp0, 2.8]
 
         else:
 

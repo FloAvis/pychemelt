@@ -11,7 +11,7 @@ from pychemelt.utils.math import exponential_baseline
 
 def_params = {
     'DHm': 120,
-    'Tm': 65,
+    'Tm': 65+273.15,
     'Cp0': 1.8,
     'm0': 2.6,
     'm1': 0,
@@ -33,6 +33,8 @@ def aux_create_pychem_sim(params,concs):
 
     # Calculate signal range for proper y-axis scaling
     temp_range = np.linspace(20, 90, 70)
+    temp_range_K = temp_range + 273.15
+
     signal_list = []
     temp_list   = []
 
@@ -41,7 +43,7 @@ def aux_create_pychem_sim(params,concs):
 
     for D in concs:
 
-        y = signal_two_state_tc_unfolding(temp_range, D, **params)
+        y = signal_two_state_tc_unfolding(temp_range_K, D, **params)
 
         y += rng.normal(0, 0.0005, len(y)) # Small error (seeded)
 

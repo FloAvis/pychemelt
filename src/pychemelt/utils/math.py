@@ -6,7 +6,7 @@ Author: Osvaldo Burastero
 
 import numpy as np
 
-from .constants  import Tref_cst
+from .constants    import Tref_cst
 from scipy.signal  import savgol_filter
 
 __all__ = [
@@ -73,6 +73,22 @@ def shift_temperature(T):
         Shifted temperature values
     """
     return temperature_to_kelvin(T) - Tref_cst
+
+def shift_temperature_K(T):
+    """
+    Shift temperature in Kelvin to be relative to Tref_cst.
+
+    Parameters
+    ----------
+    T : array-like
+        Temperature values in Kelvin
+
+    Returns
+    -------
+    array-like
+        Shifted temperature values
+    """
+    return T - Tref_cst
 
 def constant_baseline(dt,d,den_slope,a,*args):
 

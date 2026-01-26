@@ -3,7 +3,7 @@ This module contains helper functions to obtain the signal, given certain parame
 Author: Osvaldo Burastero
 """
 
-from .rates     import (
+from .rates import (
     eq_constant_termochem,
     eq_constant_thermo
 )
@@ -15,7 +15,7 @@ from .fractions import (
     fu_two_state_tetramer,
 )
 
-from .math import shift_temperature
+from .math import shift_temperature_K
 
 
 
@@ -34,13 +34,13 @@ def signal_two_state_tc_unfolding(
     Parameters
     ----------
     T : array-like
-        Temperature
+        Temperature in Kelvin units
     D : array-like
         Denaturant agent concentration
     DHm : float
         Variation of enthalpy between the two considered states at Tm
     Tm : float
-        Temperature at which the equilibrium constant equals one
+        Temperature at which the equilibrium constant equals one, in Kelvin units
     Cp0 : float
         Variation of calorific capacity between the two states
     m0 : float
@@ -67,7 +67,7 @@ def signal_two_state_tc_unfolding(
     K   = eq_constant_termochem(T,D,DHm,Tm,Cp0,m0,m1)
     fn  = fn_two_state_monomer(K)
     fu  = 1 - fn
-    dT   = shift_temperature(T)
+    dT   = shift_temperature_K(T)
 
     # Baseline signals (with quadratic dependence on temperature)
     S_native   = baseline_N_fx(dT,D,p1_N, p2_N, p3_N, p4_N)
@@ -119,10 +119,10 @@ def signal_two_state_t_unfolding(
     fn  = fn_two_state_monomer(K)
     fu  = 1 - fn
 
-    dT  = shift_temperature(T)
+    dT  = shift_temperature_K(T)
 
     S_native   = baseline_N_fx(dT,0,0,p1_N,p2_N,p3_N) # No denaturant dependence, that's why d=0 and den_slope = 0
-    S_unfolded = baseline_U_fx(dT,0,0,p1_U,p2_U,p3_U)  # No denaturant dependence, that's why d=0 and den_slope = 0
+    S_unfolded = baseline_U_fx(dT,0,0,p1_U,p2_U,p3_U) # No denaturant dependence, that's why d=0 and den_slope = 0
 
     return fn*(S_native) + fu*(S_unfolded)
 

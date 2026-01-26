@@ -48,12 +48,17 @@ def set_param_bounds(p0,param_names):
 
     for p in p0:
 
-        if -1 < p < 1:
+        if -0.1 < p < 0.1:
 
-            low_bounds.append(-5e2)
-            high_bounds.append(5e2)
+            low_bounds.append(-10)
+            high_bounds.append(10)
 
-        elif p > 1:
+        elif -1 < p < 1:
+
+            low_bounds.append(-1e2)
+            high_bounds.append(1e2)
+
+        elif p >= 1:
 
             low_bounds.append(p/1e3)
             high_bounds.append(p*1e3)

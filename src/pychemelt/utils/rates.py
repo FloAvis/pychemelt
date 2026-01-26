@@ -16,10 +16,7 @@ This is because unfolding functions for oligomers require the protein concentrat
 
 import numpy as np
 
-from .math import (
-    temperature_to_kelvin,
-    shift_temperature
-)
+from .math import shift_temperature_K
 
 from .constants import R_gas
 
@@ -33,11 +30,11 @@ def eq_constant_thermo(T,DH1,T1,Cp):
     Parameters
     ----------
     T : array-like
-        Temperature (°C or K)
+        Temperature (Kelvin)
     DH1 : float
         Variation of enthalpy between the two considered states at T1 (kcal/mol)
     T1 : float
-        Temperature at which the equilibrium constant equals one (°C or K)
+        Temperature at which the equilibrium constant equals one (Kelvin)
     Cp : float
         Variation of heat capacity between the two states (kcal/mol/K)
 
@@ -46,9 +43,6 @@ def eq_constant_thermo(T,DH1,T1,Cp):
     numpy.ndarray
         Equilibrium constant at the given temperature
     """
-
-    T  = temperature_to_kelvin(T)
-    T1 = temperature_to_kelvin(T1)
 
     DG = DH1*(1 - T/T1) - Cp*(T1 - T + T*np.log(T/T1))
     K  = np.exp(-DG / (R_gas * T))
@@ -65,13 +59,13 @@ def eq_constant_termochem(T,D,DHm,Tm,Cp0,m0,m1):
     Parameters
     ----------
     T : array-like
-        Temperature (°C or K)
+        Temperature (Kelvin only!)
     D : float
         Denaturant concentration (M)
     DHm : float
         Enthalpy change at Tm (kcal/mol)
     Tm : float
-        Melting temperature where ΔG = 0 (°C or K)
+        Melting temperature where ΔG = 0 (Kelvin only!)
     Cp0 : float
         Heat capacity change (kcal/mol/K)
     m0 : float
@@ -85,10 +79,7 @@ def eq_constant_termochem(T,D,DHm,Tm,Cp0,m0,m1):
         Equilibrium constant at a certain temperature and denaturant agent concentration
     """
 
-    T   = temperature_to_kelvin(T)
-    Tm  = temperature_to_kelvin(Tm)
-
-    DT  = shift_temperature(T)
+    DT  = shift_temperature_K(T)
 
     DG   = DHm*(1 - T/Tm) + Cp0*(T - Tm - T*np.log(T/Tm)) - D*(m0 + m1*DT)
 
