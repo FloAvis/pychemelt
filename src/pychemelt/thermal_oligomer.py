@@ -37,6 +37,7 @@ from .utils.fitting import (
     fit_oligomer_unfolding_single_slopes,
     fit_oligomer_unfolding_shared_slopes_many_signals,
     fit_oligomer_unfolding_many_signals,
+    fit_oligomer_unfolding_three_states_single_slopes,
     evaluate_fitting_and_refit,
     baseline_fx_name_to_req_params
 )
@@ -609,6 +610,15 @@ class ThermalOligomer(Sample):
         self.third_param_Ns_expanded = np.concatenate(self.third_param_Ns_per_signal, axis=0)
         self.third_param_Us_expanded = np.concatenate(self.third_param_Us_per_signal, axis=0)
 
+        #Estimating intermediate intercept
+        argmin_x = [np.argmin(x) for x in self.temp_lst_multiple]
+        argmax_x = [np.argmax(x) for x in self.temp_lst_multiple]
+
+        self.bStart = np.array([y[idx] for idx, y in zip(argmin_x, self.signal_lst_multiple)])
+        self.bEnd = np.array([y[idx] for idx, y in zip(argmax_x, self.signal_lst_multiple)])
+
+        self.intercept_intermediate = (self.bStart + self.bEnd) / 2
+
         p0 = np.concatenate([p0, self.first_param_Ns_expanded, self.first_param_Us_expanded])
 
         # We need to append as many bN and bU as the number of oligomer concentrations
@@ -659,6 +669,12 @@ class ThermalOligomer(Sample):
             for signal in self.signal_names:
                 params_names += ([param_name + ' - ' + str(self.oligomer_concentrations[i]) +
                                   ' - ' + str(signal) for i in range(self.nr_olig)])
+
+        p0 = np.concatenate([p0, self.intercept_intermediate])
+
+        for signal in self.signal_names:
+            params_names += (['intercept_intermediate - ' + str(self.oligomer_concentrations[i]) +
+                              ' - ' + str(signal) for i in range(self.nr_olig)])
 
         low_bounds = (p0.copy())
         high_bounds = (p0.copy())
@@ -753,8 +769,21 @@ class ThermalOligomer(Sample):
         if t2_init != 0:
             p0[2], low_bounds[2], high_bounds[2] = t2_init, t2_init - 15, t2_init + 15
 
+        kwargs = {
+            'oligomer_concentrations': self.oligomer_concentrations_expanded,
+            'initial_parameters': p0,
+            'low_bounds': low_bounds,
+            'high_bounds': high_bounds,
+            'cp_value': cp_value,
+            'baseline_native_fx': self.baseline_N_fx,
+            'baseline_unfolded_fx': self.baseline_U_fx,
+            'signal_fx': signal_fx
+        }
+
+        fit_fx = fit_oligomer_unfolding_three_states_single_slopes
+
         step = 6
-        num_rows = self.signal_useful.shape[0]
+        num_rows = len(self.oligomere_concentrations)
 
         if num_rows > 3:
             step += 2
@@ -763,10 +792,10 @@ class ThermalOligomer(Sample):
 
         if t1_init == 0 and t2_init == 0:
 
-            test_T1s = np.arange(np.max([self.minX + 10, 20]), self.maxX - 25, step)
-            test_T2s = np.arange(np.max([self.minX + 10, 20]) + step, self.maxX + 5, step)
+            test_T1s = np.arange(np.max([self.global_min_temp + 10, 20]), self.global_max_temp - 25, step)
+            test_T2s = np.arange(np.max([self.global_min_temp + 10, 20]) + step, self.global_max_temp + 5, step)
 
-            if 'trimer' in model:
+            if 'trimer' in self.model:
                 test_T1s = test_T1s + 10
                 test_T2s = test_T1s + 10
 
@@ -777,12 +806,16 @@ class ThermalOligomer(Sample):
 
             rss_all = []
 
+            #Using a subset for fitting
+            kwargs['list_of_temperatures'] = self.temp_lst_expanded_subset
+            kwargs['list_of_signals'] = self.signal_lst_expanded_subset
+            kwargs['fixed_t'] = True
+
             for index, row in df.iterrows():
-                fit_params, cov = fit_thermal_unfolding_three_species(self.xAxis_lst, self.signal_lst, p0,
-                                                                      low_bound, high_bound, fit_slope_native,
-                                                                      fit_slope_unfolded,
-                                                                      signal_fx, listOfOligomerConc=self.oligo_conc_lst,
-                                                                      fixed_t=True, t1=row['t1'], t2=row['t2'])
+                kwargs['t1'] = row['t1']
+                kwargs['t2'] = row['t2']
+
+                fit_params, cov, _ = fit_oligomer_unfolding_three_states_single_slopes(**kwargs)
 
                 # Insert fixed dh and ea
                 fit_params = np.insert(fit_params, 0, row['t1'])
@@ -803,19 +836,6 @@ class ThermalOligomer(Sample):
 
             low_bound[0], low_bound[2] = t1_init - 30, t2_init - 30
             high_bound[0], high_bound[2] = t1_init + 30, t2_init + 30
-
-        kwargs = {
-            'oligomer_concentrations': self.oligomer_concentrations_expanded,
-            'initial_parameters': p0,
-            'low_bounds': low_bounds,
-            'high_bounds': high_bounds,
-            'cp_value': cp_value,
-            'baseline_native_fx': self.baseline_N_fx,
-            'baseline_unfolded_fx': self.baseline_U_fx,
-            'signal_fx': signal_fx
-        }
-
-        fit_fx = fit_oligomer_unfolding_single_slopes
 
         # Do a quick prefit with a reduced data set
         if self.pre_fit:

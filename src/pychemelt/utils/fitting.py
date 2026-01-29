@@ -18,7 +18,13 @@ __all__ = [
     "fit_thermal_unfolding",
     "fit_tc_unfolding_single_slopes",
     "fit_tc_unfolding_shared_slopes_many_signals",
-    "fit_tc_unfolding_many_signals"
+    "fit_tc_unfolding_many_signals",
+    "fit_oligomer_unfolding_single_slopes",
+    "fit_oligomer_unfolding_shared_slopes_many_signals",
+    "fit_oligomer_unfolding_many_signals",
+    "fit_oligomer_unfolding_three_states_single_slopes",
+    #"fit_oligomer_unfolding_three_states_shared_slopes_many_signals",
+    #"fit_oligomer_unfolding_three_states_many_signals",
 ]
 
 def baseline_fx_name_to_req_params(baseline_fx_name):
@@ -646,10 +652,6 @@ def fit_oligomer_unfolding_single_slopes(
         function to calculate the native state baseline
     baseline_unfolded_fx : callable
         function to calculate the unfolded state baseline
-    list_of_oligomer_conc : list, optional
-        Oligomer concentrations per dataset
-    fit_m1 : bool, optional
-        Whether to fit temperature dependence of m-value
     cp_value, tm_value, dh_value : float or None, optional
         Optional fixed thermodynamic parameters
 
@@ -800,7 +802,7 @@ def fit_oligomer_unfolding_single_slopes(
 
     return global_fit_params, cov, predicted_lst
 
-def fit_oligomer_unfolding_three_state_single_slopes(
+def fit_oligomer_unfolding_three_states_single_slopes(
         list_of_temperatures,
         list_of_signals,
         oligomer_concentrations,
@@ -810,9 +812,12 @@ def fit_oligomer_unfolding_three_state_single_slopes(
         signal_fx,
         baseline_native_fx,
         baseline_unfolded_fx,
-        cp_value=None,
-        tm_value=None,
-        dh_value=None,
+        fixed_t=False,
+        t1=0,
+        t2=0,
+        fixed_dh=False,
+        dh1=0,
+        dh2=0,
 ):
     """
     Vectorized and optimized version of global thermal unfolding fitting. of oligomers
@@ -837,12 +842,14 @@ def fit_oligomer_unfolding_three_state_single_slopes(
         function to calculate the native state baseline
     baseline_unfolded_fx : callable
         function to calculate the unfolded state baseline
-    list_of_oligomer_conc : list, optional
-        Oligomer concentrations per dataset
-    fit_m1 : bool, optional
-        Whether to fit temperature dependence of m-value
-    cp_value, tm_value, dh_value : float or None, optional
-        Optional fixed thermodynamic parameters
+    fixed_t : bool, optional
+        Whether to fix the unfolding temperature
+    t1, t2 : float, optional
+        Values for the unfolding temperatures one and two
+    fixed_dh : bool, optional
+        Whether to fix the unfolding enthalpy
+    dh1, dh2 : float, optional
+        Values for the unfolding enthalpy one and two
 
     Returns
     -------
@@ -871,14 +878,29 @@ def fit_oligomer_unfolding_three_state_single_slopes(
     use_p2U, use_p3U = baseline_fx_name_to_req_params(baseline_unfolded_fx)
 
     # Convert the Tm to kelvin
-    if tm_value is None:
+    if not fixed_t:
         initial_parameters[0] = temperature_to_kelvin(initial_parameters[0])
         low_bounds[0] = temperature_to_kelvin(low_bounds[0])
         high_bounds[0] = temperature_to_kelvin(high_bounds[0])
+
+        initial_parameters[2] = temperature_to_kelvin(initial_parameters[2])
+        low_bounds[2] = temperature_to_kelvin(low_bounds[2])
+        high_bounds[2] = temperature_to_kelvin(high_bounds[2])
     else:
-        tm_value = temperature_to_kelvin(tm_value)
+        t1= temperature_to_kelvin(t1)
+        t2 = temperature_to_kelvin(t2)
+        initial_parameters = np.delete(initial_parameters, [0, 2])
+        low_bounds = np.delete(low_bounds, [0, 2])
+        high_bounds = np.delete(high_bounds, [0, 2])
 
-
+    if fixed_dh and fixed_t:
+        initial_parameters = np.delete(initial_parameters, [0, 1])
+        low_bounds = np.delete(low_bounds, [0, 1])
+        high_bounds = np.delete(high_bounds, [0, 1])
+    elif fixed_dh:
+        initial_parameters = np.delete(initial_parameters, [1, 3])
+        low_bounds = np.delete(low_bounds, [1, 3])
+        high_bounds = np.delete(high_bounds, [1, 3])
 
     def unfolding(_, *params):
 
@@ -892,9 +914,10 @@ def fit_oligomer_unfolding_three_state_single_slopes(
 
         The other arguments have to be in the following order:
 
-            - Global melting temperature
-            - Global enthalpy of unfolding
-            - Global Cp0
+            - Global melting temperature for the first transition
+            - Global enthalpy of unfolding for the first transition
+            - Global melting temperature for the second transition
+            - Global enthalpy of unfolding for the second transition
             - Single intercepts, folded
             - Single intercepts, unfolded
             - Single slopes or pre-exp terms, folded
@@ -911,23 +934,31 @@ def fit_oligomer_unfolding_three_state_single_slopes(
         i = 0
 
         # ---- Global thermodynamics ----
-        if tm_value is None:
-            Tm = params[i]
-            i += 1
-        else:
-            Tm = tm_value
 
-        if dh_value is None:
-            DHm = params[i]
-            i += 1
-        else:
-            DHm = dh_value
+        if not fixed_t:
 
-        if cp_value is None:
-            Cp0 = params[i]
-            i += 1
+            if not fixed_dh:
+                i = 4
+                Tm1, DHm1, Tm2, DHm2 = params[:4]
+            else:
+                i = 2
+                Tm1, Tm2 = params[:2]
+                DHm1 = dh1
+                DHm2 = dh2
+
         else:
-            Cp0 = cp_value
+
+            if not fixed_dh:
+                i = 2
+                DHm1, DHm2 = params[:2]
+                Tm1 = t1
+                Tm2 = t2
+            else:
+                i = 0
+                Tm1 = t1
+                Tm2 = t2
+                DHm1 = dh1
+                DHm2 = dh2
 
 
         # ---- Dataset-specific parameters ----
@@ -961,14 +992,18 @@ def fit_oligomer_unfolding_three_state_single_slopes(
         else:
             p3U = 0.0
 
+        bI = np.repeat(params[i:i + n_datasets], lengths)
+        i += n_datasets
+
         # ---- Single vectorized signal evaluation ----
         return signal_fx(
-                T_all,C_all, Tm, DHm,
+                T_all,C_all, Tm1, DHm1, Tm2, DHm2,
                 0, p1N, p2N, p3N,
                 0, p1U, p2U, p3U,
                 baseline_native_fx,
                 baseline_unfolded_fx,
-                Cp0,
+                bI,
+                0,0
             )
 
 
@@ -986,8 +1021,9 @@ def fit_oligomer_unfolding_three_state_single_slopes(
         start += n
 
     # Convert the Tm back to Celsius
-    if tm_value is None:
+    if not fixed_t:
         global_fit_params[0] = temperature_to_celsius(global_fit_params[0])
+        global_fit_params[2] = temperature_to_celsius(global_fit_params[2])
 
     return global_fit_params, cov, predicted_lst
 
