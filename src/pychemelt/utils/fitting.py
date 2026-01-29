@@ -800,6 +800,197 @@ def fit_oligomer_unfolding_single_slopes(
 
     return global_fit_params, cov, predicted_lst
 
+def fit_oligomer_unfolding_three_state_single_slopes(
+        list_of_temperatures,
+        list_of_signals,
+        oligomer_concentrations,
+        initial_parameters,
+        low_bounds,
+        high_bounds,
+        signal_fx,
+        baseline_native_fx,
+        baseline_unfolded_fx,
+        cp_value=None,
+        tm_value=None,
+        dh_value=None,
+):
+    """
+    Vectorized and optimized version of global thermal unfolding fitting. of oligomers
+
+    Parameters
+    ----------
+    list_of_temperatures : list of array-like
+        Temperature arrays for each dataset
+    list_of_signals : list of array-like
+        Signal arrays for each dataset
+    oligomer_concentrations : list
+        oligomer concentrations (one per dataset)
+    initial_parameters : array-like
+        Initial guess for parameters
+    low_bounds : array-like
+        Lower bounds for parameters
+    high_bounds : array-like
+        Upper bounds for parameters
+    signal_fx : callable
+        Signal model function
+    baseline_native_fx : callable
+        function to calculate the native state baseline
+    baseline_unfolded_fx : callable
+        function to calculate the unfolded state baseline
+    list_of_oligomer_conc : list, optional
+        Oligomer concentrations per dataset
+    fit_m1 : bool, optional
+        Whether to fit temperature dependence of m-value
+    cp_value, tm_value, dh_value : float or None, optional
+        Optional fixed thermodynamic parameters
+
+    Returns
+    -------
+    global_fit_params : numpy.ndarray
+    cov : numpy.ndarray
+    predicted_lst : list of numpy.ndarray
+    """
+
+    # ------------------------------------------------------------
+    # Precompute dataset structure
+    # ------------------------------------------------------------
+    n_datasets = len(list_of_temperatures)
+    lengths = np.array([len(T) for T in list_of_temperatures])
+
+    list_of_temperatures = [temperature_to_kelvin(T) for T in list_of_temperatures]
+
+    T_all = np.concatenate(list_of_temperatures)
+    y_all = np.concatenate(list_of_signals)
+
+    C_all = np.repeat(oligomer_concentrations, lengths)
+
+    # ------------------------------------------------------------
+    # Baseline parameter requirements (resolved ONCE)
+    # ------------------------------------------------------------
+    use_p2N, use_p3N = baseline_fx_name_to_req_params(baseline_native_fx)
+    use_p2U, use_p3U = baseline_fx_name_to_req_params(baseline_unfolded_fx)
+
+    # Convert the Tm to kelvin
+    if tm_value is None:
+        initial_parameters[0] = temperature_to_kelvin(initial_parameters[0])
+        low_bounds[0] = temperature_to_kelvin(low_bounds[0])
+        high_bounds[0] = temperature_to_kelvin(high_bounds[0])
+    else:
+        tm_value = temperature_to_kelvin(tm_value)
+
+
+
+    def unfolding(_, *params):
+
+        """
+        Calculate the thermal unfolding profile of many curves at the same time
+
+        Requires:
+
+            - The 'T_all' containing the temperatures as a single dataset
+            - The 'C_all' containing the concentrations as a single dataset
+
+        The other arguments have to be in the following order:
+
+            - Global melting temperature
+            - Global enthalpy of unfolding
+            - Global Cp0
+            - Single intercepts, folded
+            - Single intercepts, unfolded
+            - Single slopes or pre-exp terms, folded
+            - Single slopes or pre-exp terms, unfolded
+            - Single quadratic or exponential coefficients, folded
+            - Single quadratic or exponential coefficients, unfolded
+
+        Returns:
+
+            The melting curves based on the parameters Temperature of melting, enthalpy of unfolding,
+                slopes and intercept of the folded and unfolded states
+
+        """
+        i = 0
+
+        # ---- Global thermodynamics ----
+        if tm_value is None:
+            Tm = params[i]
+            i += 1
+        else:
+            Tm = tm_value
+
+        if dh_value is None:
+            DHm = params[i]
+            i += 1
+        else:
+            DHm = dh_value
+
+        if cp_value is None:
+            Cp0 = params[i]
+            i += 1
+        else:
+            Cp0 = cp_value
+
+
+        # ---- Dataset-specific parameters ----
+        p1N = np.repeat(params[i:i + n_datasets], lengths)
+        i += n_datasets
+
+        p1U = np.repeat(params[i:i + n_datasets], lengths)
+        i += n_datasets
+
+        if use_p2N:
+            p2N = np.repeat(params[i:i + n_datasets], lengths)
+            i += n_datasets
+        else:
+            p2N = 0.0
+
+        if use_p2U:
+            p2U = np.repeat(params[i:i + n_datasets], lengths)
+            i += n_datasets
+        else:
+            p2U = 0.0
+
+        if use_p3N:
+            p3N = np.repeat(params[i:i + n_datasets], lengths)
+            i += n_datasets
+        else:
+            p3N = 0.0
+
+        if use_p3U:
+            p3U = np.repeat(params[i:i + n_datasets], lengths)
+            i += n_datasets
+        else:
+            p3U = 0.0
+
+        # ---- Single vectorized signal evaluation ----
+        return signal_fx(
+                T_all,C_all, Tm, DHm,
+                0, p1N, p2N, p3N,
+                0, p1U, p2U, p3U,
+                baseline_native_fx,
+                baseline_unfolded_fx,
+                Cp0,
+            )
+
+
+    global_fit_params, cov = curve_fit(
+        unfolding, 1.0, y_all,
+        p0=initial_parameters, bounds=(low_bounds, high_bounds)
+    )
+
+    predicted_all = unfolding(1.0, *global_fit_params)
+
+    predicted_lst = []
+    start = 0
+    for n in lengths:
+        predicted_lst.append(predicted_all[start:start + n])
+        start += n
+
+    # Convert the Tm back to Celsius
+    if tm_value is None:
+        global_fit_params[0] = temperature_to_celsius(global_fit_params[0])
+
+    return global_fit_params, cov, predicted_lst
+
 
 def fit_tc_unfolding_shared_slopes_many_signals(
     list_of_temperatures,

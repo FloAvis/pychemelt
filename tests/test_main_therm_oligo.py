@@ -129,6 +129,19 @@ def test_set_model():
 
     pytest.raises(ValueError, sample.set_model, "test_false")
 
+    sample.set_model("Monomer", "Monomeric")
+    assert sample.model == "Monomer_monomeric_intermediate"
+
+    sample.set_model("Trimer", "monomeric")
+    assert sample.model == "Trimer_monomeric_intermediate"
+
+    sample.set_model("dimer", "Dimeric")
+    assert sample.model == "Dimer_dimeric_intermediate"
+
+    pytest.raises(ValueError, sample.set_model, "Monomer", "test_false")
+
+    pytest.raises(ValueError, sample.set_model, "Trimer", "Dimeric")
+
 
 def test_set_concentrations():
 

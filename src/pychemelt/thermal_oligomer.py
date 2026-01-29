@@ -15,6 +15,7 @@ from .main import Sample
 
 from .utils.signals import (
     map_two_state_model_to_signal_fx,
+    map_three_state_model_to_signal_fx,
 )
 
 from .utils.math import (
@@ -56,7 +57,7 @@ class ThermalOligomer(Sample):
         self.nr_olig = 0  # Number of oligomer concentrations
         self.model = None
 
-    def set_model(self, model_name):
+    def set_model(self, model_name, intermediate_name=None):
 
         """
         Set thermodynamic model of oligomer used for the analysis.
@@ -76,13 +77,44 @@ class ThermalOligomer(Sample):
 
         allowed_models = ["monomer", "dimer", "trimer", "tetramer"]
 
+        allowed_intermediate_models = ["monomeric", "dimeric", "trimeric"]
+
+        allowed_combinations = ['monomer_monomeric_intermediate',
+                                'dimer_monomeric_intermediate',
+                                'dimer_dimeric_intermediate',
+                                'trimer_monomeric_intermediate',
+                                'trimer_trimeric_intermediate',
+                                'tetramer_monomeric_intermediate']
+
+
         model = model_name.lower()
+
 
         if model not in allowed_models:
             raise ValueError(
             f"Invalid model '{model_name}'. "
             f"Allowed models are: {', '.join(m.capitalize() for m in allowed_models)}."
         )
+
+        if intermediate_name is not None:
+
+            intermediate = intermediate_name.lower()
+
+            if intermediate not in allowed_intermediate_models:
+                raise ValueError(
+                f"Invalid intermediate '{intermediate_name}'. "
+                f"Allowed models are: {', '.join(m.capitalize() for m in allowed_intermediate_models)}."
+                )
+
+            model = model + '_' + intermediate + '_intermediate'
+
+            if model not in allowed_combinations:
+                raise ValueError(
+                f"Invalid intermediate model '{model.capitalize()}'. "
+                f"Allowed models are: {', '.join(m.capitalize() for m in allowed_combinations)}."
+                )
+
+
 
         # Save model with first letter uppercase
         self.model = model.capitalize()
@@ -495,9 +527,11 @@ class ThermalOligomer(Sample):
         self.create_dg_df()
 
         return None
-    '''
+
     def fit_thermal_unfolding_three_state_global(
             self,
+            t1_init=0,
+            t2_init=0,
             cp_limits=None,
             dh_limits=None,
             tm_limits=None,
@@ -710,7 +744,65 @@ class ThermalOligomer(Sample):
         # Populate the expanded signal and temperature lists
         self.expand_multiple_signal()
 
-        signal_fx = map_two_state_model_to_signal_fx(self.model)
+        signal_fx = map_three_state_model_to_signal_fx(self.model)
+
+        if t1_init != 0:
+            p0[0], low_bounds[0], high_bounds[0] = t1_init, t1_init - 15, t1_init + 15
+            p0[2], low_bounds[2] = t1_init + 5, t1_init - 15
+
+        if t2_init != 0:
+            p0[2], low_bounds[2], high_bounds[2] = t2_init, t2_init - 15, t2_init + 15
+
+        step = 6
+        num_rows = self.signal_useful.shape[0]
+
+        if num_rows > 3:
+            step += 2
+        if num_rows > 4:
+            step += 2
+
+        if t1_init == 0 and t2_init == 0:
+
+            test_T1s = np.arange(np.max([self.minX + 10, 20]), self.maxX - 25, step)
+            test_T2s = np.arange(np.max([self.minX + 10, 20]) + step, self.maxX + 5, step)
+
+            if 'trimer' in model:
+                test_T1s = test_T1s + 10
+                test_T2s = test_T1s + 10
+
+            combinations = [(t1, t2) for t1 in test_T1s for t2 in test_T2s]
+            combinations = [(t1, t2) for t1, t2 in combinations if t1 < t2]
+
+            df = pd.DataFrame(combinations, columns=['t1', 't2'])
+
+            rss_all = []
+
+            for index, row in df.iterrows():
+                fit_params, cov = fit_thermal_unfolding_three_species(self.xAxis_lst, self.signal_lst, p0,
+                                                                      low_bound, high_bound, fit_slope_native,
+                                                                      fit_slope_unfolded,
+                                                                      signal_fx, listOfOligomerConc=self.oligo_conc_lst,
+                                                                      fixed_t=True, t1=row['t1'], t2=row['t2'])
+
+                # Insert fixed dh and ea
+                fit_params = np.insert(fit_params, 0, row['t1'])
+                fit_params = np.insert(fit_params, 2, row['t2'])
+
+                params_splt = split_all_params_three_state(fit_params, self.n, fit_slope_native, fit_slope_unfolded)
+
+                pred = predict_all_signal_nmer_with_intermediate(self.temperature, *params_splt, self.oligo_conc_lst,
+                                                                 signal_fx)
+
+                rss = np.nansum((pred - self.signal_useful) ** 2)
+                rss_all.append(rss)
+
+            idx = np.argmin(rss_all)
+
+            t1_init, t2_init = df['t1'][idx], df['t2'][idx]
+            p0[0], p0[2] = t1_init, t2_init
+
+            low_bound[0], low_bound[2] = t1_init - 30, t2_init - 30
+            high_bound[0], high_bound[2] = t1_init + 30, t2_init + 30
 
         kwargs = {
             'oligomer_concentrations': self.oligomer_concentrations_expanded,
@@ -779,7 +871,7 @@ class ThermalOligomer(Sample):
         self.create_dg_df()
 
         return None
-    '''
+
     def fit_thermal_unfolding_global_global(self):
 
         """

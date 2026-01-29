@@ -8,12 +8,7 @@ from .rates import (
     eq_constant_thermo
 )
 
-from .fractions import (
-    fn_two_state_monomer,
-    fu_two_state_dimer,
-    fu_two_state_trimer,
-    fu_two_state_tetramer,
-)
+from .fractions import *
 
 from .math import shift_temperature_K
 
@@ -262,9 +257,8 @@ def map_two_state_model_to_signal_fx(model):
     }
 
     return signal_fx_map.get(model)
-'''
 
-#Intermediate signals
+#Oligomeric thermal unfolding signals with intermediate signals
 
 def unfolding_curve_monomer_monomeric_intermediate(
         T, C, T1, DH1, T2, DH2,
@@ -273,7 +267,6 @@ def unfolding_curve_monomer_monomeric_intermediate(
         baseline_N_fx,
         baseline_U_fx,
         bI,
-        extra_arg,
         Cp1=0, CpTh=0):
     """
     Three states reversible unfolding N <-> I <-> U
@@ -286,13 +279,22 @@ def unfolding_curve_monomer_monomeric_intermediate(
 
     xN, xI, xU = 1 / den, A / den, A * B / den
 
+    dT = shift_temperature_K(T)
+
     S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
     S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
 
     return xN * S_native + xI * bI + xU * S_unfolded
 
 
-def unfolding_curve_dimer_monomeric_intermediate(T, T1, DH1, T2, DH2, bN, kN, bU, kU, bI, C, Cp1=0, CpTh=0):
+def unfolding_curve_dimer_monomeric_intermediate(
+        T, C, T1, DH1, T2, DH2,
+        p1_N, p2_N, p3_N, p4_N,
+        p1_U, p2_U, p3_U, p4_U,
+        baseline_N_fx,
+        baseline_U_fx,
+        bI,
+        Cp1=0, CpTh=0):
     """
     N2 ⇔ 2Ι ⇔ 2U Three-state unfolding with a monomeric intermediate
     C = concentration in dimer equivalent
@@ -305,10 +307,22 @@ def unfolding_curve_dimer_monomeric_intermediate(T, T1, DH1, T2, DH2, bN, kN, bU
     fi = fi_three_state_dimer_monomeric_intermediate(K1, K2, C)
     fu = fi * K2
 
-    return (1 - fu - fi) * linear_signal(T, bN, kN) + fi * bI * 2 + fu * linear_signal(T, bU, kU) * 2
+    dT = shift_temperature_K(T)
+
+    S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
+    S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
+
+    return (1 - fu - fi) * S_native + fi * bI * 2 + fu * S_unfolded * 2
 
 
-def unfolding_curve_trimer_monomeric_intermediate(T, T1, DH1, T2, DH2, bN, kN, bU, kU, bI, C, Cp1=0, CpTh=0):
+def unfolding_curve_trimer_monomeric_intermediate(
+        T, C, T1, DH1, T2, DH2,
+        p1_N, p2_N, p3_N, p4_N,
+        p1_U, p2_U, p3_U, p4_U,
+        baseline_N_fx,
+        baseline_U_fx,
+        bI,
+        Cp1=0, CpTh=0):
     """
     N3 ⇔ 3Ι ⇔ 3U Three-state unfolding with a monomeric intermediate
     C = concentration of the trimer equivalent
@@ -320,10 +334,22 @@ def unfolding_curve_trimer_monomeric_intermediate(T, T1, DH1, T2, DH2, bN, kN, b
     fi = fi_three_state_trimer_monomeric_intermediate(K1, K2, C)
     fu = fi * K2
 
-    return (1 - fu - fi) * linear_signal(T, bN, kN) + fi * bI * 3 + fu * linear_signal(T, bU, kU) * 3
+    dT = shift_temperature_K(T)
+
+    S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
+    S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
+
+    return (1 - fu - fi) * S_native + fi * bI * 3 + fu * S_unfolded * 3
 
 
-def unfolding_curve_tetramer_monomeric_intermediate(T, T1, DH1, T2, DH2, bN, kN, bU, kU, bI, C, Cp1=0, CpTh=0):
+def unfolding_curve_tetramer_monomeric_intermediate(
+        T, C, T1, DH1, T2, DH2,
+        p1_N, p2_N, p3_N, p4_N,
+        p1_U, p2_U, p3_U, p4_U,
+        baseline_N_fx,
+        baseline_U_fx,
+        bI,
+        Cp1=0, CpTh=0):
     """
     N4 ⇔ 4Ι ⇔ 4U Three-state unfolding with a monomeric intermediate
     C = concentration of the trimer equivalent
@@ -335,10 +361,22 @@ def unfolding_curve_tetramer_monomeric_intermediate(T, T1, DH1, T2, DH2, bN, kN,
     fi = fi_three_state_tetramer_monomeric_intermediate(K1, K2, C)
     fu = fi * K2
 
-    return (1 - fu - fi) * linear_signal(T, bN, kN) + fi * bI * 4 + fu * linear_signal(T, bU, kU) * 4
+    dT = shift_temperature_K(T)
+
+    S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
+    S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
+
+    return (1 - fu - fi) * S_native + fi * bI * 4 + fu * S_unfolded * 4
 
 
-def unfolding_curve_trimer_trimeric_intermediate(T, T1, DH1, T2, DH2, bN, kN, bU, kU, bI, C, Cp1=0, CpTh=0):
+def unfolding_curve_trimer_trimeric_intermediate(
+        T, C, T1, DH1, T2, DH2,
+        p1_N, p2_N, p3_N, p4_N,
+        p1_U, p2_U, p3_U, p4_U,
+        baseline_N_fx,
+        baseline_U_fx,
+        bI,
+        Cp1=0, CpTh=0):
     """
     N3 ⇔ Ι3 ⇔ 3U Three-state unfolding with a trimeric intermediate
     C = concentration of the trimer equivalent
@@ -350,10 +388,22 @@ def unfolding_curve_trimer_trimeric_intermediate(T, T1, DH1, T2, DH2, bN, kN, bU
     fu = fu_three_state_trimer_trimeric_intermediate(K1, K2, C)
     fi = fi_three_state_trimer_trimeric_intermediate(fu, K2, C)
 
-    return (1 - fu - fi) * linear_signal(T, bN, kN) + fi * bI + fu * linear_signal(T, bU, kU) * 3
+    dT = shift_temperature_K(T)
+
+    S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
+    S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
+
+    return (1 - fu - fi) * S_native + fi * bI + fu * S_unfolded * 3
 
 
-def unfolding_curve_dimer_dimeric_intermediate(T, T1, DH1, T2, DH2, bN, kN, bU, kU, bI, C, Cp1=0, CpTh=0):
+def unfolding_curve_dimer_dimeric_intermediate(
+        T, C, T1, DH1, T2, DH2,
+        p1_N, p2_N, p3_N, p4_N,
+        p1_U, p2_U, p3_U, p4_U,
+        baseline_N_fx,
+        baseline_U_fx,
+        bI,
+        Cp1=0, CpTh=0):
     """
     N2 ⇔ Ι2 ⇔ 2U Three-state unfolding with a monomeric intermediate
     C       = molar concentration in dimer equivalent
@@ -366,12 +416,17 @@ def unfolding_curve_dimer_dimeric_intermediate(T, T1, DH1, T2, DH2, bN, kN, bU, 
     fu = fu_three_state_dimer_dimeric_intermediate(K1, K2, C)
     fi = fi_three_state_dimer_dimeric_intermediate(fu, K2, C)
 
-    return (1 - fu - fi) * linear_signal(T, bN, kN) + fi * bI + fu * linear_signal(T, bU, kU) * 2
+    dT = shift_temperature_K(T)
+
+    S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
+    S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
+
+    return (1 - fu - fi) * S_native + fi * bI + fu * S_unfolded * 2
 
 
 def map_three_state_model_to_signal_fx(model):
     signal_fx_map = {
-        'Monomer': unfolding_curve_monomer_monomeric_intermediate,
+        'Monomer_monomeric_intermediate': unfolding_curve_monomer_monomeric_intermediate,
         'Dimer_monomeric_intermediate': unfolding_curve_dimer_monomeric_intermediate,
         'Dimer_dimeric_intermediate': unfolding_curve_dimer_dimeric_intermediate,
         'Trimer_monomeric_intermediate': unfolding_curve_trimer_monomeric_intermediate,
@@ -380,4 +435,3 @@ def map_three_state_model_to_signal_fx(model):
     }
 
     return signal_fx_map.get(model)
-'''
