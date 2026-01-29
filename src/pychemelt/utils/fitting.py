@@ -609,10 +609,10 @@ def fit_tc_unfolding_single_slopes(
 
     return global_fit_params, cov, predicted_lst
 
-def fit_oligomere_unfolding_single_slopes(
+def fit_oligomer_unfolding_single_slopes(
         list_of_temperatures,
         list_of_signals,
-        oligomere_concentrations,
+        oligomer_concentrations,
         initial_parameters,
         low_bounds,
         high_bounds,
@@ -624,7 +624,7 @@ def fit_oligomere_unfolding_single_slopes(
         dh_value=None,
 ):
     """
-    Vectorized and optimized version of global thermal unfolding fitting. of oligomeres
+    Vectorized and optimized version of global thermal unfolding fitting. of oligomers
 
     Parameters
     ----------
@@ -632,8 +632,8 @@ def fit_oligomere_unfolding_single_slopes(
         Temperature arrays for each dataset
     list_of_signals : list of array-like
         Signal arrays for each dataset
-    oligomere_concentrations : list
-        Oligomere concentrations (one per dataset)
+    oligomer_concentrations : list
+        oligomer concentrations (one per dataset)
     initial_parameters : array-like
         Initial guess for parameters
     low_bounds : array-like
@@ -671,7 +671,7 @@ def fit_oligomere_unfolding_single_slopes(
     T_all = np.concatenate(list_of_temperatures)
     y_all = np.concatenate(list_of_signals)
 
-    C_all = np.repeat(oligomere_concentrations, lengths)
+    C_all = np.repeat(oligomer_concentrations, lengths)
 
     # ------------------------------------------------------------
     # Baseline parameter requirements (resolved ONCE)
@@ -965,7 +965,7 @@ def fit_tc_unfolding_shared_slopes_many_signals(
 
     return global_fit_params, cov, predicted_lst
 
-def fit_oligomere_unfolding_shared_slopes_many_signals(
+def fit_oligomer_unfolding_shared_slopes_many_signals(
     list_of_temperatures,
     list_of_signals,
     signal_ids,
@@ -1357,6 +1357,236 @@ def fit_tc_unfolding_many_signals(
                 baseline_native_fx,
                 baseline_unfolded_fx,
                 c
+            )
+
+            scale_factor = 1 if not model_scale_factor else factors[i]
+
+            y = y * scale_factor
+
+            signal.append(y)
+
+        return np.concatenate(signal, axis=0)
+
+    global_fit_params, cov = curve_fit(
+        unfolding, 1, all_signal,
+        p0=initial_parameters,
+        bounds=(low_bounds, high_bounds))
+
+    predicted = unfolding(1, *global_fit_params)
+
+    # Convert predict to list of lists
+    predicted_lst = []
+
+    init = 0
+    for T in list_of_temperatures:
+        n = len(T)
+        predicted_lst.append(predicted[init:init + n])
+        init += n
+
+    # Convert the Tm to Celsius
+    global_fit_params[0] = temperature_to_celsius(global_fit_params[0])
+
+    return global_fit_params, cov, predicted_lst
+
+def fit_oligomer_unfolding_many_signals(
+        list_of_temperatures,
+        list_of_signals,
+        signal_ids,
+        oligomer_concentrations,
+        initial_parameters,
+        low_bounds, high_bounds,
+        signal_fx,
+        baseline_native_fx,
+        baseline_unfolded_fx,
+        fit_m1=False,
+        model_scale_factor=False,
+        scale_factor_exclude_ids=[],
+        cp_value=None,
+        fit_native_den_slope=True,
+        fit_unfolded_den_slope=True):
+    """
+    Fit thermochemical unfolding curves for many signals (optimized variant).
+
+    Parameters
+    ----------
+    list_of_temperatures : list of array-like
+    list_of_signals : list of array-like
+    signal_ids : list of int
+        Signal-type id for each dataset (0..n_signals-1)
+    oligomer_concentrations : list
+        oligomer concentrations for each dataset (flattened across signals)
+    initial_parameters : array-like
+        Initial guess for the parameters
+    low_bounds : array-like
+        Lower bounds for the parameters
+    high_bounds : array-like
+        Upper bounds for the parameters
+    signal_fx : callable
+        Signal model function
+    baseline_native_fx : callable
+        function to calculate the native state baseline
+    baseline_unfolded_fx : callable
+        function to calculate the unfolded state baseline
+    fit_m1 : bool, optional
+        Whether to include and fit temperature dependence of the m-value (m1)
+    model_scale_factor : bool, optional
+        If True, include a per-denaturant concentration scale factor to account for intensity differences
+    scale_factor_exclude_ids : list, optional
+        IDs of scale factors to exclude / fix to 1
+    cp_value : float or None, optional
+        If provided, Cp is fixed to this value and not fitted
+
+    Returns
+    -------
+    global_fit_params : numpy.ndarray
+    cov : numpy.ndarray
+    predicted_lst : list of numpy.ndarray
+    """
+
+    all_signal = np.concatenate(list_of_signals, axis=0)
+
+    n_signals = np.max(signal_ids) + 1
+
+    nr_olig = int(len(oligomer_concentrations) / n_signals)
+
+    if len(scale_factor_exclude_ids) > 0 and model_scale_factor:
+        # Sort them in ascending order to avoid issues when inserting
+        scale_factor_exclude_ids = sorted(scale_factor_exclude_ids)
+
+    baseline_native_params = [fit_native_den_slope] + baseline_fx_name_to_req_params(baseline_native_fx)
+    baseline_unfolded_params = [fit_unfolded_den_slope] + baseline_fx_name_to_req_params(baseline_unfolded_fx)
+
+    initial_parameters[0] = temperature_to_kelvin(initial_parameters[0])
+    low_bounds[0] = temperature_to_kelvin(low_bounds[0])
+    high_bounds[0] = temperature_to_kelvin(high_bounds[0])
+
+    list_of_temperatures = [temperature_to_kelvin(T) for T in list_of_temperatures]
+
+    def unfolding(dummyVariable, *args):
+
+        """
+        The parameters order is as follows:
+
+            Tm, Dh, Cp0
+
+            Intercept folded
+            Intercept unfolded
+
+            Temperature slope or term pre-exponential factor folded
+            Temperature slope term or pre-exponential factor unfolded
+
+            Denaturant slope term folded
+            Denaturant slope term unfolded
+
+            Quadratic coefficient or exponential coefficient folded
+            Quadratic coefficient or exponential coefficient unfolded
+
+        """
+
+        if cp_value is not None:
+
+            Cp0 = cp_value
+            Tm, DHm = args[:2]  # Enthalpy of unfolding, Temperature of melting
+            id_param_init = 2
+
+        else:
+
+            Tm, DHm, Cp0 = args[:3]  # Enthalpy of unfolding, Temperature of melting, Cp0
+            id_param_init = 3
+
+        # Intercept parameters
+        p2_Ns = args[id_param_init:id_param_init + n_signals]
+        p2_Us = args[id_param_init + n_signals:id_param_init + 2 * n_signals]
+
+        id_param_init = id_param_init + 2 * n_signals
+
+        # Temperature slope or pre-exponential parameters
+        if baseline_native_params[1]:
+
+            p3_Ns = args[id_param_init:id_param_init + n_signals]
+            id_param_init += n_signals
+
+        else:
+            p3_Ns = [0] * n_signals
+
+        if baseline_unfolded_params[1]:
+
+            p3_Us = args[id_param_init:id_param_init + n_signals]
+            id_param_init += n_signals
+
+        else:
+            p3_Us = [0] * n_signals
+
+        # Denaturant slope parameters
+        if baseline_native_params[0]:
+
+            p1_Ns = args[id_param_init:id_param_init + n_signals]
+            id_param_init += n_signals
+
+        else:
+
+            p1_Ns = [0] * n_signals
+
+        if baseline_unfolded_params[0]:
+
+            p1_Us = args[id_param_init:id_param_init + n_signals]
+            id_param_init += n_signals
+
+        else:
+
+            p1_Us = [0] * n_signals
+
+        # Temperature-dependent quadratic or exponential coefficients
+        if baseline_native_params[2]:
+
+            p4_Ns = args[id_param_init:id_param_init + n_signals]
+            id_param_init += n_signals
+
+        else:
+            p4_Ns = [0] * n_signals
+
+        if baseline_unfolded_params[2]:
+
+            p4_Us = args[id_param_init:id_param_init + n_signals]
+            id_param_init += n_signals
+
+        else:
+            p4_Us = [0] * n_signals
+
+        if model_scale_factor:
+            # One per denaturant concentration
+            factors = args[id_param_init:id_param_init + (nr_olig - len(scale_factor_exclude_ids))]
+
+            for id_ex in scale_factor_exclude_ids:
+                factors = np.insert(factors, id_ex, 1)
+
+            # Repeat the list so have the same length as list_of_temperatures, equal to denaturant concentration * number of signals
+            factors = np.tile(factors, n_signals)
+
+            id_param_init += nr_olig
+
+        signal = []
+
+        for i, T in enumerate(list_of_temperatures):
+
+            p1_N = p1_Ns[signal_ids[i]]
+            p1_U = p1_Us[signal_ids[i]]
+            p2_N = p2_Ns[signal_ids[i]]
+            p2_U = p2_Us[signal_ids[i]]
+            p3_N = p3_Ns[signal_ids[i]]
+            p3_U = p3_Us[signal_ids[i]]
+            p4_N = p4_Ns[signal_ids[i]]
+            p4_U = p4_Us[signal_ids[i]]
+
+            c = oligomer_concentrations[i]
+
+            y = signal_fx(
+                T, c, Tm, DHm,
+                p1_N, p2_N, p3_N, p4_N,
+                p1_U, p2_U, p3_U, p4_U,
+                baseline_native_fx,
+                baseline_unfolded_fx,
+                Cp0
             )
 
             scale_factor = 1 if not model_scale_factor else factors[i]
