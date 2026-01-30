@@ -931,7 +931,6 @@ def fit_oligomer_unfolding_three_states_single_slopes(
                 slopes and intercept of the folded and unfolded states
 
         """
-        i = 0
 
         # ---- Global thermodynamics ----
 

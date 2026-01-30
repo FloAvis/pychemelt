@@ -195,6 +195,9 @@ class ThermalOligomer(Sample):
 
         self.nr_olig = len(self.oligomer_concentrations)
 
+        # For compatibility:
+        self.nr_den = self.nr_olig
+
         # Expand the number of oligomer concentrations to match the number of signals
         oligomer_concentrations = [self.oligomer_concentrations for _ in range(self.nr_signals)]
 
@@ -205,7 +208,7 @@ class ThermalOligomer(Sample):
 
         self.oligomer_concentrations = np.array(self.oligomer_concentrations)
 
-        #self.denaturant_concentrations = self.oligomer_concentrations
+        self.denaturant_concentrations = self.oligomer_concentrations
 
         return None
 
@@ -568,13 +571,17 @@ class ThermalOligomer(Sample):
         # Initial parameters have to be in order:
         # Global melting temperature 1, Global enthalpy of unfolding 1,
         # Global melting temperature 2, Global enthalpy of unfolding 2,
-        # Cp0
         # Single intercepts folded, Single slopes folded,
         # Single intercepts unfolded, Single slopes unfolded
 
-        # Requires Cp0
-        if self.Cp0 <= 0:
-            raise ValueError('Cp0 must be positive. Please run guess_Cp before fitting globally.')
+        # For compatibility
+        self.cp_value = None
+        self.cp_limits = None
+
+        self.fixed_cp = False
+
+        self.limited_cp = False
+
 
         # Get Guess of Tm:
 
@@ -594,14 +601,15 @@ class ThermalOligomer(Sample):
         Tm1 = np.average(tm_lst) - 10
         Tm2 = np.average(tm_lst) + 10
 
-        p0 = [Tm1, 50, Tm2, 50, self.Cp0]
+        print(Tm1, Tm2)
+
+        p0 = [Tm1, 50, Tm2, 50]
 
         params_names = [
             'Tm1 (°C)',
             'ΔH1 (kcal/mol)',
             'Tm2 (°C)',
-            'ΔH2 (kcal/mol)',
-            'Cp (kcal/mol/°C)']
+            'ΔH2 (kcal/mol)']
 
         self.first_param_Ns_expanded = np.concatenate(self.first_param_Ns_per_signal, axis=0)
         self.first_param_Us_expanded = np.concatenate(self.first_param_Us_per_signal, axis=0)
@@ -611,11 +619,17 @@ class ThermalOligomer(Sample):
         self.third_param_Us_expanded = np.concatenate(self.third_param_Us_per_signal, axis=0)
 
         #Estimating intermediate intercept
-        argmin_x = [np.argmin(x) for x in self.temp_lst_multiple]
-        argmax_x = [np.argmax(x) for x in self.temp_lst_multiple]
 
-        self.bStart = np.array([y[idx] for idx, y in zip(argmin_x, self.signal_lst_multiple)])
-        self.bEnd = np.array([y[idx] for idx, y in zip(argmax_x, self.signal_lst_multiple)])
+        #print(self.temp_lst_multiple)
+        #print(np.array(self.signal_lst_multiple).shape)
+
+        argmin_x = [np.argmin(x) for x in self.temp_lst_multiple[0]]
+        argmax_x = [np.argmax(x) for x in self.temp_lst_multiple[0]]
+
+        #print(len(argmin_x))
+
+        self.bStart = np.array([y[idx] for idx, y in zip(argmin_x, self.signal_lst_multiple[0])])
+        self.bEnd = np.array([y[idx] for idx, y in zip(argmax_x, self.signal_lst_multiple[0])])
 
         self.intercept_intermediate = (self.bStart + self.bEnd) / 2
 
@@ -679,7 +693,7 @@ class ThermalOligomer(Sample):
         low_bounds = (p0.copy())
         high_bounds = (p0.copy())
 
-        low_bounds[5:], high_bounds[5:] = set_param_bounds(p0[5:], params_names[5:])
+        low_bounds[4:], high_bounds[4:] = set_param_bounds(p0[4:], params_names[4:])
 
         self.limited_tm = tm_limits is not None
 
@@ -727,35 +741,6 @@ class ThermalOligomer(Sample):
         low_bounds[3] = dh2_lower
         high_bounds[3] = dh2_upper
 
-        self.cp_value = cp_value
-        self.fixed_cp = cp_value is not None
-
-        self.limited_cp = cp_limits is not None and not self.fixed_cp
-
-        if self.limited_cp:
-
-            cp_lower, cp_upper = cp_limits
-
-        else:
-
-            cp_lower, cp_upper = 0.1, 5
-
-        if self.fixed_cp:
-
-            # Remove the Cp from p0, low_bounds and high_bounds
-            # Remove Cp0 from the parameter names
-            p0 = np.delete(p0, 4)
-            low_bounds = np.delete(low_bounds, 4)
-            high_bounds = np.delete(high_bounds, 4)
-            params_names.pop(4)
-
-        else:
-
-            low_bounds[4] = cp_lower
-            high_bounds[4] = cp_upper
-
-            # Verify that the Cp initial guess is within the user-defined limits
-            p0[4] = adjust_value_to_interval(p0[4], cp_lower, cp_upper, 0.5)
 
         # Populate the expanded signal and temperature lists
         self.expand_multiple_signal()
@@ -774,7 +759,6 @@ class ThermalOligomer(Sample):
             'initial_parameters': p0,
             'low_bounds': low_bounds,
             'high_bounds': high_bounds,
-            'cp_value': cp_value,
             'baseline_native_fx': self.baseline_N_fx,
             'baseline_unfolded_fx': self.baseline_U_fx,
             'signal_fx': signal_fx
@@ -783,7 +767,8 @@ class ThermalOligomer(Sample):
         fit_fx = fit_oligomer_unfolding_three_states_single_slopes
 
         step = 6
-        num_rows = len(self.oligomere_concentrations)
+        num_rows = len(self.oligomer_concentrations)
+
 
         if num_rows > 3:
             step += 2
@@ -799,8 +784,14 @@ class ThermalOligomer(Sample):
                 test_T1s = test_T1s + 10
                 test_T2s = test_T1s + 10
 
+            #print(test_T1s)
+            #print(test_T2s)
+
             combinations = [(t1, t2) for t1 in test_T1s for t2 in test_T2s]
             combinations = [(t1, t2) for t1, t2 in combinations if t1 < t2]
+
+            #print(step)
+            #print(combinations)
 
             df = pd.DataFrame(combinations, columns=['t1', 't2'])
 
@@ -809,24 +800,22 @@ class ThermalOligomer(Sample):
             #Using a subset for fitting
             kwargs['list_of_temperatures'] = self.temp_lst_expanded_subset
             kwargs['list_of_signals'] = self.signal_lst_expanded_subset
-            kwargs['fixed_t'] = True
+
 
             for index, row in df.iterrows():
                 kwargs['t1'] = row['t1']
                 kwargs['t2'] = row['t2']
 
-                fit_params, cov, _ = fit_oligomer_unfolding_three_states_single_slopes(**kwargs)
+                try:
+                    fit_params, cov, pred = fit_oligomer_unfolding_three_states_single_slopes(**kwargs)
+                except Exception as e:
+                    print(f"Warning: {e}")
+                    continue
 
-                # Insert fixed dh and ea
-                fit_params = np.insert(fit_params, 0, row['t1'])
-                fit_params = np.insert(fit_params, 2, row['t2'])
+                #print(np.array(pred).shape)
+                #print(np.array(self.signal_lst_expanded_subset).shape)
 
-                params_splt = split_all_params_three_state(fit_params, self.n, fit_slope_native, fit_slope_unfolded)
-
-                pred = predict_all_signal_nmer_with_intermediate(self.temperature, *params_splt, self.oligo_conc_lst,
-                                                                 signal_fx)
-
-                rss = np.nansum((pred - self.signal_useful) ** 2)
+                rss = np.nansum((np.array(pred) - np.array(self.signal_lst_expanded_subset)) ** 2)
                 rss_all.append(rss)
 
             idx = np.argmin(rss_all)
@@ -834,8 +823,14 @@ class ThermalOligomer(Sample):
             t1_init, t2_init = df['t1'][idx], df['t2'][idx]
             p0[0], p0[2] = t1_init, t2_init
 
-            low_bound[0], low_bound[2] = t1_init - 30, t2_init - 30
-            high_bound[0], high_bound[2] = t1_init + 30, t2_init + 30
+            low_bounds[0], low_bounds[2] = t1_init - 30, t2_init - 30
+            high_bounds[0], high_bounds[2] = t1_init + 30, t2_init + 30
+
+            kwargs['initial_parameters'] = p0
+            kwargs['low_bounds'] = low_bounds
+            kwargs['high_bounds'] = high_bounds
+
+
 
         # Do a quick prefit with a reduced data set
         if self.pre_fit:
@@ -846,6 +841,7 @@ class ThermalOligomer(Sample):
 
             p0 = global_fit_params
 
+
         # Now use the whole dataset
         kwargs['list_of_temperatures'] = self.temp_lst_expanded
         kwargs['list_of_signals'] = self.signal_lst_expanded
@@ -853,8 +849,10 @@ class ThermalOligomer(Sample):
         # First fit without m-value dependence on temperature
         global_fit_params, cov, predicted = fit_fx(**kwargs)
 
-        fit_m_dep = False
 
+
+        fit_m_dep = False
+        """
         global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
             global_fit_params,
             cov,
@@ -870,7 +868,7 @@ class ThermalOligomer(Sample):
             kwargs,
             fit_fx,
         )
-
+        """
         rel_errors = relative_errors(global_fit_params, cov)
 
         self.p0 = p0

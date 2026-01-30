@@ -18,7 +18,8 @@ from .utils.math import (
 from .utils.signals import (
     signal_two_state_tc_unfolding,
     signal_two_state_t_unfolding,
-    map_two_state_model_to_signal_fx
+    map_two_state_model_to_signal_fx,
+    map_three_state_model_to_signal_fx
 )
 
 from .utils.plotting import (
