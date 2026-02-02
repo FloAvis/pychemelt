@@ -347,7 +347,7 @@ def map_two_state_model_to_signal_fx(model):
 
     Parameters
     ----------
-    model: str,
+    model : str,
         string representation of model type.
 
     Returns

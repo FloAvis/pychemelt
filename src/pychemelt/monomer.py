@@ -257,6 +257,22 @@ class Monomer(Sample):
             window_range_native=12,
             window_range_unfolded=12
     ):
+        """
+        Estimate starting thermodynamic and baseline parameters for global fitting.
+
+        Parameters
+        ----------
+        native_baseline_type : {'constant', 'linear', 'quadratic', 'exponential'}
+            The model type for the native state baseline.
+        unfolded_baseline_type : {'constant', 'linear', 'quadratic', 'exponential'}
+            The model type for the unfolded state baseline.
+        window_range_native : float, optional
+            Temperature range at the start of the curve (in degrees) used for
+            native baseline estimation. Default is 12.
+        window_range_unfolded : float, optional
+            Temperature range at the end of the curve used for unfolded
+            baseline estimation. Default is 12.
+        """
 
         # We will use the Ratio signal, if available, to estimate the initial parameters
         use_ratio = 'Ratio' in self.signals and self.signal_names[0] != 'Ratio'

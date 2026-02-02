@@ -67,6 +67,11 @@ class ThermalOligomer(Sample):
             name of the used model. Can be: "Monomer", "Dimer", "Trimer", "Tetramer".
             Case insensitive
 
+        Raises
+        ------
+        ValueError
+            If the provided model name is not in the supported list.
+
         Notes
         -----
         This method creates/updates the following attributes on the instance:
@@ -183,6 +188,11 @@ class ThermalOligomer(Sample):
 
         """
         Guess the Cp of the sample by the number of residues.
+
+        Raises
+        ------
+        ValueError
+            If `self.n_residues` is not set.
 
         Notes
         -----
@@ -1049,6 +1059,11 @@ class ThermalOligomer(Sample):
             'derivative' uses the estimated derivative signal.
         scaled : bool, optional
             If True and signal_type == 'fitted' or 'raw', use the scaled versions if available.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with columns: ['Temperature', 'Signal', 'Oligomer', 'ID'].
         """
 
         # Flatten all arrays and repeat oligomer values accordingly

@@ -1,6 +1,6 @@
 """
 Main class to handle thermal and chemical denaturation data
-The current model assumes the protein is a monomer and that the unfolding is reversible
+The current model assumes that the unfolding is reversible
 """
 
 import pandas as pd
@@ -42,9 +42,42 @@ from .utils.processing import (
 
 class Sample:
     """
-    Class to hold the data of a single sample and fit it
-    """
+        Class to hold, process, and fit thermal and chemical denaturation data.
 
+        This class manages multiple signal types (e.g., 350nm, 330nm, Ratio) and
+        concentrations, providing an interface for global thermodynamic analysis
+        under the assumption of reversible unfolding.
+
+
+
+        Parameters
+        ----------
+        name : str, optional
+            Identifier for the sample. Default is 'Test'.
+
+        Attributes
+        ----------
+        signal_dic : dict
+            Raw signal data mapped by signal name.
+        temp_dic : dict
+            Temperature data mapped by signal name.
+        conditions : list of float
+            Processed numeric values for experimental conditions (e.g., [Denaturant]).
+        labels : list of str
+            Original string labels for each condition.
+        signals : list of str
+            Names of all available signal types in the loaded files.
+        nr_signals : int
+            Number of distinct signal types selected for analysis.
+        single_fit_done : bool
+            Flag indicating if individual dataset fits have been completed.
+        global_fit_done : bool
+            Flag for global thermodynamic fitting with local baselines.
+        global_global_fit_done : bool
+            Flag for global thermodynamics and global baseline slopes.
+        global_global_global_fit_done : bool
+            Flag for global thermodynamics, slopes, and intercepts.
+        """
     def __init__(self, name='Test'):
 
         self.name = name
@@ -480,7 +513,10 @@ class Sample:
         return None
 
     def reset_fittings_results(self):
+        """
+        Deletes the results of previous fittings from the object
 
+        """
         self.global_fit_done = False  # Global thermodynamic parameters, local baselines and slopes
         self.global_global_fit_done = False  # Global thermodynamic parameters, global slopes and local baselines
         self.global_global_global_fit_done = False  # Global thermodynamic parameters, global slopes and global baselines

@@ -42,7 +42,21 @@ __all__ = [
 ]
 
 def set_param_bounds(p0,param_names):
+    """
+    Generate heuristic lower and upper bounds for fitting parameters based on initial guesses.
 
+    Parameters
+    ----------
+    p0 : array-like
+        Initial parameter guesses.
+    param_names : list of str
+        Names of the parameters to apply specific logic (e.g., non-negative constraints).
+
+    Returns
+    -------
+    tuple
+        (low_bounds, high_bounds) as lists of numeric values.
+    """
     low_bounds = []
     high_bounds = []
 
@@ -273,6 +287,25 @@ def subset_signal_by_temperature(signal_lst, temp_lst, min_temp, max_temp):
     return subset_signal, subset_temp
 
 def guess_Tm_from_derivative(temp_lst, deriv_lst, x1, x2):
+    """
+    Estimate the melting temperature (Tm) by finding the extremum of the first derivative.
+
+    Parameters
+    ----------
+    temp_lst : list of np.ndarray
+        Temperature arrays for each dataset.
+    deriv_lst : list of np.ndarray
+        First derivative of the signal for each dataset.
+    x1 : float
+        Lower buffer from the temperature edges to exclude noise/artifacts.
+    x2 : float
+        Upper buffer from the temperature edges to define the baseline median window.
+
+    Returns
+    -------
+    list of float
+        Estimated Tm values for each dataset.
+    """
 
     t_melting_init = []
 
@@ -322,6 +355,10 @@ def estimate_signal_baseline_params(
 
     Parameters
     ---------
+    signal_lst : list of np.ndarray
+        List of signal arrays
+    temp_lst : list of np.ndarray
+        List of temperature arrays
     window_range_native : float
         Range of the temperature window to estimate the native state baseline
     window_range_unfolded : float
@@ -332,7 +369,9 @@ def estimate_signal_baseline_params(
         options: 'constant', 'linear', 'quadratic', 'exponential'
 
     Returns
-
+    -------
+    tuple
+        Lists of estimated parameters (p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us).
     """
 
     p1Ns  = []
@@ -427,7 +466,30 @@ def fit_local_thermal_unfolding_to_signal_lst(
     p3_Us,
     baseline_native_fx,
     baseline_unfolded_fx):
-    
+    """
+    Perform individual (local) fits for each signal curve in a list.
+
+    Parameters
+    ----------
+    signal_lst : list of np.ndarray
+        List of signals.
+    temp_lst : list of np.ndarray
+        List of temperatures.
+    t_melting_init : list of float
+        Initial Tm guesses.
+    p1_Ns, p1_Us, p2_Ns, p2_Us, p3_Ns, p3_Us : list of float
+        Estimated baseline parameters for each curve.
+    baseline_native_fx : callable
+        Function to calculate the native baseline.
+    baseline_unfolded_fx : callable
+        Function to calculate the unfolded baseline.
+
+    Returns
+    -------
+    tuple
+        (Tms, dHs, predicted_lst) containing fitted parameters and signal arrays.
+    """
+
     predicted_lst = []
     Tms           = []
     dHs           = []
@@ -496,15 +558,23 @@ def fit_local_thermal_unfolding_to_signal_lst(
     return Tms, dHs, predicted_lst
 
 def re_arrange_predictions(predicted_lst, n_signals, n_denaturants):
-
     """
-    Re-arrange the flattened predictions to match the original signal list with sublists
-    Args:
-        predicted_lst (list): Flattened list of predicted signals of length n_signals * n_denaturants
-        n_signals (int): Number of signals
-        n_denaturants (int): Number of denaturants
-    Returns:
-        list: Re-arranged list of predicted signals to be of length n_signals with sublists of length n_denaturants
+    Re-arrange the flattened predictions to match the original signal list with sublists.
+
+    Parameters
+    ----------
+    predicted_lst : list
+        Flattened list of predicted signals of length n_signals * n_denaturants.
+    n_signals : int
+        Number of signal types (e.g., different wavelengths).
+    n_denaturants : int
+        Number of denaturant concentrations or conditions per signal.
+
+    Returns
+    -------
+    list
+        Re-arranged list of predicted signals of length n_signals, where each element
+        is a sublist of length n_denaturants.
     """
 
     data = []
@@ -517,14 +587,21 @@ def re_arrange_predictions(predicted_lst, n_signals, n_denaturants):
     return data
 
 def re_arrange_params(params,n_signals):
-
     """
-    Re arrange the flattened parameters to be a list with sublists, as many sublists  as n_signals
-    Args:
-        params (list): Flattened list of parameters
-        n_signals (int): Number of signals
-    Returns:
-        list: Re-arranged list of parameters to be of length n_signals with sublists
+    Re-arrange flattened parameters into a list of sublists grouped by signal.
+
+    Parameters
+    ----------
+    params : list or np.ndarray
+        Flattened list of parameters.
+    n_signals : int
+        Number of signal types to group parameters by.
+
+    Returns
+    -------
+    list of np.ndarray
+        Re-arranged list of parameters of length n_signals containing
+        parameter arrays for each signal.
     """
 
     n_params = int(len(params) / n_signals)
@@ -540,13 +617,20 @@ def re_arrange_params(params,n_signals):
     return params_arranged
 
 def subset_data(data,max_points):
-
     """
-    Args:
-        data (np.ndarray): Input data array
-        max_points (int): Maximum number of points to keep
-    Returns:
-        np.ndarray: Subsetted data array
+    Reduces the number of data points by repeated striding until the size is below a threshold.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Input data array to be subsetted.
+    max_points : int
+        The maximum number of points allowed in the resulting array.
+
+    Returns
+    -------
+    np.ndarray
+        Subsetted data array containing every $2^n$-th point of the original.
     """
 
     # Remove one every two points until the number of points is less than max_points

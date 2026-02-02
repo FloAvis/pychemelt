@@ -37,14 +37,40 @@ def fu_two_state_dimer(K,C):
     '''
     Given the equilibrium constant K, of N2 <-> 2U, 
     and the concentration of dimer equivalent C, return the fraction of unfolded protein
+
+    Parameters
+    ----------
+    K : float
+        Equilibrium constant of the reaction N2 <-> 2U
+    C : float
+        Total concentration of the protein in dimer equivalents
+
+    Returns
+    -------
+    float
+        Fraction of unfolded protein
     '''
+
     return solve_one_root_quadratic(4*C, K, -K)
 
 def fu_two_state_trimer(K,C):
     '''
     Given the equilibrium constant K, of N3 <-> 3U, 
     and the concentration of trimer equivalent C, return the fraction of unfolded protein
+
+    Parameters
+    ----------
+    K : float
+        Equilibrium constant of the reaction N3 <-> 3U
+    C : float
+        Total concentration of the protein in trimer equivalents
+
+    Returns
+    -------
+    float
+        Fraction of unfolded protein
     '''
+
     p = K/27/np.square(C)
     return solve_one_root_depressed_cubic(p,-p)
 
@@ -52,6 +78,18 @@ def fu_two_state_tetramer(K,C):
     '''
     Given the equilibrium constant K, of N4 <-> 4U, 
     and the concentration of tetramer equivalent C, return the fraction of folded protein
+
+    Parameters
+    ----------
+    K : float
+        Equilibrium constant of the reaction N4 <-> 4U
+    C : float
+        Total concentration of the protein in tetramer equivalents
+
+    Returns
+    -------
+    float
+        Fraction of unfolded protein
     '''
 
     A = 1

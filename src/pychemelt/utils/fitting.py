@@ -1194,7 +1194,9 @@ def fit_tc_unfolding_many_signals(
     Parameters
     ----------
     list_of_temperatures : list of array-like
+        Temperature arrays for each dataset.
     list_of_signals : list of array-like
+        Signal arrays for each dataset.
     signal_ids : list of int
         Signal-type id for each dataset (0..n_signals-1)
     denaturant_concentrations : list
@@ -1221,12 +1223,17 @@ def fit_tc_unfolding_many_signals(
         IDs of scale factors to exclude / fix to 1
     cp_value : float or None, optional
         If provided, Cp is fixed to this value and not fitted
+    fit_native_den_slope, fit_unfolded_den_slope : bool, optional
+        Whether to fit denaturant dependence of baselines.
 
     Returns
     -------
     global_fit_params : numpy.ndarray
+         Fitted global parameters
     cov : numpy.ndarray
+        Covariance matrix
     predicted_lst : list of numpy.ndarray
+        Predicted signals per dataset
     """
 
     all_signal = np.concatenate(list_of_signals, axis=0)
@@ -1433,7 +1440,9 @@ def fit_oligomer_unfolding_many_signals(
     Parameters
     ----------
     list_of_temperatures : list of array-like
+        Temperature arrays for each dataset
     list_of_signals : list of array-like
+        Signal arrays for each dataset
     signal_ids : list of int
         Signal-type id for each dataset (0..n_signals-1)
     oligomer_concentrations : list
@@ -1457,13 +1466,16 @@ def fit_oligomer_unfolding_many_signals(
     cp_value : float or None, optional
         If provided, Cp is fixed to this value and not fitted
     fit_native_olig_slope, fit_unfolded_olig_slope : bool, optional
-        Whetever to fit the dependence of the slopes on the concentration
+        Whetever to fit the dependence of the slopes of the baselines
 
     Returns
     -------
     global_fit_params : numpy.ndarray
+         Fitted global parameters
     cov : numpy.ndarray
+        Covariance matrix
     predicted_lst : list of numpy.ndarray
+        Predicted signals per dataset
     """
 
     all_signal = np.concatenate(list_of_signals, axis=0)
@@ -1667,8 +1679,11 @@ def evaluate_need_to_refit(
     p0 : array-like
         Initial guess for parameters
     fit_m1 : bool, optional
+        Whether m1 (temperature dependence of m-value) is fitted
     check_cp, check_dh, check_tm : bool, optional
+        Whether to check boundaries for Cp, DHm, and Tm respectively
     fixed_cp : bool, optional
+        Whether the Cp value is fixed
     threshold : float, optional
         Threshold to compare if the fitted parameters are too close to the boundaries
 
