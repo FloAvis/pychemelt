@@ -49,6 +49,7 @@ class Monomer(Sample):
         self.fit_m_dep = False  # Fit the temperature dependence of the m-value
         self.thermodynamic_params_guess = None
         self.nr_den = 0  # Number of denaturant concentrations
+        self.oligomeric = False # Flag for oligomer for plotting
 
     def set_denaturant_concentrations(self, concentrations=None):
 
