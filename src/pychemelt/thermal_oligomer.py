@@ -53,8 +53,7 @@ class ThermalOligomer(Sample):
 
         super().__init__(name)
 
-        self.fit_m_dep = False  # Fit the temperature dependence of the m-value
-        self.thermodynamic_params_guess = None
+
         self.nr_olig = 0  # Number of oligomer concentrations
         self.model = None
 
@@ -851,7 +850,7 @@ class ThermalOligomer(Sample):
 
 
 
-        fit_m_dep = False
+
         """
         global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
             global_fit_params,
@@ -860,7 +859,7 @@ class ThermalOligomer(Sample):
             high_bounds,
             low_bounds,
             p0,
-            fit_m_dep,
+            False,
             self.limited_cp,
             self.limited_dh,
             self.limited_tm,
@@ -880,8 +879,6 @@ class ThermalOligomer(Sample):
         self.predicted_lst_multiple = re_arrange_predictions(predicted, self.nr_signals, self.nr_olig)
 
         self.global_fit_done = True
-
-        self.fit_m_dep = fit_m_dep
 
         self.params_names = params_names
 
@@ -1032,7 +1029,6 @@ class ThermalOligomer(Sample):
             'low_bounds': low_bounds,
             'high_bounds': high_bounds,
             'cp_value': self.cp_value,
-            'fit_m1': False,
             'signal_ids':self.signal_ids,
             'baseline_native_fx': self.baseline_N_fx,
             'baseline_unfolded_fx': self.baseline_U_fx,
@@ -1061,7 +1057,7 @@ class ThermalOligomer(Sample):
             high_bounds,
             low_bounds,
             p0,
-            self.fit_m_dep,
+            False,
             self.limited_cp,
             self.limited_dh,
             self.limited_tm,
@@ -1294,7 +1290,6 @@ class ThermalOligomer(Sample):
             'initial_parameters': p0,
             'low_bounds': low_bounds,
             'high_bounds': high_bounds,
-            'fit_m1': False,
             'model_scale_factor':model_scale_factor,
             'cp_value' : self.cp_value,
             'scale_factor_exclude_ids':scale_factor_exclude_ids,
@@ -1338,8 +1333,6 @@ class ThermalOligomer(Sample):
             # Add index according to the unfolded baseline polynomial order
             idx_start += unfolded_factor * self.nr_signals
 
-            # Take m1 into account, if fitting it
-            idx_start += self.fit_m_dep
 
             for _ in range(5):
 
