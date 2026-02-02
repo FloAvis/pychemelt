@@ -184,38 +184,22 @@ def test_fit_thermal_unfolding_global_global_global_failure():
     pytest.raises(ValueError, sample.fit_thermal_unfolding_global_global_global)
 
 def test_fit_thermal_unfolding_global_global_global_scaling():
-    scale_model = "Monomer"
-    scale_params = {
-        'dHm': 120,
-        'Tm': 65 + 273.15,
-        'Cp': 1.8,
-        'p1_N': 0,
-        'p2_N': 100,
-        'p3_N': 1,
-        'p4_N': 0.1,
-        'p1_U': 0,
-        'p2_U': 110,
-        'p3_U': 1,
-        'p4_U': 0.2,
-        'baseline_N_fx': exponential_baseline,
-        'baseline_U_fx': exponential_baseline,
-    }
-
     model = "Monomer"
     rng = np.random.default_rng(RNG_SEED)
 
+    #Using concentrations close to each other in order to trigger non-scaling
     scale_concs = [0.999999999999999, 1.00000000000000000001]
 
-    # Calculate signal range for proper y-axis scaling
-    scale_temp_range = np.linspace(20, 90, 100)
-    scale_temp_range_K = scale_temp_range + 273.15
+    temp_range = np.linspace(20, 90, 100)
+    temp_range_K = temp_range + 273.15
+
     signal_list = []
     temp_list = []
 
     signal_fx = map_two_state_model_to_signal_fx(model)
 
     for i, C in enumerate(scale_concs):
-        y = signal_fx(scale_temp_range_K, C, **def_params)
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to simulated signal
         y += rng.normal(0, 0.02, len(y))
@@ -224,18 +208,18 @@ def test_fit_thermal_unfolding_global_global_global_scaling():
         y *= rng.uniform(0.9, 1.1)
 
         signal_list.append(y)
-        temp_list.append(scale_temp_range)
+        temp_list.append(temp_range)
 
     pychem_sim = ThermalOligomer()
 
     pychem_sim.signal_dic['Simulated signal'] = signal_list
-    pychem_sim.temp_dic['Simulated signal'] = [scale_temp_range for _ in range(len(scale_concs))]
+    pychem_sim.temp_dic['Simulated signal'] = [temp_range for _ in range(len(scale_concs))]
 
     pychem_sim.set_model(model)
     pychem_sim.conditions = scale_concs
 
-    pychem_sim.global_min_temp = np.min(scale_temp_range)
-    pychem_sim.global_max_temp = np.max(scale_temp_range)
+    pychem_sim.global_min_temp = np.min(temp_range)
+    pychem_sim.global_max_temp = np.max(temp_range)
 
     pychem_sim.set_concentrations()
 
@@ -245,7 +229,7 @@ def test_fit_thermal_unfolding_global_global_global_scaling():
     pychem_sim.expand_multiple_signal()
 
     pychem_sim.estimate_baseline_parameters(
-        native_baseline_type='exponential',
+        native_baseline_type='linear',
         unfolded_baseline_type='exponential'
     )
 
@@ -253,7 +237,6 @@ def test_fit_thermal_unfolding_global_global_global_scaling():
     pychem_sim.guess_Cp()
 
     pychem_sim.fit_thermal_unfolding_global()
-
     pychem_sim.fit_thermal_unfolding_global_global()
     pychem_sim.fit_thermal_unfolding_global_global_global(model_scale_factor=True)
 

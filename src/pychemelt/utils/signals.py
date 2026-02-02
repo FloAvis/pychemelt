@@ -24,7 +24,8 @@ def signal_two_state_tc_unfolding(
         p1_N, p2_N, p3_N, p4_N,
         p1_U, p2_U, p3_U, p4_U,
         baseline_N_fx,
-        baseline_U_fx):
+        baseline_U_fx,
+        extra_arg=None):
 
     """
     Ref: Louise Hamborg et al., 2020. Global analysis of protein stability by temperature and chemical
@@ -54,7 +55,8 @@ def signal_two_state_tc_unfolding(
         for the native-state baseline
     baseline_U_fx : function
         for the unfolded-state baseline
-
+    extra_arg : None, optional
+        Not used but present for API compatibility with oligomeric models
     Returns
     -------
     numpy.ndarray
@@ -79,7 +81,8 @@ def signal_two_state_t_unfolding(
         p1_U, p2_U, p3_U,
         baseline_N_fx,
         baseline_U_fx,
-        Cp=0):
+        Cp=0,
+        extra_arg=None):
 
     """
     Two-state temperature unfolding (monomer).
@@ -102,6 +105,8 @@ def signal_two_state_t_unfolding(
         function to calculate the baseline for the unfolded state
     Cp : float, optional
         Variation of heat capacity between the two states (default: 0)
+    extra_arg : None, optional
+        Not used but present for compatibility
 
     Returns
     -------

@@ -229,11 +229,8 @@ def test_fit_monomer_unfolding_shared_slopes_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    # p0 includes initial parameters for m, m1 and the shared intercepts
-    # The pre-exp and exp coefficients are fitted separately
-    #p0 = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U] + [1,1]*len(concs) + [0,0]*len(concs) + [ALPHA_N_VAL, ALPHA_U_VAL]*len(concs)
-
-    p0 = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U] + [0.1] * (4 * len(concs))
+    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [PRE_EXP_N] * len(
+        concs) + [PRE_EXP_U] * len(concs) + [ALPHA_N_VAL] * len(concs) + [ALPHA_U_VAL] * len(concs)
 
     low_bounds = [-1      for _ in p0]
     high_bounds = [np.inf for _ in p0]
@@ -274,11 +271,8 @@ def test_fit_dimer_unfolding_shared_slopes_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    # p0 includes initial parameters for m, m1 and the shared intercepts
-    # The pre-exp and exp coefficients are fitted separately
-    #p0 = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U] + [1,1]*len(concs) + [0,0]*len(concs) + [ALPHA_N_VAL, ALPHA_U_VAL]*len(concs)
-
-    p0 = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U] + [0.1] * (4 * len(concs))
+    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [PRE_EXP_N] * len(
+        concs) + [PRE_EXP_U] * len(concs) + [ALPHA_N_VAL] * len(concs) + [ALPHA_U_VAL] * len(concs)
 
     low_bounds = [-1      for _ in p0]
     high_bounds = [np.inf for _ in p0]
@@ -319,11 +313,8 @@ def test_fit_trimer_unfolding_shared_slopes_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    # p0 includes initial parameters for m, m1 and the shared intercepts
-    # The pre-exp and exp coefficients are fitted separately
-    #p0 = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U] + [1,1]*len(concs) + [0,0]*len(concs) + [ALPHA_N_VAL, ALPHA_U_VAL]*len(concs)
-
-    p0 = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U] + [0.1] * (4 * len(concs))
+    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [PRE_EXP_N] * len(
+        concs) + [PRE_EXP_U] * len(concs) + [ALPHA_N_VAL] * len(concs) + [ALPHA_U_VAL] * len(concs)
 
     low_bounds = [-1      for _ in p0]
     high_bounds = [np.inf for _ in p0]
@@ -364,11 +355,7 @@ def test_fit_tetramer_unfolding_shared_slopes_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    # p0 includes initial parameters for m, m1 and the shared intercepts
-    # The pre-exp and exp coefficients are fitted separately
-    #p0 = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U] + [1,1]*len(concs) + [0,0]*len(concs) + [ALPHA_N_VAL, ALPHA_U_VAL]*len(concs)
-
-    p0 = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U] + [0.1] * (4 * len(concs))
+    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [PRE_EXP_N] * len(concs) + [PRE_EXP_U] * len(concs) + [ALPHA_N_VAL] * len(concs) + [ALPHA_U_VAL] * len(concs)
 
     low_bounds = [-1      for _ in p0]
     high_bounds = [np.inf for _ in p0]
@@ -411,8 +398,7 @@ def test_fit_monomer_unfolding_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    # p0 includes initial parameters for m, m1 and the shared intercepts
-    # The pre-exp and exp coefficients are fitted separately
+
     p0 = [Tm_VAL,DHm_VAL]
     p0 += [INTERCEPT_N, INTERCEPT_U]
     p0 += [ALPHA_N_VAL, ALPHA_U_VAL]
@@ -460,8 +446,7 @@ def test_fit_dimer_unfolding_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    # p0 includes initial parameters for m, m1 and the shared intercepts
-    # The pre-exp and exp coefficients are fitted separately
+
     p0 = [Tm_VAL,DHm_VAL]
     p0 += [INTERCEPT_N, INTERCEPT_U]
     p0 += [ALPHA_N_VAL, ALPHA_U_VAL]
@@ -509,8 +494,7 @@ def test_fit_trimer_unfolding_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    # p0 includes initial parameters for m, m1 and the shared intercepts
-    # The pre-exp and exp coefficients are fitted separately
+
     p0 = [Tm_VAL,DHm_VAL]
     p0 += [INTERCEPT_N, INTERCEPT_U]
     p0 += [ALPHA_N_VAL, ALPHA_U_VAL]
@@ -558,8 +542,6 @@ def test_fit_tetramer_unfolding_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    # p0 includes initial parameters for m, m1 and the shared intercepts
-    # The pre-exp and exp coefficients are fitted separately
     p0 = [Tm_VAL,DHm_VAL]
     p0 += [INTERCEPT_N, INTERCEPT_U]
     p0 += [ALPHA_N_VAL, ALPHA_U_VAL]
