@@ -774,6 +774,7 @@ class ThermalOligomer(Sample):
         if num_rows > 4:
             step += 2
 
+        # TODO: Figure out why this gridsearch destroys curve fitting
         if t1_init == 0 and t2_init == 0:
 
             test_T1s = np.arange(np.max([self.global_min_temp + 10, 20]), self.global_max_temp - 25, step)
@@ -830,7 +831,6 @@ class ThermalOligomer(Sample):
             kwargs['high_bounds'] = high_bounds
 
 
-
         # Do a quick prefit with a reduced data set
         if self.pre_fit:
             kwargs['list_of_temperatures'] = self.temp_lst_expanded_subset
@@ -851,7 +851,7 @@ class ThermalOligomer(Sample):
 
 
 
-        """
+
         global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
             global_fit_params,
             cov,
@@ -867,7 +867,7 @@ class ThermalOligomer(Sample):
             kwargs,
             fit_fx,
         )
-        """
+
         rel_errors = relative_errors(global_fit_params, cov)
 
         self.p0 = p0
