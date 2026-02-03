@@ -373,6 +373,7 @@ class ThermalOligomer(Sample):
 
         low_bounds[3:], high_bounds[3:] = set_param_bounds(p0[3:],params_names[3:])
 
+        # Adjusting boundaries based on the size of the oligomer
         self.limited_tm = tm_limits is not None
 
         if self.limited_tm:
@@ -381,8 +382,16 @@ class ThermalOligomer(Sample):
 
         else:
 
-            tm_lower = p0[0] - 12
+            tm_lower = p0[0] - 12 if self.model == 'Monomer' else p0[0] - 18
             tm_upper = np.max([self.user_max_temp + 20, p0[0] + 10])
+
+            if self.model in ['Trimer', 'Tetramer']:
+
+                tm_lower, p0[0] = tm_lower - 10, p0[0] - 10
+
+                if self.model == 'Tetramer':
+                    tm_lower, p0[0] = tm_lower - 10, p0[0] - 5
+
 
         low_bounds[0] = tm_lower
         high_bounds[0] = tm_upper
