@@ -16,7 +16,6 @@ __all__ = [
     "AxisConfig",
     "LayoutConfig",
     "LegendConfig",
-    "config_fig",
     "plot_unfolding"
 ]
 
@@ -145,9 +144,7 @@ def plot_unfolding(
     legend_config = legend_config or LegendConfig()
 
     # Extract the minimum and maximum denaturation concentration
-
     concs = pychemelt_sample.denaturant_concentrations
-
 
     min_conc = np.min(concs)
     max_conc = np.max(concs)

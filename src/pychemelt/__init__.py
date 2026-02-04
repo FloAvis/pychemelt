@@ -4,7 +4,6 @@ PyChemelt package for the analysis of chemical and thermal denaturation data
 
 from .main import Sample
 from .monomer import Monomer
-from .thermal_oligomer import ThermalOligomer
 
 from .utils.math import (
     get_rss,
@@ -17,8 +16,7 @@ from .utils.math import (
 
 from .utils.signals import (
     signal_two_state_tc_unfolding,
-    signal_two_state_t_unfolding,
-    map_two_state_model_to_signal_fx
+    signal_two_state_t_unfolding
 )
 
 from .utils.plotting import (
