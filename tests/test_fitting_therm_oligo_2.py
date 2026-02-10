@@ -229,8 +229,8 @@ def test_fit_monomer_unfolding_shared_slopes_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [PRE_EXP_N] * len(
-        concs) + [PRE_EXP_U] * len(concs) + [ALPHA_N_VAL] * len(concs) + [ALPHA_U_VAL] * len(concs)
+    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [
+        PRE_EXP_N] + [PRE_EXP_U] + [ALPHA_N_VAL] + [ALPHA_U_VAL]
 
     low_bounds = [-1      for _ in p0]
     high_bounds = [np.inf for _ in p0]
@@ -271,8 +271,8 @@ def test_fit_dimer_unfolding_shared_slopes_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [PRE_EXP_N] * len(
-        concs) + [PRE_EXP_U] * len(concs) + [ALPHA_N_VAL] * len(concs) + [ALPHA_U_VAL] * len(concs)
+    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [
+        PRE_EXP_N] + [PRE_EXP_U] + [ALPHA_N_VAL] + [ALPHA_U_VAL]
 
     low_bounds = [-1      for _ in p0]
     high_bounds = [np.inf for _ in p0]
@@ -313,8 +313,8 @@ def test_fit_trimer_unfolding_shared_slopes_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [PRE_EXP_N] * len(
-        concs) + [PRE_EXP_U] * len(concs) + [ALPHA_N_VAL] * len(concs) + [ALPHA_U_VAL] * len(concs)
+    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [
+        PRE_EXP_N] + [PRE_EXP_U] + [ALPHA_N_VAL] + [ALPHA_U_VAL]
 
     low_bounds = [-1      for _ in p0]
     high_bounds = [np.inf for _ in p0]
@@ -355,8 +355,8 @@ def test_fit_tetramer_unfolding_shared_slopes_many_signals_exponential():
         signal_list.append(y)
         temp_list.append(temp_range)
 
-    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [PRE_EXP_N] * len(concs) + [PRE_EXP_U] * len(concs) + [ALPHA_N_VAL] * len(concs) + [ALPHA_U_VAL] * len(concs)
-
+    p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [
+        PRE_EXP_N] + [PRE_EXP_U] + [ALPHA_N_VAL] + [ALPHA_U_VAL]
     low_bounds = [-1      for _ in p0]
     high_bounds = [np.inf for _ in p0]
 
