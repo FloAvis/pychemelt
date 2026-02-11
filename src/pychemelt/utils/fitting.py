@@ -1144,6 +1144,12 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
 
         return predicted_all - all_signal
 
+    for i in range(len(low_bounds)):
+        if low_bounds[i] >= high_bounds[i]:
+            print(i)
+            print(low_bounds[i])
+            print(high_bounds[i])
+
     # Run least_squares fit
     res = least_squares(
         residuals,
@@ -1631,6 +1637,12 @@ def fit_oligomer_unfolding_many_signals(
             signal.append(y)
 
         return np.concatenate(signal, axis=0)
+
+    for i in range(len(low_bounds)):
+        if low_bounds[i] >= high_bounds[i]:
+            print(i)
+            print(low_bounds[i])
+            print(high_bounds[i])
 
     global_fit_params, cov = curve_fit(
         unfolding, 1, all_signal,

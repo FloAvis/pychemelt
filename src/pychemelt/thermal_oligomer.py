@@ -382,15 +382,15 @@ class ThermalOligomer(Sample):
 
         else:
 
-            tm_lower = p0[0] - 12 if self.model == 'Monomer' else p0[0] - 18
-            tm_upper = p0[0] + 30 if self.model == 'Monomer' else p0[0] + 25
+            tm_lower = p0[0] - 12 if self.model == 'Monomer' else p0[0] - 20
+            tm_upper = p0[0] + 20 if self.model == 'Monomer' else p0[0] + 30
 
             if self.model in ['Trimer', 'Tetramer']:
 
-                tm_lower, tm_upper, p0[0] = tm_lower - 10, tm_upper - 10, p0[0] - 10
+                tm_lower, tm_upper, p0[0] = tm_lower + 10, tm_upper + 10, p0[0] + 20
 
                 if self.model == 'Tetramer':
-                    tm_lower, tm_upper, p0[0] = tm_lower - 10, tm_upper - 10, p0[0] - 5
+                    tm_lower, tm_upper, p0[0] = tm_lower + 10, tm_upper + 10, p0[0] + 40
 
 
         low_bounds[0] = tm_lower
