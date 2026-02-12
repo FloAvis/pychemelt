@@ -1474,7 +1474,7 @@ def fit_oligomer_unfolding_many_signals(
     fit_native_olig_slope, fit_unfolded_olig_slope : bool, optional
         Whetever to fit the dependence of the slopes of the baselines
 
-    Returns
+   Returns
     -------
     global_fit_params : numpy.ndarray
          Fitted global parameters
@@ -1498,7 +1498,7 @@ def fit_oligomer_unfolding_many_signals(
     baseline_unfolded_params = [fit_unfolded_olig_slope] + baseline_fx_name_to_req_params(baseline_unfolded_fx)
 
     initial_parameters[0] = temperature_to_kelvin(initial_parameters[0])
-    low_bounds[0] = temperature_to_kelvin(low_bounds[0])
+    low_bounds[0] = temperature_to_kelvin(max(low_bounds[0], 273.15))
     high_bounds[0] = temperature_to_kelvin(high_bounds[0])
 
     list_of_temperatures = [temperature_to_kelvin(T) for T in list_of_temperatures]
@@ -1638,11 +1638,15 @@ def fit_oligomer_unfolding_many_signals(
 
         return np.concatenate(signal, axis=0)
 
+    """    
     for i in range(len(low_bounds)):
+        print("test")
         if low_bounds[i] >= high_bounds[i]:
             print(i)
             print(low_bounds[i])
             print(high_bounds[i])
+            print(params_names[i])
+    """
 
     global_fit_params, cov = curve_fit(
         unfolding, 1, all_signal,

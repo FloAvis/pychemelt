@@ -172,8 +172,8 @@ def two_state_thermal_unfold_curve(
 
     dT  = shift_temperature_K(T)
 
-    S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
-    S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
     return fn*(S_native) + fu*(S_unfolded)
 

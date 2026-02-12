@@ -112,8 +112,8 @@ class Sample:
 
         self.global_fit_params = None
 
-        self.global_min_temp = 30
-        self.global_max_temp = 80
+        self.global_min_temp = 20
+        self.global_max_temp = 100
 
         self.n_residues = 0
 

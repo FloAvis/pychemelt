@@ -298,7 +298,7 @@ class ThermalOligomer(Sample):
 
 
 
-        p0 = [Tm, 40, self.Cp0]
+        p0 = [Tm, 100, self.Cp0]
 
 
         params_names = [
@@ -465,13 +465,117 @@ class ThermalOligomer(Sample):
 
         # Do a quick prefit with a reduced data set
         if self.pre_fit:
+            step = 6
+            num_rows = len(self.oligomer_concentrations)
 
-            kwargs['list_of_temperatures'] = self.temp_lst_expanded_subset
-            kwargs['list_of_signals'] = self.signal_lst_expanded_subset
+            if num_rows > 3:
+                step += 2
+            if num_rows > 4:
+                step += 2
 
-            global_fit_params, cov, predicted = fit_fx(**kwargs)
+            # TODO: Figure out why this gridsearch destroys curve fitting
+            if not self.limited_tm or not self.limited_dh:
 
-            p0 = global_fit_params
+                #test_Ts = np.arange(np.max([self.global_min_temp + 10, 20]), self.global_max_temp - 20, step)
+                test_Ts = np.arange(20, 100, step)
+                test_Hs = np.arange(20, 200, step)
+
+                if self.model in ['Tetramer', 'Trimer']:
+                    test_Ts = test_Ts + 10
+                    test_Hs = test_Hs + 20
+
+                    if self.model == 'Tetramer':
+                        test_Ts = test_Ts + 10
+                        test_Hs = test_Hs + 20
+
+                print(test_Ts)
+                print(test_Hs)
+
+                combinations = [(tm, dh) for tm in test_Ts for dh in test_Hs]
+
+                df = pd.DataFrame(combinations, columns=['tm', 'dh'])
+
+                rss_all = []
+
+                # Using a subset for fitting
+                kwargs['list_of_temperatures'] = self.temp_lst_expanded_subset
+                kwargs['list_of_signals'] = self.signal_lst_expanded_subset
+
+                temp_p0 = (p0.copy())
+
+
+                """
+                temp_low_bounds = (low_bounds.copy())
+                temp_high_bounds = (high_bounds.copy())
+                
+
+                # Remove the Cp from p0, low_bounds and high_bounds
+                # Remove Cp0 from the parameter names
+                temp_p0 = np.delete(temp_p0, 2)
+                temp_low_bounds = np.delete(temp_low_bounds, 2)
+                temp_high_bounds = np.delete(temp_high_bounds, 2)
+
+                kwargs['low_bounds'] = temp_low_bounds
+                kwargs['high_bounds'] = temp_high_bounds
+                kwargs['cp_value'] = 0
+
+
+                temp_low_bounds = (low_bounds.copy())
+                temp_high_bounds = (high_bounds.copy())
+
+                temp_low_bounds[0], temp_high_bounds[0] = 0, 100
+                temp_low_bounds[1], temp_high_bounds[1] = 0, 1000
+
+                kwargs['low_bounds'] = temp_low_bounds
+                kwargs['high_bounds'] = temp_high_bounds
+                
+                """
+
+                fit_params_all = []
+
+                for index, row in df.iterrows():
+                    temp_p0[0] = row['tm']
+                    temp_p0[1] = row['dh']
+
+                    kwargs['initial_parameters'] = temp_p0
+
+                    try:
+                        fit_params, cov, pred = fit_fx(**kwargs)
+                    except Exception as e:
+                        print(f"Warning: {e}")
+                        continue
+
+                    rss = np.nansum((np.array(pred) - np.array(self.signal_lst_expanded_subset)) ** 2)
+                    rss_all.append(rss)
+                    fit_params_all.append(fit_params)
+
+                print(rss_all)
+
+                idx = np.argmin(rss_all)
+
+                tm_init, dh_init = df['tm'][idx], df['dh'][idx]
+                print(tm_init, dh_init)
+                #p0[0], p0[1] = tm_init, dh_init
+
+                p0 = fit_params_all[idx]
+
+                low_bounds[0], low_bounds[1] = tm_init - 50, dh_init - 50
+                high_bounds[0], high_bounds[1] = tm_init + 50, dh_init + 50
+
+                low_bounds[0] = max(low_bounds[0], 0)
+
+                #kwargs['cp_value'] = cp_value
+                kwargs['initial_parameters'] = p0
+                kwargs['low_bounds'] = low_bounds
+                kwargs['high_bounds'] = high_bounds
+
+            else:
+                kwargs['list_of_temperatures'] = self.temp_lst_expanded_subset
+                kwargs['list_of_signals'] = self.signal_lst_expanded_subset
+
+                global_fit_params, cov, predicted = fit_fx(**kwargs)
+
+                p0 = global_fit_params
 
         # Now use the whole dataset
         kwargs['list_of_temperatures'] = self.temp_lst_expanded
