@@ -1144,12 +1144,6 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
 
         return predicted_all - all_signal
 
-    for i in range(len(low_bounds)):
-        if low_bounds[i] >= high_bounds[i]:
-            print(i)
-            print(low_bounds[i])
-            print(high_bounds[i])
-
     # Run least_squares fit
     res = least_squares(
         residuals,
@@ -1498,7 +1492,7 @@ def fit_oligomer_unfolding_many_signals(
     baseline_unfolded_params = [fit_unfolded_olig_slope] + baseline_fx_name_to_req_params(baseline_unfolded_fx)
 
     initial_parameters[0] = temperature_to_kelvin(initial_parameters[0])
-    low_bounds[0] = temperature_to_kelvin(max(low_bounds[0], 273.15))
+    low_bounds[0] = temperature_to_kelvin(low_bounds[0])
     high_bounds[0] = temperature_to_kelvin(high_bounds[0])
 
     list_of_temperatures = [temperature_to_kelvin(T) for T in list_of_temperatures]
@@ -1827,7 +1821,8 @@ def evaluate_fitting_and_refit(
         fixed_cp,
         kwargs,
         fit_fx,
-        n = 3):
+        n = 3,
+        threshold=0.05):
 
     """
     Evaluate if the fitted parameters are too close to the fitting boundaries.
@@ -1863,6 +1858,8 @@ def evaluate_fitting_and_refit(
         function to perform the fitting
     n: int, optional
         number of times to re-fit
+    threshold : float, optional
+        Threshold to compare if the fitted parameters are too close to the boundaries
 
     Returns
     -------
@@ -1891,7 +1888,8 @@ def evaluate_fitting_and_refit(
             check_cp=not limited_cp,
             check_dh=not limited_dh,
             check_tm=not limited_tm,
-            fixed_cp=fixed_cp
+            fixed_cp=fixed_cp,
+            threshold=threshold,
         )
 
         if re_fit:

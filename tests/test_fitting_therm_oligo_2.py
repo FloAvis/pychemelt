@@ -17,11 +17,11 @@ RNG_SEED = 2
 TEMP_START = 27.0
 TEMP_STOP = 90.0
 N_TEMPS = 80
-CONCS = [0.01, 1, 2, 2.6, 3, 4, 5]
+CONCS = np.arange(10, 100, 10)*1e-6
 
 # Model / ground-truth parameters
-DHm_VAL = 120
-Tm_VAL = 65
+DHm_VAL = 150
+Tm_VAL = 70
 CP0_VAL = 1.8
 
 INTERCEPT_N = 100

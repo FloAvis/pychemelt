@@ -1,5 +1,5 @@
 """
-Test file for thermal unfolding of oligomeres based difference in concentrations
+Test file for thermal unfolding of oligomers based difference in concentrations
 """
 
 import numpy as np
@@ -8,7 +8,7 @@ import pytest
 
 from pychemelt.thermal_oligomer import ThermalOligomer
 
-from pychemelt.utils.math import linear_baseline, exponential_baseline, quadratic_baseline
+from pychemelt.utils.math import linear_baseline, exponential_baseline
 
 from pychemelt.utils.signals import (
     map_two_state_model_to_signal_fx
@@ -19,14 +19,15 @@ from pychemelt.utils.signals import (
 RNG_SEED = 2
 TEMP_START = 20.0
 TEMP_STOP = 90.0
-N_TEMPS = 100
-CONCS = [0.01, 1, 2, 2.6, 3, 4, 5]
+N_TEMPS = 150
+CONCS = np.arange(10, 80, 10)*1e-6
 
 # Model / ground-truth parameters
 DHm_VAL = 100
-Tm_VAL = 50
-CP0_VAL = 1.8
+Tm_VAL = 70
+CP0_VAL = 1.0
 
+DHm_INCREASE = 50
 
 INTERCEPT_N = 24
 SLOPE_N = -0.27
@@ -106,7 +107,7 @@ def aux_create_pychem_sim(params,concs, model):
         unfolded_baseline_type='exponential'
     )
 
-    pychem_sim.n_residues = 150  # only for cp initial guess
+    pychem_sim.n_residues = 80  # only for cp initial guess
     pychem_sim.guess_Cp()
 
     return pychem_sim
@@ -300,12 +301,13 @@ def test_fit_thermal_unfolding_global_global_global_monomer():
                                rtol=0.1, atol=0)
 
 # Testing Dimer model
+def_params['dHm'] = def_params['dHm'] + DHm_INCREASE
 
 dimer_sim = aux_create_pychem_sim(def_params, concs, "Dimer")
 
 def test_fit_thermal_unfolding_global_dimer():
     # local slopes and baselines
-    expected = [Tm_VAL, DHm_VAL, CP0_VAL]
+    expected = [Tm_VAL, DHm_VAL + DHm_INCREASE, CP0_VAL]
 
     dimer_sim.fit_thermal_unfolding_global()
 
@@ -313,35 +315,35 @@ def test_fit_thermal_unfolding_global_dimer():
 
     # fixed Tm limits
 
-    monomer_sim.fit_thermal_unfolding_global(tm_limits=[Tm_VAL-12, Tm_VAL+20])
+    dimer_sim.fit_thermal_unfolding_global(tm_limits=[Tm_VAL-12, Tm_VAL+20])
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(dimer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
 
     # fixed dh limits
 
-    monomer_sim.fit_thermal_unfolding_global(dh_limits=[10, 500])
+    dimer_sim.fit_thermal_unfolding_global(dh_limits=[10, 500])
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(dimer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
 
     # fixed cp limits
 
-    monomer_sim.fit_thermal_unfolding_global(cp_limits=[0.1, 5])
+    dimer_sim.fit_thermal_unfolding_global(cp_limits=[0.1, 5])
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(dimer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
 
     # fixed cp
 
-    expected = [Tm_VAL, DHm_VAL]
+    expected = [Tm_VAL, DHm_VAL + DHm_INCREASE]
 
-    monomer_sim.fit_thermal_unfolding_global(cp_value=CP0_VAL)
+    dimer_sim.fit_thermal_unfolding_global(cp_value=CP0_VAL)
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:2, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(dimer_sim.params_df.iloc[:2, 1], expected, rtol=0.1, atol=0)
 
 
 def test_fit_thermal_unfolding_global_global_dimer():
-    expected = [Tm_VAL, DHm_VAL, CP0_VAL, SLOPE_N, SLOPE_U, EXPONENT_U]
+    expected = [Tm_VAL, DHm_VAL + DHm_INCREASE, CP0_VAL, SLOPE_N, SLOPE_U, EXPONENT_U]
 
-    monomer_sim.fit_thermal_unfolding_global()
+    dimer_sim.fit_thermal_unfolding_global()
 
     dimer_sim.fit_thermal_unfolding_global_global()
 
@@ -349,7 +351,7 @@ def test_fit_thermal_unfolding_global_global_dimer():
                                rtol=0.1, atol=0)
 
 def test_fit_thermal_unfolding_global_global_global_dimer():
-    expected = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U, SLOPE_N, SLOPE_U, EXPONENT_U]
+    expected = [Tm_VAL, DHm_VAL + DHm_INCREASE, CP0_VAL, INTERCEPT_N, INTERCEPT_U, SLOPE_N, SLOPE_U, EXPONENT_U]
 
     dimer_sim.fit_thermal_unfolding_global_global_global(model_scale_factor=True)
 
@@ -358,12 +360,13 @@ def test_fit_thermal_unfolding_global_global_global_dimer():
 
 
 # Testing Trimer model
+def_params['dHm'] = def_params['dHm'] + DHm_INCREASE
 
 trimer_sim = aux_create_pychem_sim(def_params, concs, "Trimer")
 
 def test_fit_thermal_unfolding_global_trimer():
     # local slopes and baselines
-    expected = [Tm_VAL, DHm_VAL, CP0_VAL]
+    expected = [Tm_VAL, DHm_VAL + 2*DHm_INCREASE, CP0_VAL]
 
     trimer_sim.fit_thermal_unfolding_global()
 
@@ -371,33 +374,33 @@ def test_fit_thermal_unfolding_global_trimer():
 
     # fixed Tm limits
 
-    monomer_sim.fit_thermal_unfolding_global(tm_limits=[Tm_VAL-12, Tm_VAL+20])
+    trimer_sim.fit_thermal_unfolding_global(tm_limits=[Tm_VAL-12, Tm_VAL+20])
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(trimer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
 
     # fixed dh limits
 
-    monomer_sim.fit_thermal_unfolding_global(dh_limits=[10, 500])
+    trimer_sim.fit_thermal_unfolding_global(dh_limits=[10, 500])
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(trimer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
 
     # fixed cp limits
 
-    monomer_sim.fit_thermal_unfolding_global(cp_limits=[0.1, 5])
+    trimer_sim.fit_thermal_unfolding_global(cp_limits=[0.1, 5])
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(trimer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
 
     # fixed cp
 
-    expected = [Tm_VAL, DHm_VAL]
+    expected = [Tm_VAL, DHm_VAL + 2*DHm_INCREASE]
 
-    monomer_sim.fit_thermal_unfolding_global(cp_value=CP0_VAL)
+    trimer_sim.fit_thermal_unfolding_global(cp_value=CP0_VAL)
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:2, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(trimer_sim.params_df.iloc[:2, 1], expected, rtol=0.1, atol=0)
 
 
 def test_fit_thermal_unfolding_global_global_trimer():
-    expected = [Tm_VAL, DHm_VAL, CP0_VAL, SLOPE_N, SLOPE_U, EXPONENT_U]
+    expected = [Tm_VAL, DHm_VAL + 2*DHm_INCREASE, CP0_VAL, SLOPE_N, SLOPE_U, EXPONENT_U]
 
     trimer_sim.fit_thermal_unfolding_global()
 
@@ -407,7 +410,7 @@ def test_fit_thermal_unfolding_global_global_trimer():
                                rtol=0.1, atol=0)
 
 def test_fit_thermal_unfolding_global_global_global_trimer():
-    expected = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U, SLOPE_N, SLOPE_U, EXPONENT_U]
+    expected = [Tm_VAL, DHm_VAL + 2*DHm_INCREASE, CP0_VAL, INTERCEPT_N, INTERCEPT_U, SLOPE_N, SLOPE_U, EXPONENT_U]
 
     trimer_sim.fit_thermal_unfolding_global_global_global(model_scale_factor=True)
 
@@ -416,12 +419,13 @@ def test_fit_thermal_unfolding_global_global_global_trimer():
 
 
 # Testing Tetramer model
+def_params['dHm'] = def_params['dHm'] + DHm_INCREASE
 
 tetramer_sim = aux_create_pychem_sim(def_params, concs, "Tetramer")
 
 def test_fit_thermal_unfolding_global_tetramer():
     # local slopes and baselines
-    expected = [Tm_VAL, DHm_VAL, CP0_VAL]
+    expected = [Tm_VAL, DHm_VAL + 3*DHm_INCREASE, CP0_VAL]
 
     tetramer_sim.fit_thermal_unfolding_global()
 
@@ -429,33 +433,33 @@ def test_fit_thermal_unfolding_global_tetramer():
 
     # fixed Tm limits
 
-    monomer_sim.fit_thermal_unfolding_global(tm_limits=[Tm_VAL - 12, Tm_VAL + 20])
+    tetramer_sim.fit_thermal_unfolding_global(tm_limits=[Tm_VAL - 12, Tm_VAL + 20])
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(tetramer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
 
     # fixed dh limits
 
-    monomer_sim.fit_thermal_unfolding_global(dh_limits=[10, 500])
+    tetramer_sim.fit_thermal_unfolding_global(dh_limits=[10, 500])
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(tetramer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
 
     # fixed cp limits
 
-    monomer_sim.fit_thermal_unfolding_global(cp_limits=[0.1, 5])
+    tetramer_sim.fit_thermal_unfolding_global(cp_limits=[0.1, 5])
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(tetramer_sim.params_df.iloc[:3, 1], expected, rtol=0.1, atol=0)
 
     # fixed cp
 
-    expected = [Tm_VAL, DHm_VAL]
+    expected = [Tm_VAL, DHm_VAL + 3*DHm_INCREASE]
 
-    monomer_sim.fit_thermal_unfolding_global(cp_value=CP0_VAL)
+    tetramer_sim.fit_thermal_unfolding_global(cp_value=CP0_VAL)
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:2, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(tetramer_sim.params_df.iloc[:2, 1], expected, rtol=0.1, atol=0)
 
 
 def test_fit_thermal_unfolding_global_global_tetramer():
-    expected = [Tm_VAL, DHm_VAL, CP0_VAL, SLOPE_N, SLOPE_U, EXPONENT_U]
+    expected = [Tm_VAL, DHm_VAL + 3*DHm_INCREASE, CP0_VAL, SLOPE_N, SLOPE_U, EXPONENT_U]
 
     tetramer_sim.fit_thermal_unfolding_global()
 
@@ -465,12 +469,23 @@ def test_fit_thermal_unfolding_global_global_tetramer():
                                rtol=0.1, atol=0)
 
 def test_fit_thermal_unfolding_global_global_global_tetramer():
-    expected = [Tm_VAL, DHm_VAL, CP0_VAL, INTERCEPT_N, INTERCEPT_U, SLOPE_N, SLOPE_U, EXPONENT_U]
+    expected = [Tm_VAL, DHm_VAL + 3*DHm_INCREASE, CP0_VAL, INTERCEPT_N, INTERCEPT_U, SLOPE_N, SLOPE_U, EXPONENT_U]
 
     tetramer_sim.fit_thermal_unfolding_global_global_global(model_scale_factor=True)
 
     np.testing.assert_allclose(tetramer_sim.params_df.iloc[[0, 1, 2, 3, 4, 5, 6, 9], 1], expected,
                                rtol=0.1, atol=0)
+
+# generating failing fit
+
+def_params['dHm'] = 120
+trimer_sim_fail = aux_create_pychem_sim(def_params, concs, "Trimer")
+
+def test_fit_thermal_unfolding_global_warning():
+
+    with pytest.warns(UserWarning):
+        trimer_sim_fail.fit_thermal_unfolding_global()
+
 
 def test_signal_to_df():
 
@@ -480,7 +495,7 @@ def test_signal_to_df():
 
         df = monomer_sim.signal_to_df(signal_type=signal_type, scaled=False)
 
-        assert len(df) == 700
+        assert len(df) == len(concs) * N_TEMPS
 
     signal_type_options = ['raw','fitted']
 
@@ -488,7 +503,7 @@ def test_signal_to_df():
 
         df = monomer_sim.signal_to_df(signal_type=signal_type, scaled=True)
 
-        assert len(df) == 700
+        assert len(df) == len(concs) * N_TEMPS
         assert np.max(df['Signal']) <= 100
 
 
