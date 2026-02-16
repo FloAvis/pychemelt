@@ -156,7 +156,7 @@ def plot_unfolding(
     # Extract the minimum and maximum denaturation concentration
     concs = pychemelt_sample.denaturant_concentrations
 
-    # Showing correct scale
+    # Adjusting scale depending on highest concentration
     scale = "M"
 
     if np.max(concs) < 1e-1:

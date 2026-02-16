@@ -1,5 +1,5 @@
 """
-Main class to handle thermal denaturation data of mono- and oligomers
+Main class to handle thermal denaturation data of mono- and oligomers up to tetramers
 The current model assumes the proteins' unfolding is reversible
 """
 
@@ -295,9 +295,16 @@ class ThermalOligomer(Sample):
 
         Tm = np.average(tm_lst)
 
+        dh = 100
 
+        if self.model == 'Dimer':
+            dh = 120
+        elif self.model == 'Trimer':
+            dh = 150
+        elif self.model == 'Tetramer':
+            dh = 180
 
-        p0 = [Tm, 100, self.Cp0]
+        p0 = [Tm, dh, self.Cp0]
 
 
         params_names = [
@@ -495,9 +502,10 @@ class ThermalOligomer(Sample):
             threshold=0.0005,
         )
 
+        # If the fitting returns a large error it is recommended to turn off the CP0 value fitting
         if np.nansum((np.array(predicted) - np.array(self.signal_lst_expanded)) ** 2) > 10000:
             warn('The fitted signal deviates heavily from the experimental data in the global fit. '
-                 'Consider ignoring the CP0 value by setting "cp_value=0" in the fit_thermal_unfolding_global() function')
+                 'Consider not fitting the CP0 value by setting "cp_value=0" in the fit_thermal_unfolding_global() function')
 
         rel_errors = relative_errors(global_fit_params, cov)
 

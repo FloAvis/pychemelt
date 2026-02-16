@@ -1632,16 +1632,6 @@ def fit_oligomer_unfolding_many_signals(
 
         return np.concatenate(signal, axis=0)
 
-    """    
-    for i in range(len(low_bounds)):
-        print("test")
-        if low_bounds[i] >= high_bounds[i]:
-            print(i)
-            print(low_bounds[i])
-            print(high_bounds[i])
-            print(params_names[i])
-    """
-
     global_fit_params, cov = curve_fit(
         unfolding, 1, all_signal,
         p0=initial_parameters,
