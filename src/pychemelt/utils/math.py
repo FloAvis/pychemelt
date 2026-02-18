@@ -21,9 +21,7 @@ __all__ = [
     "first_derivative_savgol",
     "relative_errors",
     "find_line_outliers",
-    "get_rss",
-    "solve_one_root_quadratic",
-    "solve_one_root_depressed_cubic",
+    "get_rss"
 ]
 
 def temperature_to_kelvin(T):
@@ -343,45 +341,3 @@ def get_rss(y, y_fit):
     rss       = np.sum(residuals ** 2)
 
     return rss
-
-
-def solve_one_root_quadratic(a,b,c):
-    """
-    Solution to one root quadratic: a * X**2 + b * X + c = 0
-    
-    Parameters
-    ----------
-    a : number type
-        parameter a
-    b : number type
-        parameter b
-    c : number type
-        parameter c
-
-    Returns
-    -------
-    float
-        Solution of the formula
-    """
-    return 2*c / (-b - np.sqrt(b**2 - 4*a*c))
-
-def solve_one_root_depressed_cubic(p,q):
-    """
-    Solution to one root depressed cubic: X**3 + p * X + q = 0
-    
-    Parameters
-    ----------
-    p : number type
-        parameter p
-    q : number type
-        parameter q
-
-    Returns
-    -------
-    float
-        Solution of the formula
-    """
-
-    delta = np.sqrt((q**2/4) + (p**3/27))
-
-    return np.cbrt(-q/2+delta) + np.cbrt(-q/2-delta)
