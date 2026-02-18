@@ -1,26 +1,28 @@
 """
-Main class to handle thermal and chemical denaturation data
-The current model assumes the protein is a monomer and that the unfolding is reversible
+Main class to handle thermal denaturation data of mono- and oligomers up to tetramers
+The current model assumes the proteins' unfolding is reversible
 """
 
 import pandas as pd
 import numpy as np
+from warnings import warn
 
 from itertools import chain
 from copy import deepcopy
 
 from .main import Sample
 
-from .utils.signals import signal_two_state_tc_unfolding
+from .utils.signals import (
+    map_two_state_model_to_signal_fx,
+)
 
 from .utils.math import (
     temperature_to_kelvin,
     relative_errors,
-    find_line_outliers
 )
 
 from .utils.processing import (
-    fit_local_thermal_unfolding_to_signal_lst,
+    guess_Tm_from_derivative,
     set_param_bounds,
     adjust_value_to_interval,
     re_arrange_params,
@@ -30,46 +32,85 @@ from .utils.processing import (
 
 from .utils.fitting import (
     fit_line_robust,
-    fit_tc_unfolding_single_slopes,
-    fit_tc_unfolding_shared_slopes_many_signals,
-    fit_tc_unfolding_many_signals,
+    fit_oligomer_unfolding_single_slopes,
+    fit_oligomer_unfolding_shared_slopes_many_signals,
+    fit_oligomer_unfolding_many_signals,
     evaluate_fitting_and_refit,
     baseline_fx_name_to_req_params
 )
 
-class Monomer(Sample):
+
+
+class ThermalOligomer(Sample):
     """
-    Class to hold the data of a single sample and fit it
+    Class to hold the data of a DSF experiment of thermal unfolding with different concentrations of oligomers
     """
 
     def __init__(self, name='Test'):
 
         super().__init__(name)
 
-        self.fit_m_dep = False  # Fit the temperature dependence of the m-value
-        self.thermodynamic_params_guess = None
-        self.nr_den = 0  # Number of denaturant concentrations
-        self.oligomeric = False # Flag for oligomer for plotting
+        self.nr_olig = 0  # Number of oligomer concentrations
+        self.model = None # Oligomer model type
+        self.oligomeric = True # Flag for oligomer for plotting
 
-    def set_denaturant_concentrations(self, concentrations=None):
+    def set_model(self, model_name):
 
         """
-        Set the denaturant concentrations for the sample
+        Set thermodynamic model of oligomer used for the analysis.
+        Currently supported are 2 state models of monomeres, dimers, trimeres and tetrameres
+
+        Parameters
+        ----------
+        model_name : str
+            name of the used model. Can be: "Monomer", "Dimer", "Trimer", "Tetramer".
+            Case insensitive
+
+        Raises
+        ------
+        ValueError
+            If the provided model name is not in the supported list.
+
+        Notes
+        -----
+        This method creates/updates the following attributes on the instance:
+        - self.model: oligomeric model used for analysis
+        """
+
+        allowed_models = ["monomer", "dimer", "trimer", "tetramer"]
+
+        model = model_name.lower()
+
+        if model not in allowed_models:
+            raise ValueError(
+            f"Invalid model '{model_name}'. "
+            f"Allowed models are: {', '.join(m.capitalize() for m in allowed_models)}."
+        )
+
+        # Save model with first letter uppercase
+        self.model = model.capitalize()
+
+        return None
+
+    def set_concentrations(self, concentrations=None):
+
+        """
+        Set the oligomer concentrations for the sample 
 
         Parameters
         ----------
         concentrations : list, optional
-            List of denaturant concentrations. If None, use the sample conditions
+            List of oligomer concentrations. If None, use the sample conditions
 
         Notes
         -----
-        Creates/updates attribute `denaturant_concentrations_pre` (numpy.ndarray)
+        Creates/updates attribute `oligomer_concentrations_pre` (numpy.ndarray)
         """
 
         if concentrations is None:
             concentrations = self.conditions
 
-        self.denaturant_concentrations_pre = np.array(concentrations)
+        self.oligomer_concentrations_pre = np.array(concentrations)
 
         return None
 
@@ -92,15 +133,15 @@ class Monomer(Sample):
         -----
         Creates/updates several attributes used by downstream fitting:
         - signal_lst_multiple, temp_lst_multiple : lists of lists with selected data
-        - denaturant_concentrations : list of selected denaturant concentrations
-        - denaturant_concentrations_expanded : flattened numpy array matching expanded signals
-        - boolean_lst, normalise_to_global_max, nr_den : control flags/values
+        - oligomer_concentrations : list of selected oligomer concentrations
+        - oligomer_concentrations_expanded : flattened numpy array matching expanded signals
+        - boolean_lst, normalise_to_global_max, nr_olig : control flags/values
         """
 
         if boolean_lst is None:
             self.signal_lst_multiple = self.signal_lst_pre_multiple
             self.temp_lst_multiple = self.temp_lst_pre_multiple
-            self.denaturant_concentrations = self.denaturant_concentrations_pre
+            self.oligomer_concentrations = self.oligomer_concentrations_pre
         else:
 
             self.signal_lst_multiple = [None for _ in range(len(self.signal_lst_pre_multiple))]
@@ -111,7 +152,7 @@ class Monomer(Sample):
                                                boolean_lst[j]]
                 self.temp_lst_multiple[i] = [x for j, x in enumerate(self.temp_lst_pre_multiple[i]) if boolean_lst[j]]
 
-            self.denaturant_concentrations = [x for i, x in enumerate(self.denaturant_concentrations_pre) if
+            self.oligomer_concentrations = [x for i, x in enumerate(self.oligomer_concentrations_pre) if
                                               boolean_lst[i]]
 
         if normalise_to_global_max:
@@ -122,69 +163,40 @@ class Monomer(Sample):
             for i in range(len(self.signal_lst_multiple)):
                 self.signal_lst_multiple[i] = [x / global_max * 100 for x in self.signal_lst_multiple[i]]
 
-        self.nr_den = len(self.denaturant_concentrations)
+        self.nr_olig = len(self.oligomer_concentrations)
 
-        # Expand the number of denaturant concentrations to match the number of signals
-        denaturant_concentrations = [self.denaturant_concentrations for _ in range(self.nr_signals)]
+        # For compatibility
+        self.nr_den = self.nr_olig
 
-        self.denaturant_concentrations_expanded = np.concatenate(denaturant_concentrations, axis=0)
+        # Expand the number of oligomer concentrations to match the number of signals
+        oligomer_concentrations = [self.oligomer_concentrations for _ in range(self.nr_signals)]
+
+        self.oligomer_concentrations_expanded = np.concatenate(oligomer_concentrations, axis=0)
 
         self.boolean_lst = boolean_lst
         self.normalise_to_global_max = normalise_to_global_max
 
-        self.denaturant_concentrations = np.array(self.denaturant_concentrations)
+        self.oligomer_concentrations = np.array(self.oligomer_concentrations)
+
+        self.denaturant_concentrations = self.oligomer_concentrations
 
         return None
 
-
-    def fit_thermal_unfolding_local(self):
-
-        """
-        Fit the thermal unfolding of the sample using the signal and temperature data
-        We fit one curve at a time, with individual parameters
-        """
-
-        # Require self.t_melting_init_multiple
-        if self.t_melting_init_multiple is None:
-
-            self.estimate_derivative()
-            self.guess_Tm()
-
-        self.Tms_multiple = []
-        self.dHs_multiple = []
-        self.predicted_lst_multiple = []
-
-        for i in range(len(self.signal_lst_multiple)):
-
-            Tms, dHs, predicted_lst = fit_local_thermal_unfolding_to_signal_lst(
-                self.signal_lst_multiple[i],
-                self.temp_lst_multiple[i],
-                self.t_melting_init_multiple[i],
-                self.first_param_Ns_per_signal[i],
-                self.first_param_Us_per_signal[i],
-                self.second_param_Ns_per_signal[i],
-                self.second_param_Us_per_signal[i],
-                self.third_param_Ns_per_signal[i],
-                self.third_param_Us_per_signal[i],
-                baseline_native_fx=self.baseline_N_fx,
-                baseline_unfolded_fx=self.baseline_U_fx
-            )
-
-            self.Tms_multiple.append(Tms)
-            self.dHs_multiple.append(dHs)
-            self.predicted_lst_multiple.append(predicted_lst)
-
-        self.single_fit_done = True
-
-        return None
-
+    
     def guess_Cp(self):
 
         """
-        Guess the Cp of the sample by fitting a line to the Tm and dH values
+        Guess the Cp of the sample by the number of residues.
+
+        Raises
+        ------
+        ValueError
+            If `self.n_residues` is not set.
 
         Notes
         -----
+        The number of residues represent the total number of residues in the oligomer
+
         This method creates/updates attributes used later in fitting:
         - Tms, dHs, slope_dh_tm, intercept_dh_tm, Cp0, Cp0 assigned to self.Cp0
         """
@@ -195,53 +207,7 @@ class Monomer(Sample):
 
         # Requires self.single_fit_done
 
-        expected_Cp0 = self.n_residues * 0.0148 - 0.1267
-
-        if not self.single_fit_done:
-            self.fit_thermal_unfolding_local()
-
-        try:
-
-            Tms = []
-            dHs = []
-
-            for i in range(len(self.Tms_multiple)):
-                Tms.extend(self.Tms_multiple[i])
-                dHs.extend(self.dHs_multiple[i])
-
-            self.Tms = Tms
-            self.dHs = dHs
-
-            tms = np.array(self.Tms)
-            dhs = np.array(self.dHs)
-
-            m, b = fit_line_robust(tms, dhs)
-
-            outliers = find_line_outliers(m, b, tms, dhs)
-
-            if len(outliers) > 0:
-                # Remove outliers
-                tms = np.delete(tms, outliers)
-                dhs = np.delete(dhs, outliers)
-
-                # Assign the new values
-                self.Tms = tms
-                self.dHs = dhs
-
-                m, b = fit_line_robust(self.Tms, self.dHs)
-
-            self.slope_dh_tm = m
-            self.intercept_dh_tm = b
-
-            Cp0 = m if m > 0 else -1
-
-            # Verify that the initial Cp is between the expected range
-            if Cp0 < expected_Cp0 / 1.5 or Cp0 > expected_Cp0 * 1.5:
-                Cp0 = expected_Cp0
-
-        except:
-
-            Cp0 = expected_Cp0
+        Cp0 = self.n_residues * 0.0148 - 0.1267
 
         # Cp0 needs to be positive
         Cp0 = max(Cp0, 0)
@@ -249,66 +215,8 @@ class Monomer(Sample):
         self.Cp0 = Cp0
 
         return None
-
-    def guess_initial_parameters(
-            self,
-            native_baseline_type,
-            unfolded_baseline_type,
-            window_range_native=12,
-            window_range_unfolded=12
-    ):
-        """
-        Estimate starting thermodynamic and baseline parameters for global fitting.
-
-        Parameters
-        ----------
-        native_baseline_type : {'constant', 'linear', 'quadratic', 'exponential'}
-            The model type for the native state baseline.
-        unfolded_baseline_type : {'constant', 'linear', 'quadratic', 'exponential'}
-            The model type for the unfolded state baseline.
-        window_range_native : float, optional
-            Temperature range at the start of the curve (in degrees) used for
-            native baseline estimation. Default is 12.
-        window_range_unfolded : float, optional
-            Temperature range at the end of the curve used for unfolded
-            baseline estimation. Default is 12.
-        """
-
-        # We will use the Ratio signal, if available, to estimate the initial parameters
-        use_ratio = 'Ratio' in self.signals and self.signal_names[0] != 'Ratio'
-
-        if use_ratio:
-
-            current_signal = self.signal_names[0]
-
-            # Extract temperature limits
-            self.set_signal('Ratio')
-            self.select_conditions(self.boolean_lst, normalise_to_global_max=True)
-            self.set_temperature_range(self.user_min_temp, self.user_max_temp)
-
-        # Fit the data using the linear - constant option
-        self.estimate_baseline_parameters(
-            native_baseline_type,
-            unfolded_baseline_type,
-            window_range_native,
-            window_range_unfolded
-        )
-
-        self.fit_thermal_unfolding_local()
-        self.guess_Cp()
-
-        # Apply a first fitting round to obtain initial estimates for the thermodynamic parameters
-        self.fit_thermal_unfolding_global()
-
-        self.thermodynamic_params_guess = self.global_fit_params[:4]
-
-        if use_ratio:
-            # Go back to the original signal
-            self.set_signal(current_signal)
-            self.select_conditions(self.boolean_lst, normalise_to_global_max=self.normalise_to_global_max)
-            self.set_temperature_range(self.user_min_temp, self.user_max_temp)
-
-        return None
+    
+    
 
     def create_dg_df(self):
 
@@ -336,7 +244,6 @@ class Monomer(Sample):
 
     def fit_thermal_unfolding_global(
             self,
-            fit_m_dep=False,
             cp_limits=None,
             dh_limits=None,
             tm_limits=None,
@@ -349,8 +256,6 @@ class Monomer(Sample):
 
         Parameters
         ----------
-        fit_m_dep : bool, optional
-            If True, fit the temperature dependence of the m-value
         cp_limits : list, optional
             List of two values, the lower and upper bounds for the Cp value. If None, bounds set automatically
         dh_limits : list, optional
@@ -366,28 +271,46 @@ class Monomer(Sample):
         - bNs_expanded, bUs_expanded, kNs_expanded, kUs_expanded, qNs_expanded, qUs_expanded
         - p0, low_bounds, high_bounds, global_fit_params, rel_errors
         - predicted_lst_multiple, params_names, params_df, dg_df
-        - flags: global_fit_done, fit_m_dep, limited_tm, limited_dh, limited_cp, fixed_cp
+        - flags: global_fit_done, limited_tm, limited_dh, limited_cp, fixed_cp
         """
 
         # Requires Cp0
         if self.Cp0 <= 0:
             raise ValueError('Cp0 must be positive. Please run guess_Cp before fitting globally.')
 
-        max_tm_id = np.argmax(self.Tms)
+        # Get Guess of Tm:
+        
+        tm_lst = []
 
-        if self.thermodynamic_params_guess is None:
+        x1 = 6
+        x2 = 11
 
-            p0 = [self.Tms[max_tm_id], np.max([self.dHs[max_tm_id], 80]), self.Cp0, 2.8]
+        for i in range(len(self.signal_lst_multiple)):
+            tm_lst.append(guess_Tm_from_derivative(
+                self.temp_deriv_lst_multiple[i],
+                self.deriv_lst_multiple[i],
+                x1,
+                x2
+            ))
 
-        else:
+        Tm = np.average(tm_lst)
 
-            p0 = self.thermodynamic_params_guess
+        dh = 100
+
+        if self.model == 'Dimer':
+            dh = 120
+        elif self.model == 'Trimer':
+            dh = 150
+        elif self.model == 'Tetramer':
+            dh = 180
+
+        p0 = [Tm, dh, self.Cp0]
+
 
         params_names = [
             'Tm (°C)',
             'ΔH (kcal/mol)',
-            'Cp (kcal/mol/°C)',
-            'm-value (kcal/mol/M)']
+            'Cp (kcal/mol/°C)']
 
         self.first_param_Ns_expanded = np.concatenate(self.first_param_Ns_per_signal, axis=0)
         self.first_param_Us_expanded = np.concatenate(self.first_param_Us_per_signal, axis=0)
@@ -398,17 +321,17 @@ class Monomer(Sample):
 
         p0 = np.concatenate([p0, self.first_param_Ns_expanded, self.first_param_Us_expanded])
 
-        # We need to append as many bN and bU as the number of denaturant concentrations
+        # We need to append as many bN and bU as the number of oligomer concentrations
         # times the number of signal types
         for signal in self.signal_names:
 
-            params_names += (['intercept_native - ' + str(self.denaturant_concentrations[i]) +
-                              ' - ' + str(signal) for i in range(self.nr_den)])
+            params_names += (['intercept_native - ' + str(self.oligomer_concentrations[i]) +
+                              ' - ' + str(signal) for i in range(self.nr_olig)])
 
         for signal in self.signal_names:
 
-            params_names += (['intercept_unfolded - ' + str(self.denaturant_concentrations[i]) +
-                              ' - ' + str(signal) for i in range(self.nr_den)])
+            params_names += (['intercept_unfolded - ' + str(self.oligomer_concentrations[i]) +
+                              ' - ' + str(signal) for i in range(self.nr_olig)])
 
         if self.native_baseline_type in ['linear', 'quadratic','exponential']:
 
@@ -417,8 +340,8 @@ class Monomer(Sample):
             p0 = np.concatenate([p0, self.second_param_Ns_expanded])
 
             for signal in self.signal_names:
-                params_names += ([param_name + ' - ' + str(self.denaturant_concentrations[i]) +
-                                  ' - ' + str(signal) for i in range(self.nr_den)])
+                params_names += ([param_name + ' - ' + str(self.oligomer_concentrations[i]) +
+                                  ' - ' + str(signal) for i in range(self.nr_olig)])
 
         if self.unfolded_baseline_type in ['linear', 'quadratic','exponential']:
 
@@ -427,8 +350,8 @@ class Monomer(Sample):
             p0 = np.concatenate([p0, self.second_param_Us_expanded])
 
             for signal in self.signal_names:
-                params_names += ([param_name + ' - ' + str(self.denaturant_concentrations[i]) +
-                                  ' - ' + str(signal) for i in range(self.nr_den)])
+                params_names += ([param_name + ' - ' + str(self.oligomer_concentrations[i]) +
+                                  ' - ' + str(signal) for i in range(self.nr_olig)])
 
         if self.native_baseline_type in ['quadratic', 'exponential']:
 
@@ -437,8 +360,8 @@ class Monomer(Sample):
             p0 = np.concatenate([p0, self.third_param_Ns_expanded])
             for signal in self.signal_names:
 
-                params_names += ([param_name + ' - ' + str(self.denaturant_concentrations[i]) +
-                                  ' - ' + str(signal) for i in range(self.nr_den)])
+                params_names += ([param_name + ' - ' + str(self.oligomer_concentrations[i]) +
+                                  ' - ' + str(signal) for i in range(self.nr_olig)])
 
         if self.unfolded_baseline_type in ['quadratic', 'exponential']:
 
@@ -448,14 +371,15 @@ class Monomer(Sample):
 
             for signal in self.signal_names:
 
-                params_names += ([param_name + ' - ' + str(self.denaturant_concentrations[i]) +
-                                  ' - ' + str(signal) for i in range(self.nr_den)])
+                params_names += ([param_name + ' - ' + str(self.oligomer_concentrations[i]) +
+                                  ' - ' + str(signal) for i in range(self.nr_olig)])
 
         low_bounds = (p0.copy())
         high_bounds = (p0.copy())
 
-        low_bounds[4:], high_bounds[4:] = set_param_bounds(p0[4:],params_names[4:])
+        low_bounds[3:], high_bounds[3:] = set_param_bounds(p0[3:],params_names[3:])
 
+        # Adjusting boundaries based on the size of the oligomer
         self.limited_tm = tm_limits is not None
 
         if self.limited_tm:
@@ -464,8 +388,16 @@ class Monomer(Sample):
 
         else:
 
-            tm_lower = p0[0] - 12
-            tm_upper = np.max([self.user_max_temp + 20, p0[0] + 10])
+            tm_lower = p0[0] - 12 if self.model == 'Monomer' else p0[0] - 20
+            tm_upper = p0[0] + 20 if self.model == 'Monomer' else p0[0] + 30
+
+            if self.model in ['Trimer', 'Tetramer']:
+
+                tm_lower, tm_upper, p0[0] = tm_lower + 10, tm_upper + 10, p0[0] + 10
+
+                if self.model == 'Tetramer':
+                    tm_lower, tm_upper, p0[0] = tm_lower + 10, tm_upper + 20, p0[0] + 20
+
 
         low_bounds[0] = tm_lower
         high_bounds[0] = tm_upper
@@ -482,16 +414,9 @@ class Monomer(Sample):
             p0[1] = adjust_value_to_interval(p0[1], dh_lower, dh_upper, 1)
 
         else:
+            dh_lower = 10
+            dh_upper = 500
 
-            if self.thermodynamic_params_guess is None:
-
-                dh_lower = 10
-                dh_upper = 500
-
-            else:
-
-                dh_lower = self.thermodynamic_params_guess[1] / 5
-                dh_upper = self.thermodynamic_params_guess[1] * 5
 
         low_bounds[1] = dh_lower
         high_bounds[1] = dh_upper
@@ -526,26 +451,23 @@ class Monomer(Sample):
             # Verify that the Cp initial guess is within the user-defined limits
             p0[2] = adjust_value_to_interval(p0[2], cp_lower, cp_upper, 0.5)
 
-        id_m = 2 + (not self.fixed_cp)
-
-        low_bounds[id_m] = 0.5
-        high_bounds[id_m] = 9
-
         # Populate the expanded signal and temperature lists
         self.expand_multiple_signal()
 
+        signal_fx = map_two_state_model_to_signal_fx(self.model)
+
         kwargs = {
-            'denaturant_concentrations' : self.denaturant_concentrations_expanded,
+            'oligomer_concentrations' : self.oligomer_concentrations_expanded,
             'initial_parameters': p0,
             'low_bounds' : low_bounds,
             'high_bounds' : high_bounds,
             'cp_value' : cp_value,
             'baseline_native_fx' : self.baseline_N_fx,
             'baseline_unfolded_fx' : self.baseline_U_fx,
-            'signal_fx' : signal_two_state_tc_unfolding
+            'signal_fx' : signal_fx
         }
 
-        fit_fx = fit_tc_unfolding_single_slopes
+        fit_fx = fit_oligomer_unfolding_single_slopes
 
         # Do a quick prefit with a reduced data set
         if self.pre_fit:
@@ -561,26 +483,7 @@ class Monomer(Sample):
         kwargs['list_of_temperatures'] = self.temp_lst_expanded
         kwargs['list_of_signals'] = self.signal_lst_expanded
 
-        # First fit without m-value dependence on temperature
         global_fit_params, cov, predicted = fit_fx(**kwargs)
-
-        # Insert the initial estimate for the m-value dependence of temperature, in the position 4
-        if fit_m_dep:
-
-            kwargs['fit_m1'] = fit_m_dep
-
-            p0 = global_fit_params
-            p0 = np.insert(p0, id_m+1, 0)
-            low_bounds = np.insert(low_bounds, id_m+1, -0.5)
-            high_bounds = np.insert(high_bounds, id_m+1, 0.5)
-
-            kwargs['initial_parameters'] = p0
-            kwargs['low_bounds'] = low_bounds
-            kwargs['high_bounds'] = high_bounds
-
-            params_names.insert(id_m+1, 'm - T dependence')
-
-            global_fit_params, cov, predicted = fit_fx(**kwargs)
 
         global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
             global_fit_params,
@@ -589,14 +492,20 @@ class Monomer(Sample):
             high_bounds,
             low_bounds,
             p0,
-            fit_m_dep,
+            False,
             self.limited_cp,
             self.limited_dh,
             self.limited_tm,
             self.fixed_cp,
             kwargs,
             fit_fx,
+            threshold=0.0005,
         )
+
+        # If the fitting returns a large error it is recommended to turn off the CP0 value fitting
+        if np.nansum((np.array(predicted) - np.array(self.signal_lst_expanded)) ** 2) > 10000:
+            warn('The fitted signal deviates heavily from the experimental data in the global fit. '
+                 'Consider not fitting the CP0 value by setting "cp_value=0" in the fit_thermal_unfolding_global() function')
 
         rel_errors = relative_errors(global_fit_params, cov)
 
@@ -606,11 +515,9 @@ class Monomer(Sample):
         self.global_fit_params = global_fit_params
         self.rel_errors = rel_errors
 
-        self.predicted_lst_multiple = re_arrange_predictions(predicted, self.nr_signals, self.nr_den)
+        self.predicted_lst_multiple = re_arrange_predictions(predicted, self.nr_signals, self.nr_olig)
 
         self.global_fit_done = True
-
-        self.fit_m_dep = fit_m_dep
 
         self.params_names = params_names
 
@@ -639,13 +546,13 @@ class Monomer(Sample):
         if self.signal_ids is None:
             self.set_signal_id()
 
-        param_init = 3 + self.fit_m_dep + (self.cp_value is None)
+        param_init = 2 + (self.cp_value is None)
 
         p0 = self.global_fit_params[:param_init]
         low_bounds = self.low_bounds[:param_init]
         high_bounds = self.high_bounds[:param_init]
 
-        n_datasets = self.nr_den * self.nr_signals
+        n_datasets = self.nr_olig * self.nr_signals
 
         p1Ns = self.global_fit_params[param_init:param_init + n_datasets]
         p1Us = self.global_fit_params[param_init + n_datasets:param_init + 2 * n_datasets]
@@ -703,7 +610,7 @@ class Monomer(Sample):
         low_bounds = np.concatenate([low_bounds, low_bounds_p1Ns, low_bounds_p1Us])
         high_bounds = np.concatenate([high_bounds, high_bounds_p1Ns, high_bounds_p1Us])
 
-        # Baselines are still independent for each signal and denaturant concentration
+        # Baselines are still independent for each signal and oligomer concentration
         # Slopes and quadratic terms are shared - per signal only
 
         if self.native_baseline_type in ['linear', 'quadratic','exponential']:
@@ -750,23 +657,24 @@ class Monomer(Sample):
                 low_bounds = np.append(low_bounds, np.min(low_bounds_qUs_i))
                 high_bounds = np.append(high_bounds, np.max(high_bounds_qUs_i))
 
+        signal_fx = map_two_state_model_to_signal_fx(self.model)
+
         kwargs = {
 
-            'denaturant_concentrations': self.denaturant_concentrations_expanded,
+            'oligomer_concentrations': self.oligomer_concentrations_expanded,
             'list_of_temperatures': self.temp_lst_expanded_subset,
             'list_of_signals': self.signal_lst_expanded_subset,
             'initial_parameters': p0,
             'low_bounds': low_bounds,
             'high_bounds': high_bounds,
             'cp_value': self.cp_value,
-            'fit_m1': self.fit_m_dep,
             'signal_ids':self.signal_ids,
             'baseline_native_fx': self.baseline_N_fx,
             'baseline_unfolded_fx': self.baseline_U_fx,
-            'signal_fx' : signal_two_state_tc_unfolding
+            'signal_fx' : signal_fx
         }
 
-        fit_fx = fit_tc_unfolding_shared_slopes_many_signals
+        fit_fx = fit_oligomer_unfolding_shared_slopes_many_signals
 
         if self.pre_fit:
             # Do a pre-fit with a reduced data set
@@ -788,7 +696,7 @@ class Monomer(Sample):
             high_bounds,
             low_bounds,
             p0,
-            self.fit_m_dep,
+            False,
             self.limited_cp,
             self.limited_dh,
             self.limited_tm,
@@ -806,7 +714,7 @@ class Monomer(Sample):
         self.rel_errors = rel_errors
 
         self.predicted_lst_multiple = re_arrange_predictions(
-            predicted, self.nr_signals, self.nr_den)
+            predicted, self.nr_signals, self.nr_olig)
 
         self.params_names = params_names
 
@@ -829,7 +737,7 @@ class Monomer(Sample):
         Parameters
         ----------
         model_scale_factor : bool, optional
-            If True, model a scale factor for each denaturant concentration
+            If True, model a scale factor for each oligomer concentration
 
         Notes
         -----
@@ -842,7 +750,7 @@ class Monomer(Sample):
         if not self.global_global_fit_done:
             self.fit_thermal_unfolding_global_global()
 
-        param_init = 3 + self.fit_m_dep + (self.cp_value is None)
+        param_init = 2 + (self.cp_value is None)
 
         params_names = self.params_names[:param_init]
 
@@ -850,7 +758,7 @@ class Monomer(Sample):
         low_bounds = self.low_bounds[:param_init]
         high_bounds = self.high_bounds[:param_init]
 
-        n_datasets = self.nr_den * self.nr_signals
+        n_datasets = self.nr_olig * self.nr_signals
 
         p1Ns = self.global_fit_params[param_init:param_init + n_datasets]
         p1Us = self.global_fit_params[param_init + n_datasets:param_init + 2 * n_datasets]
@@ -863,15 +771,15 @@ class Monomer(Sample):
 
         for p1Ns, p1Us in zip(p1Ns_per_signal, p1Us_per_signal):
 
-            # Estimate the slope of bNs versus denaturant concentration
-            m1, b1 = fit_line_robust(self.denaturant_concentrations, p1Ns)
+            # Estimate the slope of bNs versus oligomer concentration
+            m1, b1 = fit_line_robust(self.oligomer_concentrations, p1Ns)
             m1_low = m1 / 100 if m1 > 0 else 100 * m1
             m1_high = 100 * m1 if m1 > 0 else m1 / 100
             b1_low = b1 / 100 if b1 > 0 else 100 * b1
             b1_high = 100 * b1 if b1 > 0 else b1 / 100
 
-            # Estimate the slope of bUs versus denaturant concentration
-            m2, b2 = fit_line_robust(self.denaturant_concentrations, p1Us)
+            # Estimate the slope of bUs versus oligomer concentration
+            m2, b2 = fit_line_robust(self.oligomer_concentrations, p1Us)
             m2_low = m2 / 100 if m2 > 0 else 100 * m2
             m2_high = 100 * m2 if m2 > 0 else m2 / 100
             b2_low = b2 / 100 if b2 > 0 else 100 * b2
@@ -918,8 +826,8 @@ class Monomer(Sample):
             idx += self.nr_signals
             params_names += [param_name + ' - ' + signal_name for signal_name in self.signal_names]
 
-        params_names += ['denaturant_slope_term_native - ' + signal_name for signal_name in self.signal_names]
-        params_names += ['denaturant_slope_term_unfolded - ' + signal_name for signal_name in self.signal_names]
+        params_names += ['oligomer_slope_term_native - ' + signal_name for signal_name in self.signal_names]
+        params_names += ['oligomer_slope_term_unfolded - ' + signal_name for signal_name in self.signal_names]
 
         if self.native_baseline_type in ['quadratic', 'exponential']:
 
@@ -979,8 +887,8 @@ class Monomer(Sample):
         # Find index in the param names
         for signal_name in self.signal_names:
 
-            c_N_name = 'denaturant_slope_term_native - ' + signal_name
-            c_U_name = 'denaturant_slope_term_unfolded - ' + signal_name
+            c_N_name = 'oligomer_slope_term_native - ' + signal_name
+            c_U_name = 'oligomer_slope_term_unfolded - ' + signal_name
 
             c_N_idx = params_names.index(c_N_name)
             c_U_idx = params_names.index(c_U_name)
@@ -991,23 +899,25 @@ class Monomer(Sample):
             low_bounds[c_U_idx] -= 5
             high_bounds[c_U_idx] += 5
 
-        # If required, include a scale factor for each denaturant concentration
+        # If required, include a scale factor for each oligomer concentration
         if model_scale_factor:
-            # The last denaturant concentration is fixed to 1, the rest are fitted
-            scale_factors = [1 for _ in range(self.nr_den - 1)]
-            scale_factors_low = [0.5882 for _ in range(self.nr_den - 1)]
-            scale_factors_high = [1.7 for _ in range(self.nr_den - 1)]
+            # The last oligomer concentration is fixed to 1, the rest are fitted
+            scale_factors = [1 for _ in range(self.nr_olig - 1)]
+            scale_factors_low = [0.5882 for _ in range(self.nr_olig - 1)]
+            scale_factors_high = [1.7 for _ in range(self.nr_olig - 1)]
 
             p0 = np.concatenate([p0, scale_factors])
             low_bounds = np.concatenate([low_bounds, scale_factors_low])
             high_bounds = np.concatenate([high_bounds, scale_factors_high])
 
             params_names += ['Scale factor - ' + str(d) + ' (M). ID: ' + str(i) for
-                             i, d in enumerate(self.denaturant_concentrations)]
+                             i, d in enumerate(self.oligomer_concentrations)]
 
             params_names.pop()  # Remove the last one, as it is fixed to 1
 
-        scale_factor_exclude_ids = [self.nr_den - 1] if model_scale_factor else []
+        scale_factor_exclude_ids = [self.nr_olig - 1] if model_scale_factor else []
+
+        signal_fx = map_two_state_model_to_signal_fx(self.model)
 
         # Do a prefit with a reduced dataset
         kwargs = {
@@ -1015,22 +925,21 @@ class Monomer(Sample):
             'list_of_temperatures' : self.temp_lst_expanded_subset,
             'list_of_signals' : self.signal_lst_expanded_subset,
             'signal_ids' : self.signal_ids,
-            'denaturant_concentrations': self.denaturant_concentrations_expanded,
+            'oligomer_concentrations': self.oligomer_concentrations_expanded,
             'initial_parameters': p0,
             'low_bounds': low_bounds,
             'high_bounds': high_bounds,
-            'fit_m1': self.fit_m_dep,
             'model_scale_factor':model_scale_factor,
             'cp_value' : self.cp_value,
             'scale_factor_exclude_ids':scale_factor_exclude_ids,
-            'signal_fx' : signal_two_state_tc_unfolding,
+            'signal_fx' : signal_fx,
             'baseline_native_fx' : self.baseline_N_fx,
             'baseline_unfolded_fx' : self.baseline_U_fx,
-            'fit_native_den_slope' : True,
-            'fit_unfolded_den_slope' : True
+            'fit_native_olig_slope' : True,
+            'fit_unfolded_olig_slope' : True
         }
 
-        fit_fx = fit_tc_unfolding_many_signals
+        fit_fx = fit_oligomer_unfolding_many_signals
 
         if self.pre_fit:
 
@@ -1053,7 +962,7 @@ class Monomer(Sample):
             # 3 parameters corresponding to Tm, dH, m
             # plus Cp if fitted
             # plus m1 if fitted
-            idx_start = 3 + self.fit_m_dep + (self.cp_value is None)
+            idx_start = 2 + (self.cp_value is None)
 
             native_factor   = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_N_fx))
             unfolded_factor = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_U_fx))
@@ -1063,16 +972,13 @@ class Monomer(Sample):
             # Add index according to the unfolded baseline polynomial order
             idx_start += unfolded_factor * self.nr_signals
 
-            # Take m1 into account, if fitting it
-            idx_start += self.fit_m_dep
-
             for _ in range(5):
 
                 # Sort in ascending order the IDs to exclude
                 scale_factor_exclude_ids = sorted(scale_factor_exclude_ids)
 
                 n_fixed_factors = len(scale_factor_exclude_ids)
-                n_fit_factors = self.nr_den - n_fixed_factors
+                n_fit_factors = self.nr_olig - n_fixed_factors
 
                 if n_fit_factors == 0:
                     break
@@ -1131,7 +1037,7 @@ class Monomer(Sample):
         self.rel_errors = rel_errors
 
         self.predicted_lst_multiple = re_arrange_predictions(
-            predicted, self.nr_signals, self.nr_den)
+            predicted, self.nr_signals, self.nr_olig)
 
         self.create_params_df()
         self.create_dg_df()
@@ -1162,7 +1068,7 @@ class Monomer(Sample):
 
     def signal_to_df(self, signal_type='raw', scaled=False):
         """
-        Create a dataframe with three columns: Temperature, Signal, and Denaturant.
+        Create a dataframe with three columns: Temperature, Signal, and oligomer.
         Optimized for speed by avoiding per-curve DataFrame creation.
 
         Parameters
@@ -1172,9 +1078,14 @@ class Monomer(Sample):
             'derivative' uses the estimated derivative signal.
         scaled : bool, optional
             If True and signal_type == 'fitted' or 'raw', use the scaled versions if available.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with columns: ['Temperature', 'Signal', 'Oligomer', 'ID'].
         """
 
-        # Flatten all arrays and repeat denaturant values accordingly
+        # Flatten all arrays and repeat oligomer values accordingly
 
         if signal_type == 'derivative':
 
@@ -1225,11 +1136,11 @@ class Monomer(Sample):
                 signal_all = np.concatenate(signal_lst)
 
         denat_all = np.concatenate([
-            np.full_like(temp_lst[i], self.denaturant_concentrations[i], dtype=np.float64)
+            np.full_like(temp_lst[i], self.oligomer_concentrations[i], dtype=np.float64)
             for i in range(len(temp_lst))
         ])
 
-        # Add an ID column, so we can identify the curves, even with the same denaturant concentration
+        # Add an ID column, so we can identify the curves, even with the same oligomer concentration
         id_all = np.concatenate([
             np.full_like(temp_lst[i], i, dtype=np.int32)
             for i in range(len(temp_lst))
@@ -1238,7 +1149,7 @@ class Monomer(Sample):
         signal_df = pd.DataFrame({
             'Temperature': temp_all,
             'Signal': signal_all,
-            'Denaturant': denat_all,
+            'Oligomer': denat_all,
             'ID': id_all
         })
 

@@ -16,6 +16,7 @@ __all__ = [
     "AxisConfig",
     "LayoutConfig",
     "LegendConfig",
+    "config_fig",
     "plot_unfolding"
 ]
 
@@ -113,6 +114,7 @@ def config_fig(fig,
 
 def plot_unfolding(
         pychemelt_sample,
+        plot_derivative = False,
         plot_config: PlotConfig = None,
         axis_config: AxisConfig = None,
         layout_config: LayoutConfig = None,
@@ -126,6 +128,8 @@ def plot_unfolding(
 
     pychemelt_sample:
         pychemelt.Sample object
+    plot_derivative: bool
+        Whether to plot the derivative of the signal
     plot_config : PlotConfig, optional
         Configuration for the overall plot
     axis_config : AxisConfig, optional
@@ -143,8 +147,24 @@ def plot_unfolding(
     layout_config = layout_config or LayoutConfig()
     legend_config = legend_config or LegendConfig()
 
+    fittings_done = pychemelt_sample.global_fit_params is not None
+
+    # If derivative is plotted and not present, get derivative
+    if plot_derivative and not hasattr(pychemelt_sample, "deriv_lst_multiple") or fittings_done and not hasattr(pychemelt_sample, "predicted_deriv_lst_multiple"):
+        pychemelt_sample.estimate_derivative()
+
     # Extract the minimum and maximum denaturation concentration
     concs = pychemelt_sample.denaturant_concentrations
+
+    # Adjusting scale depending on highest concentration
+    scale = "M"
+
+    if np.max(concs) < 1e-1:
+        concs = concs * 1e3
+        scale = "mM"
+    if np.max(concs) < 1e-1:
+        concs = concs * 1e3
+        scale = "μM"
 
     min_conc = np.min(concs)
     max_conc = np.max(concs)
@@ -176,8 +196,6 @@ def plot_unfolding(
 
     subplot_idx = 0
 
-    fittings_done = pychemelt_sample.global_fit_params is not None
-
     ys_fit = None
 
     nr_den = pychemelt_sample.nr_den
@@ -189,14 +207,21 @@ def plot_unfolding(
 
         if fittings_done:
             # Reduced dataset if fittings were done
-            ys_fit = pychemelt_sample.predicted_lst_multiple[i]
             xs     = pychemelt_sample.temp_lst_expanded[i*nr_den:(i+1)*nr_den]
-            ys     = pychemelt_sample.signal_lst_expanded[i*nr_den:(i+1)*nr_den]
+            if plot_derivative:
+                ys = pychemelt_sample.deriv_lst_expanded[i*nr_den:(i+1)*nr_den]
+                ys_fit = pychemelt_sample.predicted_deriv_lst_multiple[i]
+            else:
+                ys_fit = pychemelt_sample.predicted_lst_multiple[i]
+                ys = pychemelt_sample.signal_lst_expanded[i*nr_den:(i+1)*nr_den]
 
         else:
             # Full dataset if no fittings were done
             xs = pychemelt_sample.temp_lst_multiple[i]
-            ys = pychemelt_sample.signal_lst_multiple[i]
+            if plot_derivative:
+                ys = pychemelt_sample.deriv_lst_multiple[i]
+            else:
+                ys = pychemelt_sample.signal_lst_multiple[i]
 
         for j,conc in enumerate(concs):
 
@@ -209,7 +234,7 @@ def plot_unfolding(
                 go.Scatter(
                     x=x, y=y, mode='markers',
                     marker=dict(size=plot_config.marker_size, color=color),
-                    name=f'{conc:.2f} M',
+                    name=f'{conc:.2f} {scale}',
                     showlegend=False
                 ),
                 row=row, col=col
@@ -236,6 +261,7 @@ def plot_unfolding(
     # Update subplot layout with white background and axis styling
     fig.update_layout(
         font_family="Roboto",
+        font_color="black",
         plot_bgcolor='white',
         paper_bgcolor='white',
         legend=dict(font=dict(size=plot_config.font_size - 1))
@@ -250,7 +276,10 @@ def plot_unfolding(
         title_text_x = 'Temperature (°C)' if row == nrows else ''
 
         # Set the y-axis title only for the first column
-        title_text_y = 'Signal' if col == 1 else ''
+        if plot_derivative:
+            title_text_y = 'Derivative' if col == 1 else ''
+        else:
+            title_text_y = 'Signal' if col == 1 else ''
 
         fig.update_xaxes(
             title_text=title_text_x,
@@ -297,7 +326,7 @@ def plot_unfolding(
     _yanchor = 'top'    if legend_config.color_bar_orientation == 'h' else 'middle'
 
     colorbar_dict = dict(
-        title='[Denaturant] (M)',
+        title=f'[Protein] ({scale})' if pychemelt_sample.oligomeric else f'[Denaturant] ({scale})',
         tickvals=[min_conc, 0.5*(min_conc + max_conc), max_conc],
         ticktext=[f"{min_conc:.2g}", f"{(min_conc + max_conc) * 0.5:.2g}", f"{max_conc:.2g}"],
         len=legend_config.color_bar_length,
@@ -324,6 +353,14 @@ def plot_unfolding(
             hoverinfo='skip'
         ),
         row=1, col=1
+    )
+
+    def is_subplot_title(x):
+        return x.text in ["Simulated Signal"]
+
+    fig.update_annotations(
+        selector=is_subplot_title,
+        patch=dict(font=dict(size=plot_config.font_size + 10))
     )
 
     fig = config_fig(
