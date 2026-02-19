@@ -1460,7 +1460,7 @@ def fit_oligomer_unfolding_many_signals(
     baseline_unfolded_fx : callable
         function to calculate the unfolded state baseline
     model_scale_factor : bool, optional
-        If True, include a per-denaturant concentration scale factor to account for intensity differences
+        If True, include a per-oligomeric concentration scale factor to account for intensity differences
     scale_factor_exclude_ids : list, optional
         IDs of scale factors to exclude / fix to 1
     cp_value : float or None, optional
@@ -1510,8 +1510,8 @@ def fit_oligomer_unfolding_many_signals(
             Temperature slope or term pre-exponential factor folded
             Temperature slope term or pre-exponential factor unfolded
 
-            Denaturant slope term folded
-            Denaturant slope term unfolded
+            Oligomer slope term folded
+            Oligomer slope term unfolded
 
             Quadratic coefficient or exponential coefficient folded
             Quadratic coefficient or exponential coefficient unfolded
@@ -1552,7 +1552,7 @@ def fit_oligomer_unfolding_many_signals(
         else:
             p3_Us = [0] * n_signals
 
-        # Denaturant slope parameters
+        # Oligomer slope parameters
         if baseline_native_params[0]:
 
             p1_Ns = args[id_param_init:id_param_init + n_signals]
@@ -1589,7 +1589,7 @@ def fit_oligomer_unfolding_many_signals(
             p4_Us = [0] * n_signals
 
         if model_scale_factor:
-            # One per denaturant concentration
+            # One per oligomer concentration
             factors = args[id_param_init:id_param_init + (nr_olig - len(scale_factor_exclude_ids))]
 
             for id_ex in scale_factor_exclude_ids:
@@ -1625,6 +1625,9 @@ def fit_oligomer_unfolding_many_signals(
             )
 
             scale_factor = 1 if not model_scale_factor else factors[i]
+
+            # Correcting signal by scaling with concentration
+            y = y * c
 
             y = y * scale_factor
 
