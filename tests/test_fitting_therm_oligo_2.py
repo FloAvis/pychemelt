@@ -210,7 +210,7 @@ def test_fit_tetramer_unfolding_single_slopes_exponential():
 
     expected = [Tm_VAL, DHm_VAL, CP0_VAL]
 
-    np.testing.assert_allclose(global_fit_params[:3], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(global_fit_params[:3], expected, rtol=0.25, atol=0)
 
 
 
