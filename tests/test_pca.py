@@ -51,13 +51,13 @@ def test_apply_pca():
 def test_filter_basis_spectra():
     explained_variance, basis_spectra, coefficients = apply_pca(X_2)
 
-    _, _, k = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 99.99)
+    _, _, k = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 100)
 
     assert k == 2
 
     explained_variance, basis_spectra, coefficients = apply_pca(X_3)
 
-    _, _, k = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 99.99)
+    _, _, k = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 100)
 
     assert k == 3
 
@@ -66,7 +66,7 @@ def test_rotate_spectra():
     # Rotate two basis spectra
     explained_variance, basis_spectra, coefficients = apply_pca(X_2)
 
-    basis_spectra_new, _, _ = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 99.99)
+    basis_spectra_new, _, _ = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 100)
 
     basis_spectra_rot, coefficients_rot = rotate_two_basis_spectra(X_2, basis_spectra_new, pca_based=True)
 
@@ -78,7 +78,7 @@ def test_rotate_spectra():
     # Rotate three basis spectra
     explained_variance, basis_spectra, coefficients = apply_pca(X_3)
 
-    basis_spectra_new, _, _ = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 99.99)
+    basis_spectra_new, _, _ = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 100)
 
     basis_spectra_rot, coefficients_rot = rotate_three_basis_spectra(X_3, basis_spectra_new, pca_based=True)
 
@@ -92,7 +92,7 @@ def test_variance_change_after_rotation():
     # Rotate two basis spectra
     explained_variance, basis_spectra, coefficients = apply_pca(X_2)
 
-    basis_spectra_new, _, _ = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 99.99)
+    basis_spectra_new, _, _ = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 100)
 
     basis_spectra_rot, coefficients_rot = rotate_two_basis_spectra(X_2, basis_spectra_new, pca_based=True)
 
