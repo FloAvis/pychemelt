@@ -51,13 +51,13 @@ def test_apply_pca():
 def test_filter_basis_spectra():
     explained_variance, basis_spectra, coefficients = apply_pca(X_2)
 
-    _, _, k = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 100)
+    _, _, k = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 99.99)
 
     assert k == 2
 
     explained_variance, basis_spectra, coefficients = apply_pca(X_3)
 
-    _, _, k = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 100)
+    _, _, k = filter_basis_spectra(explained_variance, basis_spectra, coefficients, 99.99)
 
     assert k == 3
 
