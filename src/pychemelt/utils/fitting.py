@@ -789,6 +789,8 @@ def fit_oligomer_unfolding_single_slopes(
         else:
             p3U = 0.0
 
+        p1N, p1U = p1N / C_all, p1U / C_all
+
         # ---- Single vectorized signal evaluation ----
         return signal_fx(
                 T_all,C_all, Tm, DHm,
@@ -1135,8 +1137,8 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
 
             predicted_all[start:end] = signal_fx(
                 T, c, Tm, DHm,
-                0, intercepts_folded[i], p2_n_s[sig_id], p3_n_s[sig_id],
-                0, intercepts_unfolded[i], p2_u_s[sig_id], p3_u_s[sig_id],
+                0, intercepts_folded[i] / c, p2_n_s[sig_id], p3_n_s[sig_id],
+                0, intercepts_unfolded[i] / c, p2_u_s[sig_id], p3_u_s[sig_id],
                 baseline_native_fx,
                 baseline_unfolded_fx,
                 Cp0
@@ -1615,6 +1617,11 @@ def fit_oligomer_unfolding_many_signals(
 
             c = oligomer_concentrations[i]
 
+            p2_N, p2_U = p2_N / c, p2_U / c
+
+            #print(T, c, Tm, DHm, Cp0)
+            print(p1_N, p1_U, p2_N, p2_U, p3_N, p3_U, p4_N, p4_U)
+
             y = signal_fx(
                 T, c, Tm, DHm,
                 p1_N, p2_N, p3_N, p4_N,
@@ -1626,9 +1633,6 @@ def fit_oligomer_unfolding_many_signals(
 
             scale_factor = 1 if not model_scale_factor else factors[i]
 
-            # Correcting signal by scaling with concentration
-            y = y * c
-
             y = y * scale_factor
 
             signal.append(y)
@@ -1636,11 +1640,11 @@ def fit_oligomer_unfolding_many_signals(
         return np.concatenate(signal, axis=0)
 
     global_fit_params, cov = curve_fit(
-        unfolding, 1, all_signal,
+        unfolding, 1.0, all_signal,
         p0=initial_parameters,
         bounds=(low_bounds, high_bounds))
 
-    predicted = unfolding(1, *global_fit_params)
+    predicted = unfolding(1.0, *global_fit_params)
 
     # Convert predict to list of lists
     predicted_lst = []
@@ -1666,7 +1670,8 @@ def evaluate_need_to_refit(
         check_dh=True,
         check_tm=True,
         fixed_cp=False,
-        threshold=0.05):
+        threshold=0.05,
+        fit_m0=True,):
 
     """
     Check and expand parameter bounds when fitted parameters are too close to boundaries.
@@ -1689,6 +1694,8 @@ def evaluate_need_to_refit(
         Whether the Cp value is fixed
     threshold : float, optional
         Threshold to compare if the fitted parameters are too close to the boundaries
+    fit_m0 : bool, optional
+        Whether m0 (m-value) is fitted (not in oligomeric models)
 
     Returns
     -------
@@ -1749,16 +1756,20 @@ def evaluate_need_to_refit(
         
         id_next += 1
 
-    # Check the m-value boundary
-    m_diff = high_bounds[id_next] - global_fit_params[id_next]
-    # Expand the boundary if the m-value is too close to the boundary
-    if m_diff < 0.5:
-        high_bounds[id_next] = global_fit_params[id_next] + 2
-        p0[id_next] = global_fit_params[id_next] + 0.5
-        re_fit = True
+    if fit_m0:
+        # Check the m-value boundary
+        m_diff = high_bounds[id_next] - global_fit_params[id_next]
+        # Expand the boundary if the m-value is too close to the boundary
+        if m_diff < 0.5:
+            high_bounds[id_next] = global_fit_params[id_next] + 2
+            p0[id_next] = global_fit_params[id_next] + 0.5
+            re_fit = True
 
-    # Evaluate if m1 is fitted
-    id_start = id_next + 1
+        # Evaluate if m1 is fitted
+        id_start = id_next + 1
+    else:
+        id_start = id_next
+
 
     if fit_m1:
 
@@ -1815,7 +1826,8 @@ def evaluate_fitting_and_refit(
         kwargs,
         fit_fx,
         n = 3,
-        threshold=0.05):
+        threshold=0.05,
+        fit_m_value=True,):
 
     """
     Evaluate if the fitted parameters are too close to the fitting boundaries.
@@ -1853,6 +1865,8 @@ def evaluate_fitting_and_refit(
         number of times to re-fit
     threshold : float, optional
         Threshold to compare if the fitted parameters are too close to the boundaries
+    fit_m_value : bool, optional
+        Whether m0 (m-value) is fitted (not in oligomeric models)
 
     Returns
     -------
@@ -1883,6 +1897,7 @@ def evaluate_fitting_and_refit(
             check_tm=not limited_tm,
             fixed_cp=fixed_cp,
             threshold=threshold,
+            fit_m0=fit_m_value,
         )
 
         if re_fit:

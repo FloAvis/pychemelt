@@ -14,6 +14,7 @@ from .fractions import (
     fu_two_state_trimer,
     fu_two_state_tetramer,
 )
+import numpy as np
 
 from .math import shift_temperature_K
 
@@ -175,7 +176,9 @@ def two_state_thermal_unfold_curve(
     S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
     S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
-    return fn*(S_native) + fu*(S_unfolded)
+    return C * (fn*(S_native) + fu*(S_unfolded))
+
+    # return fn * (S_native) + fu * (S_unfolded)
 
 def two_state_thermal_unfold_curve_dimer(
         T,C,Tm,dHm,
@@ -230,7 +233,9 @@ def two_state_thermal_unfold_curve_dimer(
     S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
     S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
 
-    return fn*(S_native) + fu*(S_unfolded)*2
+    return C * (fn*(S_native) + fu*(S_unfolded)*2)
+
+    #return fn * (S_native) + fu * (S_unfolded) * 2
 
 def two_state_thermal_unfold_curve_trimer(
         T,C,Tm,dHm,
@@ -285,8 +290,9 @@ def two_state_thermal_unfold_curve_trimer(
     S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
     S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
 
-
-    return fn*(S_native) + fu*(S_unfolded)*3
+    return C * (fn*(S_native) + fu*(S_unfolded)*3)
+    
+    #return fn*(S_native) + fu*(S_unfolded)*3
 
 def two_state_thermal_unfold_curve_tetramer(
         T,C,Tm,dHm,
@@ -344,7 +350,9 @@ def two_state_thermal_unfold_curve_tetramer(
     S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
 
 
-    return fn*(S_native) + fu*(S_unfolded)*4
+    return C * (fn*(S_native) + fu*(S_unfolded)*4)
+
+    #return fn * (S_native) + fu * (S_unfolded) * 4
 
 def map_two_state_model_to_signal_fx(model):
     """

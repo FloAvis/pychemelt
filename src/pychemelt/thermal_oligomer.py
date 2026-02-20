@@ -499,8 +499,10 @@ class ThermalOligomer(Sample):
             self.fixed_cp,
             kwargs,
             fit_fx,
-            threshold=0.0005,
+            #threshold=0.0005,
+            fit_m_value=True,
         )
+
 
         # If the fitting returns a large error it is recommended to turn off the CP0 value fitting
         if np.nansum((np.array(predicted) - np.array(self.signal_lst_expanded)) ** 2) > 10000:
@@ -703,6 +705,7 @@ class ThermalOligomer(Sample):
             self.fixed_cp,
             kwargs,
             fit_fx,
+            fit_m_value=True,
         )
 
         rel_errors = relative_errors(global_fit_params, cov)
@@ -771,6 +774,8 @@ class ThermalOligomer(Sample):
 
         for p1Ns, p1Us in zip(p1Ns_per_signal, p1Us_per_signal):
 
+            print(p1Ns, p1Us)
+
             # Estimate the slope of bNs versus oligomer concentration
             m1, b1 = fit_line_robust(self.oligomer_concentrations, p1Ns)
             m1_low = m1 / 100 if m1 > 0 else 100 * m1
@@ -798,6 +803,9 @@ class ThermalOligomer(Sample):
             b2s_low.append(b2_low)
             m2s_high.append(m2_high)
             b2s_high.append(b2_high)
+
+        print(m1s, b1s)
+        print(m2s, b2s)
 
         idx = param_init + 2 * n_datasets
 
@@ -941,6 +949,8 @@ class ThermalOligomer(Sample):
 
         fit_fx = fit_oligomer_unfolding_many_signals
 
+        print("P0 before prefit: ", p0)
+
         if self.pre_fit:
 
             global_fit_params, cov, predicted = fit_fx(**kwargs)
@@ -949,12 +959,15 @@ class ThermalOligomer(Sample):
             p0 = global_fit_params
 
             # End of prefit with reduced dataset
+        print("P0 before fit: ", p0)
 
         # Use the whole dataset
         kwargs['list_of_signals'] = self.signal_lst_expanded
         kwargs['list_of_temperatures'] = self.temp_lst_expanded
 
         global_fit_params, cov, predicted = fit_fx(**kwargs)
+
+        print("P0 before scaling: ", p0)
 
         # Remove scale factors that are not significant
         if model_scale_factor:
