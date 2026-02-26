@@ -14,7 +14,6 @@ from .main import Sample
 
 from .utils.signals import (
     map_two_state_model_to_signal_fx,
-    map_three_state_model_to_signal_fx,
 )
 
 from .utils.math import (
@@ -43,7 +42,6 @@ from .utils.fitting import (
     fit_oligomer_unfolding_single_slopes,
     fit_oligomer_unfolding_shared_slopes_many_signals,
     fit_oligomer_unfolding_many_signals,
-    fit_oligomer_unfolding_three_states_single_slopes,
     evaluate_fitting_and_refit,
     baseline_fx_name_to_req_params
 )
@@ -63,7 +61,7 @@ class ThermalOligomer(Sample):
         self.model = None # Oligomer model type
         self.oligomeric = True # Flag for oligomer for plotting
 
-    def set_model(self, model_name, intermediate_name=None):
+    def set_model(self, model_name):
 
         """
         Set thermodynamic model of oligomer used for the analysis.
@@ -88,44 +86,13 @@ class ThermalOligomer(Sample):
 
         allowed_models = ["monomer", "dimer", "trimer", "tetramer"]
 
-        allowed_intermediate_models = ["monomeric", "dimeric", "trimeric"]
-
-        allowed_combinations = ['monomer_monomeric_intermediate',
-                                'dimer_monomeric_intermediate',
-                                'dimer_dimeric_intermediate',
-                                'trimer_monomeric_intermediate',
-                                'trimer_trimeric_intermediate',
-                                'tetramer_monomeric_intermediate']
-
-
         model = model_name.lower()
-
 
         if model not in allowed_models:
             raise ValueError(
             f"Invalid model '{model_name}'. "
             f"Allowed models are: {', '.join(m.capitalize() for m in allowed_models)}."
         )
-
-        if intermediate_name is not None:
-
-            intermediate = intermediate_name.lower()
-
-            if intermediate not in allowed_intermediate_models:
-                raise ValueError(
-                f"Invalid intermediate '{intermediate_name}'. "
-                f"Allowed models are: {', '.join(m.capitalize() for m in allowed_intermediate_models)}."
-                )
-
-            model = model + '_' + intermediate + '_intermediate'
-
-            if model not in allowed_combinations:
-                raise ValueError(
-                f"Invalid intermediate model '{model.capitalize()}'. "
-                f"Allowed models are: {', '.join(m.capitalize() for m in allowed_combinations)}."
-                )
-
-
 
         # Save model with first letter uppercase
         self.model = model.capitalize()
@@ -207,7 +174,7 @@ class ThermalOligomer(Sample):
 
         self.nr_olig = len(self.oligomer_concentrations)
 
-        # For compatibility:
+        # For compatibility
         self.nr_den = self.nr_olig
 
         # Expand the number of oligomer concentrations to match the number of signals
@@ -756,8 +723,8 @@ class ThermalOligomer(Sample):
             fit_m_value=False,
         )
 
-        
-         # If the fitting returns a large error it is recommended to turn off the CP0 value fitting
+
+        # If the fitting returns a large error it is recommended to turn off the CP0 value fitting
         error = np.nansum((np.array(predicted) - np.array(self.signal_lst_expanded)) ** 2)
         if self.normalise_to_global_max:
             if error > 10000:
@@ -766,363 +733,12 @@ class ThermalOligomer(Sample):
         else:
             flat = list(chain.from_iterable(chain.from_iterable(self.signal_lst_multiple)))
             global_max = np.max(flat)  # Global maximum across all signals
-            
+
             error = error / global_max * 100 if not self.normalise_to_global_max else error
-            
+
             if error > 10:
                 warn('The fitted signal deviates heavily from the experimental data in the global fit. '
                      'Consider not fitting the CP0 value by setting "cp_value=0" in the fit_thermal_unfolding_global() function')
-                
-              
-        rel_errors = relative_errors(global_fit_params, cov)
-
-        self.p0 = p0
-        self.low_bounds = low_bounds
-        self.high_bounds = high_bounds
-        self.global_fit_params = global_fit_params
-        self.rel_errors = rel_errors
-
-        self.predicted_lst_multiple = re_arrange_predictions(predicted, self.nr_signals, self.nr_olig)
-
-        self.global_fit_done = True
-
-        self.fit_m_dep = fit_m_dep
-
-        self.params_names = params_names
-
-        self.create_params_df()
-        self.create_dg_df()
-
-        return None
-
-    def fit_thermal_unfolding_three_state_global(
-            self,
-            t1_init=0,
-            t2_init=0,
-            cp_limits=None,
-            dh_limits=None,
-            tm_limits=None,
-            cp_value=None):
-
-        """
-        Fit the thermal unfolding of the sample using the signal and temperature data on a three state model
-        We fit all the curves at once, with global thermodynamic parameters but local slopes and local baselines)
-        Multiple signals can be fitted at the same time, such as 350nm and 330nm
-
-        Parameters
-        ----------
-        cp_limits : list, optional
-            List of two values, the lower and upper bounds for the Cp value. If None, bounds set automatically
-        dh_limits : list of lists, optional
-            List of two lists with two values each, the lower and upper bounds for the dH values.
-            If None, bounds set automatically
-        tm_limits : list of lists, optional
-            List of two lists with two values each, the lower and upper bounds for the Tm values.
-            If None, bounds set automatically
-        cp_value : float, optional
-            If provided, the Cp value is fixed to this value, the bounds are ignored
-
-        Notes
-        -----
-        This is a heavy routine that creates/updates many fitting-related attributes, including:
-        - bNs_expanded, bUs_expanded, kNs_expanded, kUs_expanded, qNs_expanded, qUs_expanded
-        - p0, low_bounds, high_bounds, global_fit_params, rel_errors
-        - predicted_lst_multiple, params_names, params_df, dg_df
-        - flags: global_fit_done, limited_tm, limited_dh, limited_cp, fixed_cp
-        """
-
-        # Initial parameters have to be in order:
-        # Global melting temperature 1, Global enthalpy of unfolding 1,
-        # Global melting temperature 2, Global enthalpy of unfolding 2,
-        # Single intercepts folded, Single slopes folded,
-        # Single intercepts unfolded, Single slopes unfolded
-
-        # For compatibility
-        self.cp_value = None
-        self.cp_limits = None
-
-        self.fixed_cp = False
-
-        self.limited_cp = False
-
-
-        # Get Guess of Tm:
-
-        tm_lst = []
-
-        x1 = 6
-        x2 = 11
-
-        for i in range(len(self.signal_lst_multiple)):
-            tm_lst.append(guess_Tm_from_derivative(
-                self.temp_deriv_lst_multiple[i],
-                self.deriv_lst_multiple[i],
-                x1,
-                x2
-            ))
-
-        Tm1 = np.average(tm_lst) - 10
-        Tm2 = np.average(tm_lst) + 10
-
-        print(Tm1, Tm2)
-
-        p0 = [Tm1, 50, Tm2, 50]
-
-        params_names = [
-            'Tm1 (°C)',
-            'ΔH1 (kcal/mol)',
-            'Tm2 (°C)',
-            'ΔH2 (kcal/mol)']
-
-        self.first_param_Ns_expanded = np.concatenate(self.first_param_Ns_per_signal, axis=0)
-        self.first_param_Us_expanded = np.concatenate(self.first_param_Us_per_signal, axis=0)
-        self.second_param_Ns_expanded = np.concatenate(self.second_param_Ns_per_signal, axis=0)
-        self.second_param_Us_expanded = np.concatenate(self.second_param_Us_per_signal, axis=0)
-        self.third_param_Ns_expanded = np.concatenate(self.third_param_Ns_per_signal, axis=0)
-        self.third_param_Us_expanded = np.concatenate(self.third_param_Us_per_signal, axis=0)
-
-        #Estimating intermediate intercept
-
-        #print(self.temp_lst_multiple)
-        #print(np.array(self.signal_lst_multiple).shape)
-
-        argmin_x = [np.argmin(x) for x in self.temp_lst_multiple[0]]
-        argmax_x = [np.argmax(x) for x in self.temp_lst_multiple[0]]
-
-        #print(len(argmin_x))
-
-        self.bStart = np.array([y[idx] for idx, y in zip(argmin_x, self.signal_lst_multiple[0])])
-        self.bEnd = np.array([y[idx] for idx, y in zip(argmax_x, self.signal_lst_multiple[0])])
-
-        self.intercept_intermediate = (self.bStart + self.bEnd) / 2
-
-        p0 = np.concatenate([p0, self.first_param_Ns_expanded, self.first_param_Us_expanded])
-
-        # We need to append as many bN and bU as the number of oligomer concentrations
-        # times the number of signal types
-        for signal in self.signal_names:
-            params_names += (['intercept_native - ' + str(self.oligomer_concentrations[i]) +
-                              ' - ' + str(signal) for i in range(self.nr_olig)])
-
-        for signal in self.signal_names:
-            params_names += (['intercept_unfolded - ' + str(self.oligomer_concentrations[i]) +
-                              ' - ' + str(signal) for i in range(self.nr_olig)])
-
-        if self.native_baseline_type in ['linear', 'quadratic', 'exponential']:
-
-            param_name = 'pre_exponential_factor_native' if self.native_baseline_type == 'exponential' else 'slope_term_native'
-
-            p0 = np.concatenate([p0, self.second_param_Ns_expanded])
-
-            for signal in self.signal_names:
-                params_names += ([param_name + ' - ' + str(self.oligomer_concentrations[i]) +
-                                  ' - ' + str(signal) for i in range(self.nr_olig)])
-
-        if self.unfolded_baseline_type in ['linear', 'quadratic', 'exponential']:
-
-            param_name = 'pre_exponential_factor_unfolded' if self.unfolded_baseline_type == 'exponential' else 'slope_term_unfolded'
-
-            p0 = np.concatenate([p0, self.second_param_Us_expanded])
-
-            for signal in self.signal_names:
-                params_names += ([param_name + ' - ' + str(self.oligomer_concentrations[i]) +
-                                  ' - ' + str(signal) for i in range(self.nr_olig)])
-
-        if self.native_baseline_type in ['quadratic', 'exponential']:
-
-            param_name = 'exponential_coefficient_native' if self.native_baseline_type == 'exponential' else 'quadratic_term_native'
-
-            p0 = np.concatenate([p0, self.third_param_Ns_expanded])
-            for signal in self.signal_names:
-                params_names += ([param_name + ' - ' + str(self.oligomer_concentrations[i]) +
-                                  ' - ' + str(signal) for i in range(self.nr_olig)])
-
-        if self.unfolded_baseline_type in ['quadratic', 'exponential']:
-
-            param_name = 'exponential_coefficient_unfolded' if self.unfolded_baseline_type == 'exponential' else 'quadratic_term_unfolded'
-
-            p0 = np.concatenate([p0, self.third_param_Us_expanded])
-
-            for signal in self.signal_names:
-                params_names += ([param_name + ' - ' + str(self.oligomer_concentrations[i]) +
-                                  ' - ' + str(signal) for i in range(self.nr_olig)])
-
-        p0 = np.concatenate([p0, self.intercept_intermediate])
-
-        for signal in self.signal_names:
-            params_names += (['intercept_intermediate - ' + str(self.oligomer_concentrations[i]) +
-                              ' - ' + str(signal) for i in range(self.nr_olig)])
-
-        low_bounds = (p0.copy())
-        high_bounds = (p0.copy())
-
-        low_bounds[4:], high_bounds[4:] = set_param_bounds(p0[4:], params_names[4:])
-
-        self.limited_tm = tm_limits is not None
-
-        if self.limited_tm:
-
-            tm1_lower, tm1_upper, tm2_lower, tm2_upper = np.array(tm_limits).flatten().tolist()
-
-        else:
-
-            tm1_lower = p0[0] - 12
-            tm1_upper = np.max([self.user_max_temp + 20, p0[0] + 10])
-
-            tm2_lower = p0[2] - 12
-            tm2_upper = np.max([self.user_max_temp + 20, p0[2] + 10])
-
-        low_bounds[0] = tm1_lower
-        high_bounds[0] = tm1_upper
-
-        low_bounds[2] = tm2_lower
-        high_bounds[2] = tm2_upper
-
-        # Verify that the initial guesses are within the user-defined limits
-        p0[0] = adjust_value_to_interval(p0[0], tm1_lower, tm1_upper, 1)
-        p0[2] = adjust_value_to_interval(p0[2], tm2_lower, tm2_upper, 1)
-
-        self.limited_dh = dh_limits is not None
-
-        if self.limited_dh:
-
-            dh1_lower, dh1_upper, dh2_lower, dh2_upper, = np.array(dh_limits).flatten().tolist()
-
-            p0[1] = adjust_value_to_interval(p0[1], dh1_lower, dh1_upper, 1)
-            p0[3] = adjust_value_to_interval(p0[3], dh2_lower, dh2_upper, 1)
-            
-            dh1_lower = 10
-            dh1_upper = 500
-
-            dh2_lower = 10
-            dh2_upper = 500
-
-        low_bounds[1] = dh1_lower
-        high_bounds[1] = dh1_upper
-
-        low_bounds[3] = dh2_lower
-        high_bounds[3] = dh2_upper
-
-
-        # Populate the expanded signal and temperature lists
-        self.expand_multiple_signal()
-
-        signal_fx = map_three_state_model_to_signal_fx(self.model)
-
-        if t1_init != 0:
-            p0[0], low_bounds[0], high_bounds[0] = t1_init, t1_init - 15, t1_init + 15
-            p0[2], low_bounds[2] = t1_init + 5, t1_init - 15
-
-        if t2_init != 0:
-            p0[2], low_bounds[2], high_bounds[2] = t2_init, t2_init - 15, t2_init + 15
-
-        kwargs = {
-            'oligomer_concentrations': self.oligomer_concentrations_expanded,
-            'initial_parameters': p0,
-            'low_bounds': low_bounds,
-            'high_bounds': high_bounds,
-            'baseline_native_fx': self.baseline_N_fx,
-            'baseline_unfolded_fx': self.baseline_U_fx,
-            'signal_fx': signal_fx
-        }
-
-        fit_fx = fit_oligomer_unfolding_three_states_single_slopes
-
-        step = 6
-        num_rows = len(self.oligomer_concentrations)
-
-
-        if num_rows > 3:
-            step += 2
-        if num_rows > 4:
-            step += 2
-
-        # TODO: Figure out why this gridsearch destroys curve fitting
-        if t1_init == 0 and t2_init == 0:
-
-            test_T1s = np.arange(np.max([self.global_min_temp + 10, 20]), self.global_max_temp - 25, step)
-            test_T2s = np.arange(np.max([self.global_min_temp + 10, 20]) + step, self.global_max_temp + 5, step)
-
-            if 'trimer' in self.model:
-                test_T1s = test_T1s + 10
-                test_T2s = test_T1s + 10
-
-            #print(test_T1s)
-            #print(test_T2s)
-
-            combinations = [(t1, t2) for t1 in test_T1s for t2 in test_T2s]
-            combinations = [(t1, t2) for t1, t2 in combinations if t1 < t2]
-
-            #print(step)
-            #print(combinations)
-
-            df = pd.DataFrame(combinations, columns=['t1', 't2'])
-
-            rss_all = []
-
-            #Using a subset for fitting
-            kwargs['list_of_temperatures'] = self.temp_lst_expanded_subset
-            kwargs['list_of_signals'] = self.signal_lst_expanded_subset
-
-
-            for index, row in df.iterrows():
-                kwargs['t1'] = row['t1']
-                kwargs['t2'] = row['t2']
-
-                try:
-                    fit_params, cov, pred = fit_oligomer_unfolding_three_states_single_slopes(**kwargs)
-                except Exception as e:
-                    print(f"Warning: {e}")
-                    continue
-
-                #print(np.array(pred).shape)
-                #print(np.array(self.signal_lst_expanded_subset).shape)
-
-                rss = np.nansum((np.array(pred) - np.array(self.signal_lst_expanded_subset)) ** 2)
-                rss_all.append(rss)
-
-            idx = np.argmin(rss_all)
-
-            t1_init, t2_init = df['t1'][idx], df['t2'][idx]
-            p0[0], p0[2] = t1_init, t2_init
-
-            low_bounds[0], low_bounds[2] = t1_init - 30, t2_init - 30
-            high_bounds[0], high_bounds[2] = t1_init + 30, t2_init + 30
-
-            kwargs['initial_parameters'] = p0
-            kwargs['low_bounds'] = low_bounds
-            kwargs['high_bounds'] = high_bounds
-
-
-        # Do a quick prefit with a reduced data set
-        if self.pre_fit:
-            kwargs['list_of_temperatures'] = self.temp_lst_expanded_subset
-            kwargs['list_of_signals'] = self.signal_lst_expanded_subset
-
-            global_fit_params, cov, predicted = fit_fx(**kwargs)
-
-            p0 = global_fit_params
-
-
-        # Now use the whole dataset
-        kwargs['list_of_temperatures'] = self.temp_lst_expanded
-        kwargs['list_of_signals'] = self.signal_lst_expanded
-
-        global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
-            global_fit_params,
-            cov,
-            predicted,
-            high_bounds,
-            low_bounds,
-            p0,
-            False,
-            self.limited_cp,
-            self.limited_dh,
-            self.limited_tm,
-            self.fixed_cp,
-            kwargs,
-            fit_fx,
-        )
 
         rel_errors = relative_errors(global_fit_params, cov)
 
