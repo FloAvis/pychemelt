@@ -52,7 +52,6 @@ def signal_two_state_tc_unfolding(
         for the unfolded-state baseline
     extra_arg : None, optional
         Not used but present for API compatibility with oligomeric models
-
     Returns
     -------
     numpy.ndarray
@@ -139,6 +138,8 @@ def two_state_thermal_unfold_curve(
     ----------
     T : array-like
         Temperature
+    C : array-like
+        Oligomer sample concentration
     Tm : float
         Temperature at which the equilibrium constant equals one
     dHm : float
@@ -153,8 +154,6 @@ def two_state_thermal_unfold_curve(
         function to calculate the baseline for the unfolded state
     Cp : float, optional
         Variation of heat capacity between the two states (default: 0)
-    extra_arg : None, optional
-        Not used but present for compatibility
 
     Returns
     -------
@@ -168,10 +167,10 @@ def two_state_thermal_unfold_curve(
 
     dT  = shift_temperature_K(T)
 
-    S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
-    S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
-    return fn*(S_native) + fu*(S_unfolded)
+    return fn * (S_native) + fu * (S_unfolded)
 
 def two_state_thermal_unfold_curve_dimer(
         T,C,Tm,dHm,
@@ -179,11 +178,42 @@ def two_state_thermal_unfold_curve_dimer(
         p1_U, p2_U, p3_U, p4_U,
         baseline_N_fx,
         baseline_U_fx,
-        Cp=0,
-        extra_arg=None):
+        Cp=0):
     
     """
+    Two-state temperature unfolding (dimer).
     N2 ⇔ 2U   C is the total concentration (M) of the protein in dimer equivalent.
+
+    Parameters
+    ----------
+    T : array-like
+        Temperature
+    C : array-like
+        Oligomer sample concentration
+    Tm : float
+        Temperature at which the equilibrium constant equals one
+    dHm : float
+        Variation of enthalpy between the two considered states at Tm
+    p1_N, p2_N, p3_N : float
+        baseline parameters for the native-state baseline
+    p1_U, p2_U, p3_U : float
+        baseline parameters for the unfolded-state baseline
+    baseline_N_fx : callable
+        function to calculate the baseline for the native state
+    baseline_U_fx : callable
+        function to calculate the baseline for the unfolded state
+    Cp : float, optional
+        Variation of heat capacity between the two states (default: 0)
+
+    Returns
+    -------
+    numpy.ndarray
+        Signal at the given temperatures, given the parameters
+
+    Notes
+    -----
+    C is the total concentration (M) of the protein in dimer equivalent.
+
     """
 
     K  = eq_constant_thermo(T,dHm,Tm,Cp)
@@ -192,10 +222,10 @@ def two_state_thermal_unfold_curve_dimer(
 
     dT  = shift_temperature_K(T)
 
-    S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
-    S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
-    return fn*(S_native) + fu*(S_unfolded)*2
+    return fn * (S_native) + fu * (S_unfolded) * 2
 
 def two_state_thermal_unfold_curve_trimer(
         T,C,Tm,dHm,
@@ -203,11 +233,42 @@ def two_state_thermal_unfold_curve_trimer(
         p1_U, p2_U, p3_U, p4_U,
         baseline_N_fx,
         baseline_U_fx,
-        Cp=0,
-        extra_arg=None):
+        Cp=0):
 
     """
-    N3 ⇔ 3U   C is the total concentration (M) of the protein in trimer equivalent.
+    Two-state temperature unfolding (trimer).
+    N3 ⇔ 3U
+
+    Parameters
+    ----------
+    T : array-like
+        Temperature
+    C : array-like
+        Oligomer sample concentration
+    Tm : float
+        Temperature at which the equilibrium constant equals one
+    dHm : float
+        Variation of enthalpy between the two considered states at Tm
+    p1_N, p2_N, p3_N : float
+        baseline parameters for the native-state baseline
+    p1_U, p2_U, p3_U : float
+        baseline parameters for the unfolded-state baseline
+    baseline_N_fx : callable
+        function to calculate the baseline for the native state
+    baseline_U_fx : callable
+        function to calculate the baseline for the unfolded state
+    Cp : float, optional
+        Variation of heat capacity between the two states (default: 0)
+
+    Returns
+    -------
+    numpy.ndarray
+        Signal at the given temperatures, given the parameters
+
+    Notes
+    -----
+    C is the total concentration (M) of the protein in dimer equivalent.
+
     """
 
     K  = eq_constant_thermo(T,dHm,Tm,Cp)
@@ -216,10 +277,9 @@ def two_state_thermal_unfold_curve_trimer(
 
     dT  = shift_temperature_K(T)
 
-    S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
-    S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
-
-
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
+    
     return fn*(S_native) + fu*(S_unfolded)*3
 
 def two_state_thermal_unfold_curve_tetramer(
@@ -232,8 +292,41 @@ def two_state_thermal_unfold_curve_tetramer(
         extra_arg=None):
 
     """
-    N4 ⇔ 4U   C is the total concentration (M) of the protein in tetramer equivalent.
+    Two-state temperature unfolding (tetramer).
+    N4 ⇔ 4U
+
+    Parameters
+    ----------
+    T : array-like
+        Temperature
+    C : array-like
+        Oligomer sample concentration
+    Tm : float
+        Temperature at which the equilibrium constant equals one
+    dHm : float
+        Variation of enthalpy between the two considered states at Tm
+    p1_N, p2_N, p3_N : float
+        baseline parameters for the native-state baseline
+    p1_U, p2_U, p3_U : float
+        baseline parameters for the unfolded-state baseline
+    baseline_N_fx : callable
+        function to calculate the baseline for the native state
+    baseline_U_fx : callable
+        function to calculate the baseline for the unfolded state
+    Cp : float, optional
+        Variation of heat capacity between the two states (default: 0)
+
+    Returns
+    -------
+    numpy.ndarray
+        Signal at the given temperatures, given the parameters
+
+    Notes
+    -----
+    C is the total concentration (M) of the protein in dimer equivalent.
+
     """
+
 
     K  = eq_constant_thermo(T,dHm,Tm,Cp)
     fu = fu_two_state_tetramer(K,C)
@@ -241,14 +334,27 @@ def two_state_thermal_unfold_curve_tetramer(
 
     dT  = shift_temperature_K(T)
 
-    S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
-    S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
-
-    return fn*(S_native) + fu*(S_unfolded)*4
+    return fn * (S_native) + fu * (S_unfolded) * 4
 
 def map_two_state_model_to_signal_fx(model):
+    """
 
+    Maps the model string to the signal type
+
+    Parameters
+    ----------
+    model : str,
+        string representation of model type.
+
+    Returns
+    -------
+    function
+        signal function corresponding to the string
+
+    """
     signal_fx_map = {
     'Monomer':  two_state_thermal_unfold_curve,
     'Dimer':    two_state_thermal_unfold_curve_dimer,
@@ -257,6 +363,7 @@ def map_two_state_model_to_signal_fx(model):
     }
 
     return signal_fx_map.get(model)
+  
 
 #Oligomeric thermal unfolding signals with intermediate signals
 

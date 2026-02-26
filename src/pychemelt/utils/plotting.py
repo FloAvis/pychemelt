@@ -156,6 +156,15 @@ def plot_unfolding(
     # Extract the minimum and maximum denaturation concentration
     concs = pychemelt_sample.denaturant_concentrations
 
+    # Adjusting scale depending on highest concentration
+    scale = "M"
+
+    if np.max(concs) < 1e-1:
+        concs = concs * 1e3
+        scale = "mM"
+    if np.max(concs) < 1e-1:
+        concs = concs * 1e3
+        scale = "μM"
 
     min_conc = np.min(concs)
     max_conc = np.max(concs)
@@ -225,7 +234,7 @@ def plot_unfolding(
                 go.Scatter(
                     x=x, y=y, mode='markers',
                     marker=dict(size=plot_config.marker_size, color=color),
-                    name=f'{conc:.2f} M',
+                    name=f'{conc:.2f} {scale}',
                     showlegend=False
                 ),
                 row=row, col=col
@@ -252,6 +261,7 @@ def plot_unfolding(
     # Update subplot layout with white background and axis styling
     fig.update_layout(
         font_family="Roboto",
+        font_color="black",
         plot_bgcolor='white',
         paper_bgcolor='white',
         legend=dict(font=dict(size=plot_config.font_size - 1))
@@ -266,7 +276,10 @@ def plot_unfolding(
         title_text_x = 'Temperature (°C)' if row == nrows else ''
 
         # Set the y-axis title only for the first column
-        title_text_y = 'Signal' if col == 1 else ''
+        if plot_derivative:
+            title_text_y = 'Derivative' if col == 1 else ''
+        else:
+            title_text_y = 'Signal' if col == 1 else ''
 
         fig.update_xaxes(
             title_text=title_text_x,
@@ -313,7 +326,7 @@ def plot_unfolding(
     _yanchor = 'top'    if legend_config.color_bar_orientation == 'h' else 'middle'
 
     colorbar_dict = dict(
-        title='[Denaturant] (M)',
+        title=f'[Protein] ({scale})' if pychemelt_sample.oligomeric else f'[Denaturant] ({scale})',
         tickvals=[min_conc, 0.5*(min_conc + max_conc), max_conc],
         ticktext=[f"{min_conc:.2g}", f"{(min_conc + max_conc) * 0.5:.2g}", f"{max_conc:.2g}"],
         len=legend_config.color_bar_length,
@@ -340,6 +353,14 @@ def plot_unfolding(
             hoverinfo='skip'
         ),
         row=1, col=1
+    )
+
+    def is_subplot_title(x):
+        return x.text in ["Simulated Signal"]
+
+    fig.update_annotations(
+        selector=is_subplot_title,
+        patch=dict(font=dict(size=plot_config.font_size + 10))
     )
 
     fig = config_fig(

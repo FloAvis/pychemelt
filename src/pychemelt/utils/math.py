@@ -193,13 +193,7 @@ def exponential_baseline(dt,d,den_slope,a,c,alpha):
     float
         Baseline signal
     """
-    #print("Params: ", a, c, alpha, den_slope)
 
-    if not np.all(np.isfinite(a + c * np.exp(-alpha * dt) + den_slope * d)):
-        #print(dt, d)
-        #print("Params: ", a, c, alpha, den_slope)
-        #print(a + c * np.exp(-alpha * dt) + den_slope * d)
-        pass
     return a + c * np.exp(-alpha * dt) + den_slope * d
 
 def is_evenly_spaced(x, tol = 1e-4):

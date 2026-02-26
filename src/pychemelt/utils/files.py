@@ -76,10 +76,12 @@ def file_is_of_type_aunty(file_path):
     row contains the word 'wavelength' and the second row contains the word
     'temperature' in the first column.
 
-    Args:
+    Parameters
+    ----------
         file_path (str): Path to the .xls or .xlsx file to test.
 
-    Returns:
+    Returns
+    -------
         bool: True if the file matches the AUNTY format heuristic, False otherwise.
     """
 

@@ -1,12 +1,11 @@
 """
-Main class to handle thermal denaturation data of mono- and oligomers
+Main class to handle thermal denaturation data of mono- and oligomers up to tetramers
 The current model assumes the proteins' unfolding is reversible
-TODO: 
-- check out necessary data loading and if it fits, need to know data shape for adjustment
 """
 
 import pandas as pd
 import numpy as np
+from warnings import warn
 
 from itertools import chain
 from copy import deepcopy
@@ -21,6 +20,11 @@ from .utils.signals import (
 from .utils.math import (
     temperature_to_kelvin,
     relative_errors,
+    shift_temperature,
+    constant_baseline,
+    linear_baseline,
+    quadratic_baseline,
+    exponential_baseline,
 )
 
 from .utils.processing import (
@@ -34,6 +38,8 @@ from .utils.processing import (
 
 from .utils.fitting import (
     fit_line_robust,
+    fit_quadratic_robust,
+    fit_exponential_robust,
     fit_oligomer_unfolding_single_slopes,
     fit_oligomer_unfolding_shared_slopes_many_signals,
     fit_oligomer_unfolding_many_signals,
@@ -53,9 +59,9 @@ class ThermalOligomer(Sample):
 
         super().__init__(name)
 
-
         self.nr_olig = 0  # Number of oligomer concentrations
-        self.model = None
+        self.model = None # Oligomer model type
+        self.oligomeric = True # Flag for oligomer for plotting
 
     def set_model(self, model_name, intermediate_name=None):
 
@@ -68,6 +74,11 @@ class ThermalOligomer(Sample):
         model_name : str
             name of the used model. Can be: "Monomer", "Dimer", "Trimer", "Tetramer".
             Case insensitive
+
+        Raises
+        ------
+        ValueError
+            If the provided model name is not in the supported list.
 
         Notes
         -----
@@ -189,6 +200,8 @@ class ThermalOligomer(Sample):
             flat = list(chain.from_iterable(chain.from_iterable(self.signal_lst_multiple)))
             global_max = np.max(flat)  # Global maximum across all signals
 
+            self.data_global_max = global_max
+
             for i in range(len(self.signal_lst_multiple)):
                 self.signal_lst_multiple[i] = [x / global_max * 100 for x in self.signal_lst_multiple[i]]
 
@@ -215,10 +228,17 @@ class ThermalOligomer(Sample):
     def guess_Cp(self):
 
         """
-        Guess the Cp of the sample by fitting a line to the Tm and dH values
+        Guess the Cp of the sample by the number of residues.
+
+        Raises
+        ------
+        ValueError
+            If `self.n_residues` is not set.
 
         Notes
         -----
+        The number of residues represent the total number of residues in the oligomer
+
         This method creates/updates attributes used later in fitting:
         - Tms, dHs, slope_dh_tm, intercept_dh_tm, Cp0, Cp0 assigned to self.Cp0
         """
@@ -237,8 +257,219 @@ class ThermalOligomer(Sample):
         self.Cp0 = Cp0
 
         return None
-    
-    
+
+    def oligomer_number(self):
+        """
+        Get the number of subunits in the oligomer based on the model.
+
+        Returns
+        -------
+        int
+            The number of subunits (2 for 'Dimer', 3 for 'Trimer',
+            4 for 'Tetramer', 1 otherwise).
+        """
+        if self.model == 'Dimer':
+            return 2
+        elif self.model == 'Trimer':
+            return 3
+        elif self.model == 'Tetramer':
+            return 4
+        else:
+            return 1
+
+    def estimate_signal_baseline_params(
+            self,
+            signal_lst,
+            temp_lst,
+            native_baseline_type,
+            unfolded_baseline_type,
+            window_range_native=12,
+            window_range_unfolded=12):
+
+        """
+        Estimate the baseline parameters for the sample
+
+        Parameters
+        ---------
+        signal_lst : list of np.ndarray
+            List of signal arrays
+        temp_lst : list of np.ndarray
+            List of temperature arrays
+        window_range_native : float
+            Range of the temperature window to estimate the native state baseline
+        window_range_unfolded : float
+            Range of the temperature window to estimate the unfolded state baseline
+        native_baseline_type : str
+            options: 'constant', 'linear', 'quadratic', 'exponential'
+        unfolded_baseline_type : str
+            options: 'constant', 'linear', 'quadratic', 'exponential'
+
+        Returns
+        -------
+        tuple
+            Lists of estimated parameters (p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us).
+        """
+
+        p1Ns = []
+        p1Us = []
+        p2Ns = []
+        p2Us = []
+        p3Ns = []
+        p3Us = []
+
+        for s, t in zip(signal_lst, temp_lst):
+
+            signal_native = s[t < np.min(t) + window_range_native]
+            temp_native = t[t < np.min(t) + window_range_native]
+
+            # Shift temperature to be centered at Tref !!! defined in constants.py
+            temp_native = shift_temperature(temp_native)
+
+            signal_denat = s[t > np.max(t) - window_range_unfolded]
+            temp_denat = t[t > np.max(t) - window_range_unfolded]
+
+            # Shift temperature to be centered at Tref !!! defined in constants.py
+            temp_denat = shift_temperature(temp_denat)
+
+            # Correct signal for oligomeric influence
+            signal_denat = signal_denat / self.oligomer_number() if not self.normalise_to_global_max else signal_denat
+
+
+            if native_baseline_type == 'constant':
+                p1N = np.median(signal_native)
+                p1Ns.append(p1N)
+
+            if unfolded_baseline_type == 'constant':
+                p1U = np.median(signal_denat)
+                p1Us.append(p1U)
+
+            if native_baseline_type == 'linear':
+                p2N, p1N = fit_line_robust(temp_native, signal_native)
+
+                p2Ns.append(p2N)
+                p1Ns.append(p1N)
+
+            if unfolded_baseline_type == 'linear':
+                p2U, p1U = fit_line_robust(temp_denat, signal_denat)
+
+                p2Us.append(p2U)
+                p1Us.append(p1U)
+
+            if native_baseline_type == 'quadratic':
+                p3N, p2N, p1N = fit_quadratic_robust(temp_native, signal_native)
+
+                p3Ns.append(p3N)
+                p2Ns.append(p2N)
+                p1Ns.append(p1N)
+
+            if unfolded_baseline_type == 'quadratic':
+                p3U, p2U, p1U = fit_quadratic_robust(temp_denat, signal_denat)
+
+                p3Us.append(p3U)
+                p2Us.append(p2U)
+                p1Us.append(p1U)
+
+            if native_baseline_type == 'exponential':
+                p1N, p2N, p3N = fit_exponential_robust(temp_native, signal_native)
+
+                p3Ns.append(p3N)
+                p2Ns.append(p2N)
+                p1Ns.append(p1N)
+
+            if unfolded_baseline_type == 'exponential':
+                p1U, p2U, p3U = fit_exponential_robust(temp_denat, signal_denat)
+
+                p3Us.append(p3U)
+                p2Us.append(p2U)
+                p1Us.append(p1U)
+
+        return p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us
+
+    def estimate_baseline_parameters(
+            self,
+            native_baseline_type,
+            unfolded_baseline_type,
+            window_range_native=12,
+            window_range_unfolded=12):
+
+        """
+        Estimate the baseline parameters for multiple signals
+
+        Parameters
+        ----------
+        native_baseline_type : str
+            one of 'constant', 'linear', 'quadratic', 'exponential'
+        unfolded_baseline_type : str
+            one of 'constant', 'linear', 'quadratic', 'exponential'
+        window_range_native : int, optional
+            Range of the window (in degrees) to estimate the baselines and slopes of the native state
+        window_range_unfolded : int, optional
+            Range of the window (in degrees) to estimate the baselines and slopes of the unfolded state
+
+        Notes
+        -----
+        This method sets or updates these attributes:
+        - bNs_per_signal, bUs_per_signal, kNs_per_signal, kUs_per_signal, qNs_per_signal, qUs_per_signal
+        - poly_order_native, poly_order_unfolded
+        """
+
+        self.first_param_Ns_per_signal = []
+        self.first_param_Us_per_signal = []
+        self.second_param_Ns_per_signal = []
+        self.second_param_Us_per_signal = []
+        self.third_param_Ns_per_signal = []
+        self.third_param_Us_per_signal = []
+
+        # If oligomeric, we need to correct the signal for the concentration of the oligomer, if not already normalised
+        if self.oligomeric:
+            if self.normalise_to_global_max:
+
+                # normalised concentration difference for normalised signal
+                norm_conc = [x / max(self.oligomer_concentrations) for x in self.oligomer_concentrations]
+
+                oligomer_concentrations = np.repeat(norm_conc,
+                                                    np.array(self.signal_lst_multiple).shape[-1])
+                oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
+
+            else:
+                    oligomer_concentrations = np.repeat(self.oligomer_concentrations, np.array(self.signal_lst_multiple).shape[-1])
+                    oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
+
+        for i in range(len(self.signal_lst_multiple)):
+
+            if self.oligomeric:
+                adjusted_signal_lst_multiple = list(np.array(self.signal_lst_multiple[i])/ np.array(oligomer_concentrations))
+
+            p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us = self.estimate_signal_baseline_params(
+                self.signal_lst_multiple[i] if not self.oligomeric else adjusted_signal_lst_multiple,
+                self.temp_lst_multiple[i],
+                native_baseline_type,
+                unfolded_baseline_type,
+                window_range_native,
+                window_range_unfolded
+            )
+
+            self.first_param_Ns_per_signal.append(p1Ns)
+            self.first_param_Us_per_signal.append(p1Us)
+            self.second_param_Ns_per_signal.append(p2Ns)
+            self.second_param_Us_per_signal.append(p2Us)
+            self.third_param_Ns_per_signal.append(p3Ns)
+            self.third_param_Us_per_signal.append(p3Us)
+
+        baseline_fx_dic = {
+            'constant': constant_baseline,
+            'linear': linear_baseline,
+            'quadratic': quadratic_baseline,
+            'exponential': exponential_baseline
+        }
+
+        self.baseline_N_fx = baseline_fx_dic[native_baseline_type]
+        self.baseline_U_fx = baseline_fx_dic[unfolded_baseline_type]
+
+        self.native_baseline_type = native_baseline_type
+        self.unfolded_baseline_type = unfolded_baseline_type
+
+        return None
 
     def create_dg_df(self):
 
@@ -317,9 +548,16 @@ class ThermalOligomer(Sample):
 
         Tm = np.average(tm_lst)
 
+        dh = 100
 
+        if self.model == 'Dimer':
+            dh = 120
+        elif self.model == 'Trimer':
+            dh = 150
+        elif self.model == 'Tetramer':
+            dh = 180
 
-        p0 = [Tm, 40, self.Cp0]
+        p0 = [Tm, dh, self.Cp0]
 
 
         params_names = [
@@ -394,6 +632,7 @@ class ThermalOligomer(Sample):
 
         low_bounds[3:], high_bounds[3:] = set_param_bounds(p0[3:],params_names[3:])
 
+        # Adjusting boundaries based on the size of the oligomer
         self.limited_tm = tm_limits is not None
 
         if self.limited_tm:
@@ -402,8 +641,16 @@ class ThermalOligomer(Sample):
 
         else:
 
-            tm_lower = p0[0] - 12
-            tm_upper = np.max([self.user_max_temp + 20, p0[0] + 10])
+            tm_lower = p0[0] - 12 if self.model == 'Monomer' else p0[0] - 20
+            tm_upper = p0[0] + 20 if self.model == 'Monomer' else p0[0] + 30
+
+            if self.model in ['Trimer', 'Tetramer']:
+
+                tm_lower, tm_upper, p0[0] = tm_lower + 10, tm_upper + 10, p0[0] + 10
+
+                if self.model == 'Tetramer':
+                    tm_lower, tm_upper, p0[0] = tm_lower + 10, tm_upper + 20, p0[0] + 20
+
 
         low_bounds[0] = tm_lower
         high_bounds[0] = tm_upper
@@ -470,7 +717,8 @@ class ThermalOligomer(Sample):
             'cp_value' : cp_value,
             'baseline_native_fx' : self.baseline_N_fx,
             'baseline_unfolded_fx' : self.baseline_U_fx,
-            'signal_fx' : signal_fx
+            'signal_fx' : signal_fx,
+            'normalise_to_global_max' : self.normalise_to_global_max,
         }
 
         fit_fx = fit_oligomer_unfolding_single_slopes
@@ -489,10 +737,7 @@ class ThermalOligomer(Sample):
         kwargs['list_of_temperatures'] = self.temp_lst_expanded
         kwargs['list_of_signals'] = self.signal_lst_expanded
 
-        # First fit without m-value dependence on temperature
         global_fit_params, cov, predicted = fit_fx(**kwargs)
-
-        fit_m_dep = False
 
         global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
             global_fit_params,
@@ -501,15 +746,34 @@ class ThermalOligomer(Sample):
             high_bounds,
             low_bounds,
             p0,
-            fit_m_dep,
+            False,
             self.limited_cp,
             self.limited_dh,
             self.limited_tm,
             self.fixed_cp,
             kwargs,
             fit_fx,
+            fit_m_value=False,
         )
 
+        
+         # If the fitting returns a large error it is recommended to turn off the CP0 value fitting
+        error = np.nansum((np.array(predicted) - np.array(self.signal_lst_expanded)) ** 2)
+        if self.normalise_to_global_max:
+            if error > 10000:
+                warn('The fitted signal deviates heavily from the experimental data in the global fit. '
+                     'Consider not fitting the CP0 value by setting "cp_value=0" in the fit_thermal_unfolding_global() function')
+        else:
+            flat = list(chain.from_iterable(chain.from_iterable(self.signal_lst_multiple)))
+            global_max = np.max(flat)  # Global maximum across all signals
+            
+            error = error / global_max * 100 if not self.normalise_to_global_max else error
+            
+            if error > 10:
+                warn('The fitted signal deviates heavily from the experimental data in the global fit. '
+                     'Consider not fitting the CP0 value by setting "cp_value=0" in the fit_thermal_unfolding_global() function')
+                
+              
         rel_errors = relative_errors(global_fit_params, cov)
 
         self.p0 = p0
@@ -726,8 +990,7 @@ class ThermalOligomer(Sample):
 
             p0[1] = adjust_value_to_interval(p0[1], dh1_lower, dh1_upper, 1)
             p0[3] = adjust_value_to_interval(p0[3], dh2_lower, dh2_upper, 1)
-
-        else:
+            
             dh1_lower = 10
             dh1_upper = 500
 
@@ -844,13 +1107,6 @@ class ThermalOligomer(Sample):
         # Now use the whole dataset
         kwargs['list_of_temperatures'] = self.temp_lst_expanded
         kwargs['list_of_signals'] = self.signal_lst_expanded
-
-        # First fit without m-value dependence on temperature
-        global_fit_params, cov, predicted = fit_fx(**kwargs)
-
-
-
-
 
         global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
             global_fit_params,
@@ -1032,7 +1288,8 @@ class ThermalOligomer(Sample):
             'signal_ids':self.signal_ids,
             'baseline_native_fx': self.baseline_N_fx,
             'baseline_unfolded_fx': self.baseline_U_fx,
-            'signal_fx' : signal_fx
+            'signal_fx' : signal_fx,
+            'normalise_to_global_max': self.normalise_to_global_max,
         }
 
         fit_fx = fit_oligomer_unfolding_shared_slopes_many_signals
@@ -1064,6 +1321,7 @@ class ThermalOligomer(Sample):
             self.fixed_cp,
             kwargs,
             fit_fx,
+            fit_m_value=False,
         )
 
         rel_errors = relative_errors(global_fit_params, cov)
@@ -1296,8 +1554,9 @@ class ThermalOligomer(Sample):
             'signal_fx' : signal_fx,
             'baseline_native_fx' : self.baseline_N_fx,
             'baseline_unfolded_fx' : self.baseline_U_fx,
-            'fit_native_den_slope' : True,
-            'fit_unfolded_den_slope' : True
+            'normalise_to_global_max': self.normalise_to_global_max,
+            'fit_native_olig_slope' : True,
+            'fit_unfolded_olig_slope' : True
         }
 
         fit_fx = fit_oligomer_unfolding_many_signals
@@ -1320,9 +1579,8 @@ class ThermalOligomer(Sample):
         # Remove scale factors that are not significant
         if model_scale_factor:
 
-            # 3 parameters corresponding to Tm, dH, m
+            # 2 parameters corresponding to Tm, dH
             # plus Cp if fitted
-            # plus m1 if fitted
             idx_start = 2 + (self.cp_value is None)
 
             native_factor   = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_N_fx))
@@ -1332,7 +1590,6 @@ class ThermalOligomer(Sample):
             idx_start += native_factor * self.nr_signals
             # Add index according to the unfolded baseline polynomial order
             idx_start += unfolded_factor * self.nr_signals
-
 
             for _ in range(5):
 
@@ -1440,6 +1697,11 @@ class ThermalOligomer(Sample):
             'derivative' uses the estimated derivative signal.
         scaled : bool, optional
             If True and signal_type == 'fitted' or 'raw', use the scaled versions if available.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with columns: ['Temperature', 'Signal', 'Oligomer', 'ID'].
         """
 
         # Flatten all arrays and repeat oligomer values accordingly

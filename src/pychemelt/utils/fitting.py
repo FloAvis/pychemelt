@@ -28,6 +28,19 @@ __all__ = [
 ]
 
 def baseline_fx_name_to_req_params(baseline_fx_name):
+    """
+    Determine which baseline parameters are required based on the function name.
+
+    Parameters
+    ----------
+    baseline_fx_name : str or function object
+        baseline type to discern the number of parameters needed
+
+    Returns
+    -------
+    list
+        boolean list of needed parameters for the baseline
+    """
 
     # If baseline_fx_name is not a string, extract the name from the function object
     if not isinstance(baseline_fx_name, str):
@@ -443,13 +456,17 @@ def fit_tc_unfolding_single_slopes(
         Whether to fit temperature dependence of m-value
     cp_value, tm_value, dh_value : float or None, optional
         Optional fixed thermodynamic parameters
+    method : str, optional
+        Optimization method ('least_sq' or 'curve_fit')
 
     Returns
     -------
     global_fit_params : numpy.ndarray
+         Fitted global parameters
     cov : numpy.ndarray
+        Covariance matrix
     predicted_lst : list of numpy.ndarray
-
+        Predicted signals per dataset
     """
 
     # ------------------------------------------------------------
@@ -625,6 +642,7 @@ def fit_oligomer_unfolding_single_slopes(
         signal_fx,
         baseline_native_fx,
         baseline_unfolded_fx,
+        normalise_to_global_max,
         cp_value=None,
         tm_value=None,
         dh_value=None,
@@ -652,14 +670,19 @@ def fit_oligomer_unfolding_single_slopes(
         function to calculate the native state baseline
     baseline_unfolded_fx : callable
         function to calculate the unfolded state baseline
+    normalise_to_global_max : bool
+        indicator if data is normalised to global max
     cp_value, tm_value, dh_value : float or None, optional
         Optional fixed thermodynamic parameters
 
     Returns
     -------
     global_fit_params : numpy.ndarray
+         Fitted global parameters
     cov : numpy.ndarray
+        Covariance matrix
     predicted_lst : list of numpy.ndarray
+        Predicted signals per dataset
     """
 
     # ------------------------------------------------------------
@@ -690,6 +713,10 @@ def fit_oligomer_unfolding_single_slopes(
         tm_value = temperature_to_kelvin(tm_value)
 
 
+    # normalised concentration difference for normalised signal
+    norm_conc = [x/ max(oligomer_concentrations) for x in oligomer_concentrations]
+
+    norm_conc_all = np.repeat(norm_conc, lengths)
 
     def unfolding(_, *params):
 
@@ -773,14 +800,24 @@ def fit_oligomer_unfolding_single_slopes(
             p3U = 0.0
 
         # ---- Single vectorized signal evaluation ----
-        return signal_fx(
-                T_all,C_all, Tm, DHm,
-                0, p1N, p2N, p3N,
-                0, p1U, p2U, p3U,
-                baseline_native_fx,
-                baseline_unfolded_fx,
-                Cp0,
-            )
+        if normalise_to_global_max:
+            return norm_conc_all * signal_fx(
+                    T_all,C_all, Tm, DHm,
+                    0, p1N, p2N, p3N,
+                    0, p1U, p2U, p3U,
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0,
+                )
+        else:
+            return C_all * signal_fx(
+                    T_all,C_all, Tm, DHm,
+                    0, p1N, p2N, p3N,
+                    0, p1U, p2U, p3U,
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0,
+                )
 
 
     global_fit_params, cov = curve_fit(
@@ -1051,7 +1088,9 @@ def fit_tc_unfolding_shared_slopes_many_signals(
     Parameters
     ----------
     list_of_temperatures : list of array-like
+        Temperature arrays for each dataset
     list_of_signals : list of array-like
+        Signal arrays for each dataset
     signal_ids : list of int
         Signal-type id for each dataset (0..n_signals-1)
     denaturant_concentrations : list
@@ -1078,9 +1117,11 @@ def fit_tc_unfolding_shared_slopes_many_signals(
     Returns
     -------
     global_fit_params : numpy.ndarray
+         Fitted global parameters
     cov : numpy.ndarray
+        Covariance matrix
     predicted_lst : list of numpy.ndarray
-
+        Predicted signals per dataset
     """
 
     # Flatten all signals
@@ -1202,20 +1243,21 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
     signal_fx,
     baseline_native_fx,
     baseline_unfolded_fx,
-    list_of_oligomer_conc=None,
-    fit_m1=False,
+    normalise_to_global_max,
     cp_value=None,
     tm_value=None,
     dh_value=None
 ):
     """
-    Vectorized fitting of thermochemical unfolding curves for multiple signal types
+    Vectorized fitting of oligomer thermal unfolding curves for multiple signal types
     sharing thermodynamic parameters and slopes, using least_squares.
 
     Parameters
     ----------
     list_of_temperatures : list of array-like
+        Temperature arrays for each dataset.
     list_of_signals : list of array-like
+        Signal arrays for each dataset.
     signal_ids : list of int
         Signal-type id for each dataset (0..n_signals-1)
     oligomer_concentrations : list
@@ -1232,18 +1274,19 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
         function to calculate the baseline for the native state
     baseline_unfolded_fx : callable
         function to calculate the baseline for the unfolded state
-    list_of_oligomer_conc : list, optional
-        Oligomer concentrations per dataset
-    fit_m1 : bool, optional
-        Whether to fit temperature dependence of m-value
+    normalise_to_global_max : bool
+        indicator if data is normalised to global max
     cp_value, tm_value, dh_value : float or None, optional
         Optional fixed thermodynamic parameters
 
     Returns
     -------
     global_fit_params : numpy.ndarray
+         Fitted global parameters
     cov : numpy.ndarray
+        Covariance matrix
     predicted_lst : list of numpy.ndarray
+        Predicted signals per dataset
 
     """
 
@@ -1268,6 +1311,9 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
         high_bounds[0] = temperature_to_kelvin(high_bounds[0])
     else:
         tm_value = temperature_to_kelvin(tm_value)
+
+    # normalised concentration difference for normalised signal
+    norm_conc = [x/ max(oligomer_concentrations) for x in oligomer_concentrations]
 
     # Vectorized residuals function for least_squares
     def residuals(params):
@@ -1335,14 +1381,24 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
             c = oligomer_concentrations[i]
             sig_id = signal_ids[i]
 
-            predicted_all[start:end] = signal_fx(
-                T, c, Tm, DHm,
-                0, intercepts_folded[i], p2_n_s[sig_id], p3_n_s[sig_id],
-                0, intercepts_unfolded[i], p2_u_s[sig_id], p3_u_s[sig_id],
-                baseline_native_fx,
-                baseline_unfolded_fx,
-                Cp0
-            )
+            if normalise_to_global_max:
+                predicted_all[start:end] = norm_conc[i] * signal_fx(
+                    T, c, Tm, DHm,
+                    0, intercepts_folded[i], p2_n_s[sig_id], p3_n_s[sig_id],
+                    0, intercepts_unfolded[i], p2_u_s[sig_id], p3_u_s[sig_id],
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0
+                )
+            else:
+                predicted_all[start:end] = c * signal_fx(
+                    T, c, Tm, DHm,
+                    0, intercepts_folded[i], p2_n_s[sig_id], p3_n_s[sig_id],
+                    0, intercepts_unfolded[i], p2_u_s[sig_id], p3_u_s[sig_id],
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0
+                )
 
         return predicted_all - all_signal
 
@@ -1396,7 +1452,9 @@ def fit_tc_unfolding_many_signals(
     Parameters
     ----------
     list_of_temperatures : list of array-like
+        Temperature arrays for each dataset.
     list_of_signals : list of array-like
+        Signal arrays for each dataset.
     signal_ids : list of int
         Signal-type id for each dataset (0..n_signals-1)
     denaturant_concentrations : list
@@ -1423,12 +1481,17 @@ def fit_tc_unfolding_many_signals(
         IDs of scale factors to exclude / fix to 1
     cp_value : float or None, optional
         If provided, Cp is fixed to this value and not fitted
+    fit_native_den_slope, fit_unfolded_den_slope : bool, optional
+        Whether to fit denaturant dependence of baselines.
 
     Returns
     -------
     global_fit_params : numpy.ndarray
+         Fitted global parameters
     cov : numpy.ndarray
+        Covariance matrix
     predicted_lst : list of numpy.ndarray
+        Predicted signals per dataset
     """
 
     all_signal = np.concatenate(list_of_signals, axis=0)
@@ -1624,19 +1687,21 @@ def fit_oligomer_unfolding_many_signals(
         signal_fx,
         baseline_native_fx,
         baseline_unfolded_fx,
-        fit_m1=False,
+        normalise_to_global_max,
         model_scale_factor=False,
         scale_factor_exclude_ids=[],
         cp_value=None,
-        fit_native_den_slope=True,
-        fit_unfolded_den_slope=True):
+        fit_native_olig_slope=True,
+        fit_unfolded_olig_slope=True):
     """
-    Fit thermochemical unfolding curves for many signals (optimized variant).
+    Fit thermal unfolding curves of oligomers for many signals (optimized variant).
 
     Parameters
     ----------
     list_of_temperatures : list of array-like
+        Temperature arrays for each dataset
     list_of_signals : list of array-like
+        Signal arrays for each dataset
     signal_ids : list of int
         Signal-type id for each dataset (0..n_signals-1)
     oligomer_concentrations : list
@@ -1653,20 +1718,25 @@ def fit_oligomer_unfolding_many_signals(
         function to calculate the native state baseline
     baseline_unfolded_fx : callable
         function to calculate the unfolded state baseline
-    fit_m1 : bool, optional
-        Whether to include and fit temperature dependence of the m-value (m1)
+    normalise_to_global_max : bool
+        indicator if data is normalised to global max
     model_scale_factor : bool, optional
-        If True, include a per-denaturant concentration scale factor to account for intensity differences
+        If True, include a per-oligomeric concentration scale factor to account for intensity differences
     scale_factor_exclude_ids : list, optional
         IDs of scale factors to exclude / fix to 1
     cp_value : float or None, optional
         If provided, Cp is fixed to this value and not fitted
+    fit_native_olig_slope, fit_unfolded_olig_slope : bool, optional
+        Whetever to fit the dependence of the slopes of the baselines
 
-    Returns
+   Returns
     -------
     global_fit_params : numpy.ndarray
+         Fitted global parameters
     cov : numpy.ndarray
+        Covariance matrix
     predicted_lst : list of numpy.ndarray
+        Predicted signals per dataset
     """
 
     all_signal = np.concatenate(list_of_signals, axis=0)
@@ -1679,14 +1749,17 @@ def fit_oligomer_unfolding_many_signals(
         # Sort them in ascending order to avoid issues when inserting
         scale_factor_exclude_ids = sorted(scale_factor_exclude_ids)
 
-    baseline_native_params = [fit_native_den_slope] + baseline_fx_name_to_req_params(baseline_native_fx)
-    baseline_unfolded_params = [fit_unfolded_den_slope] + baseline_fx_name_to_req_params(baseline_unfolded_fx)
+    baseline_native_params = [fit_native_olig_slope] + baseline_fx_name_to_req_params(baseline_native_fx)
+    baseline_unfolded_params = [fit_unfolded_olig_slope] + baseline_fx_name_to_req_params(baseline_unfolded_fx)
 
     initial_parameters[0] = temperature_to_kelvin(initial_parameters[0])
     low_bounds[0] = temperature_to_kelvin(low_bounds[0])
     high_bounds[0] = temperature_to_kelvin(high_bounds[0])
 
     list_of_temperatures = [temperature_to_kelvin(T) for T in list_of_temperatures]
+
+    # normalised concentration difference for normalised signal
+    norm_conc = [x / max(oligomer_concentrations) for x in oligomer_concentrations]
 
     def unfolding(dummyVariable, *args):
 
@@ -1701,8 +1774,8 @@ def fit_oligomer_unfolding_many_signals(
             Temperature slope or term pre-exponential factor folded
             Temperature slope term or pre-exponential factor unfolded
 
-            Denaturant slope term folded
-            Denaturant slope term unfolded
+            Oligomer slope term folded
+            Oligomer slope term unfolded
 
             Quadratic coefficient or exponential coefficient folded
             Quadratic coefficient or exponential coefficient unfolded
@@ -1743,7 +1816,7 @@ def fit_oligomer_unfolding_many_signals(
         else:
             p3_Us = [0] * n_signals
 
-        # Denaturant slope parameters
+        # Oligomer slope parameters
         if baseline_native_params[0]:
 
             p1_Ns = args[id_param_init:id_param_init + n_signals]
@@ -1780,7 +1853,7 @@ def fit_oligomer_unfolding_many_signals(
             p4_Us = [0] * n_signals
 
         if model_scale_factor:
-            # One per denaturant concentration
+            # One per oligomer concentration
             factors = args[id_param_init:id_param_init + (nr_olig - len(scale_factor_exclude_ids))]
 
             for id_ex in scale_factor_exclude_ids:
@@ -1806,14 +1879,24 @@ def fit_oligomer_unfolding_many_signals(
 
             c = oligomer_concentrations[i]
 
-            y = signal_fx(
-                T, c, Tm, DHm,
-                p1_N, p2_N, p3_N, p4_N,
-                p1_U, p2_U, p3_U, p4_U,
-                baseline_native_fx,
-                baseline_unfolded_fx,
-                Cp0
-            )
+            if normalise_to_global_max:
+                y = norm_conc[i] * signal_fx(
+                    T, c, Tm, DHm,
+                    p1_N, p2_N, p3_N, p4_N,
+                    p1_U, p2_U, p3_U, p4_U,
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0
+                )
+            else:
+                y = c * signal_fx(
+                    T, c, Tm, DHm,
+                    p1_N, p2_N, p3_N, p4_N,
+                    p1_U, p2_U, p3_U, p4_U,
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0
+                )
 
             scale_factor = 1 if not model_scale_factor else factors[i]
 
@@ -1824,11 +1907,11 @@ def fit_oligomer_unfolding_many_signals(
         return np.concatenate(signal, axis=0)
 
     global_fit_params, cov = curve_fit(
-        unfolding, 1, all_signal,
+        unfolding, 1.0, all_signal,
         p0=initial_parameters,
         bounds=(low_bounds, high_bounds))
 
-    predicted = unfolding(1, *global_fit_params)
+    predicted = unfolding(1.0, *global_fit_params)
 
     # Convert predict to list of lists
     predicted_lst = []
@@ -1854,7 +1937,8 @@ def evaluate_need_to_refit(
         check_dh=True,
         check_tm=True,
         fixed_cp=False,
-        threshold=0.05):
+        threshold=0.05,
+        fit_m0=True,):
 
     """
     Check and expand parameter bounds when fitted parameters are too close to boundaries.
@@ -1870,10 +1954,15 @@ def evaluate_need_to_refit(
     p0 : array-like
         Initial guess for parameters
     fit_m1 : bool, optional
+        Whether m1 (temperature dependence of m-value) is fitted
     check_cp, check_dh, check_tm : bool, optional
+        Whether to check boundaries for Cp, DHm, and Tm respectively
     fixed_cp : bool, optional
+        Whether the Cp value is fixed
     threshold : float, optional
         Threshold to compare if the fitted parameters are too close to the boundaries
+    fit_m0 : bool, optional
+        Whether m0 (m-value) is fitted (not in oligomeric models)
 
     Returns
     -------
@@ -1934,16 +2023,20 @@ def evaluate_need_to_refit(
         
         id_next += 1
 
-    # Check the m-value boundary
-    m_diff = high_bounds[id_next] - global_fit_params[id_next]
-    # Expand the boundary if the m-value is too close to the boundary
-    if m_diff < 0.5:
-        high_bounds[id_next] = global_fit_params[id_next] + 2
-        p0[id_next] = global_fit_params[id_next] + 0.5
-        re_fit = True
+    if fit_m0:
+        # Check the m-value boundary
+        m_diff = high_bounds[id_next] - global_fit_params[id_next]
+        # Expand the boundary if the m-value is too close to the boundary
+        if m_diff < 0.5:
+            high_bounds[id_next] = global_fit_params[id_next] + 2
+            p0[id_next] = global_fit_params[id_next] + 0.5
+            re_fit = True
 
-    # Evaluate if m1 is fitted
-    id_start = id_next + 1
+        # Evaluate if m1 is fitted
+        id_start = id_next + 1
+    else:
+        id_start = id_next
+
 
     if fit_m1:
 
@@ -1999,7 +2092,9 @@ def evaluate_fitting_and_refit(
         fixed_cp,
         kwargs,
         fit_fx,
-        n = 3):
+        n = 3,
+        threshold=0.05,
+        fit_m_value=True,):
 
     """
     Evaluate if the fitted parameters are too close to the fitting boundaries.
@@ -2035,6 +2130,10 @@ def evaluate_fitting_and_refit(
         function to perform the fitting
     n: int, optional
         number of times to re-fit
+    threshold : float, optional
+        Threshold to compare if the fitted parameters are too close to the boundaries
+    fit_m_value : bool, optional
+        Whether m0 (m-value) is fitted (not in oligomeric models)
 
     Returns
     -------
@@ -2063,7 +2162,9 @@ def evaluate_fitting_and_refit(
             check_cp=not limited_cp,
             check_dh=not limited_dh,
             check_tm=not limited_tm,
-            fixed_cp=fixed_cp
+            fixed_cp=fixed_cp,
+            threshold=threshold,
+            fit_m0=fit_m_value,
         )
 
         if re_fit:
