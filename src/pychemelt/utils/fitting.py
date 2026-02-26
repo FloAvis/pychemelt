@@ -639,6 +639,7 @@ def fit_oligomer_unfolding_single_slopes(
         signal_fx,
         baseline_native_fx,
         baseline_unfolded_fx,
+        normalise_to_global_max,
         cp_value=None,
         tm_value=None,
         dh_value=None,
@@ -666,6 +667,8 @@ def fit_oligomer_unfolding_single_slopes(
         function to calculate the native state baseline
     baseline_unfolded_fx : callable
         function to calculate the unfolded state baseline
+    normalise_to_global_max : bool
+        indicator if data is normalised to global max
     cp_value, tm_value, dh_value : float or None, optional
         Optional fixed thermodynamic parameters
 
@@ -707,6 +710,10 @@ def fit_oligomer_unfolding_single_slopes(
         tm_value = temperature_to_kelvin(tm_value)
 
 
+    # normalised concentration difference for normalised signal
+    norm_conc = [x/ max(oligomer_concentrations) for x in oligomer_concentrations]
+
+    norm_conc_all = np.repeat(norm_conc, lengths)
 
     def unfolding(_, *params):
 
@@ -789,17 +796,25 @@ def fit_oligomer_unfolding_single_slopes(
         else:
             p3U = 0.0
 
-        p1N, p1U = p1N / C_all, p1U / C_all
-
         # ---- Single vectorized signal evaluation ----
-        return signal_fx(
-                T_all,C_all, Tm, DHm,
-                0, p1N, p2N, p3N,
-                0, p1U, p2U, p3U,
-                baseline_native_fx,
-                baseline_unfolded_fx,
-                Cp0,
-            )
+        if normalise_to_global_max:
+            return norm_conc_all * signal_fx(
+                    T_all,C_all, Tm, DHm,
+                    0, p1N, p2N, p3N,
+                    0, p1U, p2U, p3U,
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0,
+                )
+        else:
+            return C_all * signal_fx(
+                    T_all,C_all, Tm, DHm,
+                    0, p1N, p2N, p3N,
+                    0, p1U, p2U, p3U,
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0,
+                )
 
 
     global_fit_params, cov = curve_fit(
@@ -1001,6 +1016,7 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
     signal_fx,
     baseline_native_fx,
     baseline_unfolded_fx,
+    normalise_to_global_max,
     cp_value=None,
     tm_value=None,
     dh_value=None
@@ -1031,8 +1047,8 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
         function to calculate the baseline for the native state
     baseline_unfolded_fx : callable
         function to calculate the baseline for the unfolded state
-    list_of_oligomer_conc : list, optional
-        Oligomer concentrations per dataset
+    normalise_to_global_max : bool
+        indicator if data is normalised to global max
     cp_value, tm_value, dh_value : float or None, optional
         Optional fixed thermodynamic parameters
 
@@ -1068,6 +1084,9 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
         high_bounds[0] = temperature_to_kelvin(high_bounds[0])
     else:
         tm_value = temperature_to_kelvin(tm_value)
+
+    # normalised concentration difference for normalised signal
+    norm_conc = [x/ max(oligomer_concentrations) for x in oligomer_concentrations]
 
     # Vectorized residuals function for least_squares
     def residuals(params):
@@ -1135,14 +1154,24 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
             c = oligomer_concentrations[i]
             sig_id = signal_ids[i]
 
-            predicted_all[start:end] = signal_fx(
-                T, c, Tm, DHm,
-                0, intercepts_folded[i] / c, p2_n_s[sig_id], p3_n_s[sig_id],
-                0, intercepts_unfolded[i] / c, p2_u_s[sig_id], p3_u_s[sig_id],
-                baseline_native_fx,
-                baseline_unfolded_fx,
-                Cp0
-            )
+            if normalise_to_global_max:
+                predicted_all[start:end] = norm_conc[i] * signal_fx(
+                    T, c, Tm, DHm,
+                    0, intercepts_folded[i], p2_n_s[sig_id], p3_n_s[sig_id],
+                    0, intercepts_unfolded[i], p2_u_s[sig_id], p3_u_s[sig_id],
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0
+                )
+            else:
+                predicted_all[start:end] = c * signal_fx(
+                    T, c, Tm, DHm,
+                    0, intercepts_folded[i], p2_n_s[sig_id], p3_n_s[sig_id],
+                    0, intercepts_unfolded[i], p2_u_s[sig_id], p3_u_s[sig_id],
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0
+                )
 
         return predicted_all - all_signal
 
@@ -1431,6 +1460,7 @@ def fit_oligomer_unfolding_many_signals(
         signal_fx,
         baseline_native_fx,
         baseline_unfolded_fx,
+        normalise_to_global_max,
         model_scale_factor=False,
         scale_factor_exclude_ids=[],
         cp_value=None,
@@ -1461,6 +1491,8 @@ def fit_oligomer_unfolding_many_signals(
         function to calculate the native state baseline
     baseline_unfolded_fx : callable
         function to calculate the unfolded state baseline
+    normalise_to_global_max : bool
+        indicator if data is normalised to global max
     model_scale_factor : bool, optional
         If True, include a per-oligomeric concentration scale factor to account for intensity differences
     scale_factor_exclude_ids : list, optional
@@ -1498,6 +1530,9 @@ def fit_oligomer_unfolding_many_signals(
     high_bounds[0] = temperature_to_kelvin(high_bounds[0])
 
     list_of_temperatures = [temperature_to_kelvin(T) for T in list_of_temperatures]
+
+    # normalised concentration difference for normalised signal
+    norm_conc = [x / max(oligomer_concentrations) for x in oligomer_concentrations]
 
     def unfolding(dummyVariable, *args):
 
@@ -1617,19 +1652,24 @@ def fit_oligomer_unfolding_many_signals(
 
             c = oligomer_concentrations[i]
 
-            p2_N, p2_U = p2_N / c, p2_U / c
-
-            #print(T, c, Tm, DHm, Cp0)
-            print(p1_N, p1_U, p2_N, p2_U, p3_N, p3_U, p4_N, p4_U)
-
-            y = signal_fx(
-                T, c, Tm, DHm,
-                p1_N, p2_N, p3_N, p4_N,
-                p1_U, p2_U, p3_U, p4_U,
-                baseline_native_fx,
-                baseline_unfolded_fx,
-                Cp0
-            )
+            if normalise_to_global_max:
+                y = norm_conc[i] * signal_fx(
+                    T, c, Tm, DHm,
+                    p1_N, p2_N, p3_N, p4_N,
+                    p1_U, p2_U, p3_U, p4_U,
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0
+                )
+            else:
+                y = c * signal_fx(
+                    T, c, Tm, DHm,
+                    p1_N, p2_N, p3_N, p4_N,
+                    p1_U, p2_U, p3_U, p4_U,
+                    baseline_native_fx,
+                    baseline_unfolded_fx,
+                    Cp0
+                )
 
             scale_factor = 1 if not model_scale_factor else factors[i]
 

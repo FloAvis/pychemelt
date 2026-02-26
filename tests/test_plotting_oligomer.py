@@ -61,7 +61,9 @@ def aux_create_pychem_sim(params,concs, model):
 
         y = signal_fx(temp_range_K, D, **params)
 
-        y += rng.normal(0, 0.0005, len(y)) # Small error (seeded)
+        y = y * D
+
+        y += rng.normal(0, 0.002*1e-4, len(y)) # Small error (seeded)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -88,11 +90,11 @@ def aux_create_pychem_sim(params,concs, model):
 
 
     pychem_sim.estimate_baseline_parameters(
-        native_baseline_type='exponential',
+        native_baseline_type='constant',
         unfolded_baseline_type='constant'
     )
 
-    pychem_sim.n_residues = 130 # only for cp initial guess
+    pychem_sim.n_residues = 80 # only for cp initial guess
     pychem_sim.guess_Cp()
 
     return pychem_sim
