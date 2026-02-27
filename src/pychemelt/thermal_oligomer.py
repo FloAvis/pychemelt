@@ -332,7 +332,7 @@ class ThermalOligomer(Sample):
             temp_denat = shift_temperature(temp_denat)
 
             # Correct signal for oligomeric influence
-            signal_denat = signal_denat / self.oligomer_number() if not self.normalise_to_global_max else signal_denat
+            signal_denat = signal_denat / self.oligomer_number()
 
 
             if native_baseline_type == 'constant':
@@ -422,18 +422,9 @@ class ThermalOligomer(Sample):
 
         # If oligomeric, we need to correct the signal for the concentration of the oligomer, if not already normalised
         if self.oligomeric:
-            if self.normalise_to_global_max:
 
-                # normalised concentration difference for normalised signal
-                norm_conc = [x / max(self.oligomer_concentrations) for x in self.oligomer_concentrations]
-
-                oligomer_concentrations = np.repeat(norm_conc,
-                                                    np.array(self.signal_lst_multiple).shape[-1])
-                oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
-
-            else:
-                    oligomer_concentrations = np.repeat(self.oligomer_concentrations, np.array(self.signal_lst_multiple).shape[-1])
-                    oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
+            oligomer_concentrations = np.repeat(self.oligomer_concentrations, np.array(self.signal_lst_multiple).shape[-1])
+            oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
 
         for i in range(len(self.signal_lst_multiple)):
 
@@ -866,7 +857,7 @@ class ThermalOligomer(Sample):
 
         print(Tm1, Tm2)
 
-        p0 = [Tm1, 50, Tm2, 50]
+        p0 = [Tm1, 150, Tm2, 200]
 
         params_names = [
             'Tm1 (°C)',
@@ -990,7 +981,8 @@ class ThermalOligomer(Sample):
 
             p0[1] = adjust_value_to_interval(p0[1], dh1_lower, dh1_upper, 1)
             p0[3] = adjust_value_to_interval(p0[3], dh2_lower, dh2_upper, 1)
-            
+
+        else:
             dh1_lower = 10
             dh1_upper = 500
 
@@ -1093,6 +1085,7 @@ class ThermalOligomer(Sample):
             kwargs['low_bounds'] = low_bounds
             kwargs['high_bounds'] = high_bounds
 
+        print(p0)
 
         # Do a quick prefit with a reduced data set
         if self.pre_fit:
