@@ -1,3 +1,9 @@
+"""
+Module for fitting of thermal unfolding curves.
+
+Tests the fitting methods used by ThermalOligomer for their capabilities of fitting to simulated data
+"""
+
 import numpy as np
 
 from pychemelt.utils.fitting import (
@@ -61,11 +67,8 @@ def test_fit_monomer_unfolding_single_slopes_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -83,8 +86,7 @@ def test_fit_monomer_unfolding_single_slopes_constant():
         'oligomer_concentrations' : concs,
         'signal_fx' : signal_fx,
         'baseline_native_fx':constant_baseline,
-        'baseline_unfolded_fx':constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx':constant_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_single_slopes(
@@ -174,11 +176,8 @@ def test_fit_dimer_unfolding_single_slopes_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -196,8 +195,7 @@ def test_fit_dimer_unfolding_single_slopes_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx': constant_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_single_slopes(
@@ -287,11 +285,8 @@ def test_fit_trimer_unfolding_single_slopes_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -309,8 +304,7 @@ def test_fit_trimer_unfolding_single_slopes_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx': constant_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_single_slopes(
@@ -399,11 +393,8 @@ def test_fit_tetramer_unfolding_single_slopes_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -421,8 +412,7 @@ def test_fit_tetramer_unfolding_single_slopes_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx': constant_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_single_slopes(
@@ -514,11 +504,8 @@ def test_fit_monomer_unfolding_shared_slopes_many_signals_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -537,8 +524,7 @@ def test_fit_monomer_unfolding_shared_slopes_many_signals_constant():
         'oligomer_concentrations' : concs,
         'signal_fx' : signal_fx,
         'baseline_native_fx':constant_baseline,
-        'baseline_unfolded_fx':constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx':constant_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_shared_slopes_many_signals(
@@ -581,11 +567,8 @@ def test_fit_dimer_unfolding_shared_slopes_many_signals_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -604,8 +587,7 @@ def test_fit_dimer_unfolding_shared_slopes_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx': constant_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_shared_slopes_many_signals(
@@ -649,11 +631,8 @@ def test_fit_trimer_unfolding_shared_slopes_many_signals_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -672,8 +651,7 @@ def test_fit_trimer_unfolding_shared_slopes_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx': constant_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_shared_slopes_many_signals(
@@ -717,11 +695,8 @@ def test_fit_tetramer_unfolding_shared_slopes_many_signals_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -740,8 +715,7 @@ def test_fit_tetramer_unfolding_shared_slopes_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx': constant_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_shared_slopes_many_signals(
@@ -787,11 +761,8 @@ def test_fit_monomer_unfolding_many_signals_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -810,8 +781,7 @@ def test_fit_monomer_unfolding_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx': constant_baseline, 
         'fit_native_olig_slope' : False,
         'fit_unfolded_olig_slope' : False,
     }
@@ -876,11 +846,8 @@ def test_fit_dimer_unfolding_many_signals_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -899,8 +866,7 @@ def test_fit_dimer_unfolding_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx': constant_baseline, 
         'fit_native_olig_slope': False,
         'fit_unfolded_olig_slope': False,
     }
@@ -965,11 +931,8 @@ def test_fit_trimer_unfolding_many_signals_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
@@ -988,8 +951,7 @@ def test_fit_trimer_unfolding_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx': constant_baseline, 
         'fit_native_olig_slope': False,
         'fit_unfolded_olig_slope': False,
     }
@@ -1054,12 +1016,8 @@ def test_fit_tetramer_unfolding_many_signals_constant():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
-
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
         # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y))
 
@@ -1077,8 +1035,7 @@ def test_fit_tetramer_unfolding_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx': constant_baseline, 
         'fit_native_olig_slope': False,
         'fit_unfolded_olig_slope': False,
     }

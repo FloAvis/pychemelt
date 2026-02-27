@@ -1,3 +1,9 @@
+"""
+Module for fitting of thermal unfolding curves.
+
+Tests the fitting methods used by ThermalOligomer for their capabilities of fitting to simulated data
+"""
+
 import numpy as np
 
 from pychemelt.utils.fitting import (
@@ -64,11 +70,8 @@ def test_fit_monomer_unfolding_single_slopes_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -84,8 +87,7 @@ def test_fit_monomer_unfolding_single_slopes_exponential():
         'oligomer_concentrations' : concs,
         'signal_fx' : signal_fx,
         'baseline_native_fx':exponential_baseline,
-        'baseline_unfolded_fx':exponential_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx':exponential_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_single_slopes(
@@ -105,14 +107,12 @@ def test_fit_dimer_unfolding_single_slopes_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
+
     p0 = [Tm_VAL, DHm_VAL, CP0_VAL] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [
         PRE_EXP_N] * len(concs) + [PRE_EXP_U] * len(concs) + [ALPHA_N_VAL] * len(concs) + [ALPHA_U_VAL] * len(concs)
     low_bounds = [TEMP_START, TEMP_START, 1]   + [1e-5]*(6*len(concs))
@@ -124,8 +124,7 @@ def test_fit_dimer_unfolding_single_slopes_exponential():
         'oligomer_concentrations' : concs,
         'signal_fx' : signal_fx,
         'baseline_native_fx':exponential_baseline,
-        'baseline_unfolded_fx':exponential_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx':exponential_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_single_slopes(
@@ -145,11 +144,8 @@ def test_fit_trimer_unfolding_single_slopes_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -165,8 +161,7 @@ def test_fit_trimer_unfolding_single_slopes_exponential():
         'oligomer_concentrations' : concs,
         'signal_fx' : signal_fx,
         'baseline_native_fx':exponential_baseline,
-        'baseline_unfolded_fx':exponential_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx':exponential_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_single_slopes(
@@ -186,11 +181,8 @@ def test_fit_tetramer_unfolding_single_slopes_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -206,8 +198,7 @@ def test_fit_tetramer_unfolding_single_slopes_exponential():
         'oligomer_concentrations' : concs,
         'signal_fx' : signal_fx,
         'baseline_native_fx':exponential_baseline,
-        'baseline_unfolded_fx':exponential_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx':exponential_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_single_slopes(
@@ -229,11 +220,8 @@ def test_fit_monomer_unfolding_shared_slopes_many_signals_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -251,8 +239,7 @@ def test_fit_monomer_unfolding_shared_slopes_many_signals_exponential():
         'signal_fx' : signal_fx,
         'baseline_native_fx':exponential_baseline,
         'baseline_unfolded_fx':exponential_baseline,
-        'signal_ids' : [0 for _ in range(len(signal_list))],
-        'normalise_to_global_max': False,
+        'signal_ids' : [0 for _ in range(len(signal_list))], 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_shared_slopes_many_signals(
@@ -272,11 +259,8 @@ def test_fit_dimer_unfolding_shared_slopes_many_signals_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -294,8 +278,7 @@ def test_fit_dimer_unfolding_shared_slopes_many_signals_exponential():
         'signal_fx' : signal_fx,
         'baseline_native_fx':exponential_baseline,
         'baseline_unfolded_fx':exponential_baseline,
-        'signal_ids' : [0 for _ in range(len(signal_list))],
-        'normalise_to_global_max': False,
+        'signal_ids' : [0 for _ in range(len(signal_list))], 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_shared_slopes_many_signals(
@@ -315,11 +298,8 @@ def test_fit_trimer_unfolding_shared_slopes_many_signals_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -337,8 +317,7 @@ def test_fit_trimer_unfolding_shared_slopes_many_signals_exponential():
         'signal_fx' : signal_fx,
         'baseline_native_fx':exponential_baseline,
         'baseline_unfolded_fx':exponential_baseline,
-        'signal_ids' : [0 for _ in range(len(signal_list))],
-        'normalise_to_global_max': False,
+        'signal_ids' : [0 for _ in range(len(signal_list))], 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_shared_slopes_many_signals(
@@ -358,11 +337,8 @@ def test_fit_tetramer_unfolding_shared_slopes_many_signals_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -379,8 +355,7 @@ def test_fit_tetramer_unfolding_shared_slopes_many_signals_exponential():
         'signal_fx' : signal_fx,
         'baseline_native_fx':exponential_baseline,
         'baseline_unfolded_fx':exponential_baseline,
-        'signal_ids' : [0 for _ in range(len(signal_list))],
-        'normalise_to_global_max': False,
+        'signal_ids' : [0 for _ in range(len(signal_list))], 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_shared_slopes_many_signals(
@@ -402,11 +377,8 @@ def test_fit_monomer_unfolding_many_signals_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -432,8 +404,7 @@ def test_fit_monomer_unfolding_many_signals_exponential():
         'model_scale_factor': False,
         'cp_value' : CP0_VAL,
         'baseline_native_fx':exponential_baseline,
-        'baseline_unfolded_fx':exponential_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx':exponential_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_many_signals(
@@ -451,11 +422,8 @@ def test_fit_dimer_unfolding_many_signals_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -481,8 +449,7 @@ def test_fit_dimer_unfolding_many_signals_exponential():
         'model_scale_factor': False,
         'cp_value' : CP0_VAL,
         'baseline_native_fx':exponential_baseline,
-        'baseline_unfolded_fx':exponential_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx':exponential_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_many_signals(
@@ -500,11 +467,8 @@ def test_fit_trimer_unfolding_many_signals_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -530,8 +494,7 @@ def test_fit_trimer_unfolding_many_signals_exponential():
         'model_scale_factor': False,
         'cp_value' : CP0_VAL,
         'baseline_native_fx':exponential_baseline,
-        'baseline_unfolded_fx':exponential_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx':exponential_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_many_signals(
@@ -549,11 +512,8 @@ def test_fit_tetramer_unfolding_many_signals_exponential():
     signal_list = []
     temp_list = []
 
-    for D in concs:
-        y = signal_fx(temp_range_K, D, **def_params)
-
-        # Concentration dependent scaling
-        y = y * D
+    for C in concs:
+        y = signal_fx(temp_range_K, C, **def_params)
 
         signal_list.append(y)
         temp_list.append(temp_range)
@@ -578,8 +538,7 @@ def test_fit_tetramer_unfolding_many_signals_exponential():
         'model_scale_factor': False,
         'cp_value' : CP0_VAL,
         'baseline_native_fx':exponential_baseline,
-        'baseline_unfolded_fx':exponential_baseline,
-        'normalise_to_global_max': False,
+        'baseline_unfolded_fx':exponential_baseline, 
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_many_signals(

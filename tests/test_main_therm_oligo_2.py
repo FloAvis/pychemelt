@@ -1,6 +1,8 @@
 """
-Tests to ensure that the main functionalities of the pychemelt Sample class work as expected.
+Tests to ensure that the main functionalities of the pychemelt ThermalOligomer class work as expected.
 The order of the tests is important, as some functions depend on the previous ones.
+
+This file tests the fitting of the thermal unfolding model to exponential native and constant unfolded baseline data.
 """
 import numpy as np
 import pytest
@@ -71,13 +73,11 @@ def aux_create_pychem_sim(params,concs, model):
     # Use a seeded Generator for reproducible noise in tests
     rng = np.random.default_rng(2)
 
-    for D in concs:
+    for C in concs:
 
-        y = signal_fx(temp_range_K, D, **params)
+        y = signal_fx(temp_range_K, C, **params)
 
-        # Concentration dependent scaling
-        y = y * D
-
+        # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y)) # Small error (seeded)
 
         signal_list.append(y)

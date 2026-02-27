@@ -19,7 +19,6 @@ from .utils.signals import (
 from .utils.math import (
     temperature_to_kelvin,
     relative_errors,
-    shift_temperature,
     constant_baseline,
     linear_baseline,
     quadratic_baseline,
@@ -32,13 +31,13 @@ from .utils.processing import (
     adjust_value_to_interval,
     re_arrange_params,
     re_arrange_predictions,
-    subset_data
+    subset_data,
+    estimate_signal_baseline_params,
+    oligomer_number
 )
 
 from .utils.fitting import (
     fit_line_robust,
-    fit_quadratic_robust,
-    fit_exponential_robust,
     fit_oligomer_unfolding_single_slopes,
     fit_oligomer_unfolding_shared_slopes_many_signals,
     fit_oligomer_unfolding_many_signals,
@@ -50,22 +49,22 @@ from .utils.fitting import (
 
 class ThermalOligomer(Sample):
     """
-    Class to hold the data of a DSF experiment of thermal unfolding with different concentrations of oligomers
+    Class to hold the data of a DSF experiment of thermal unfolding with different concentrations of an oligomer.
     """
 
     def __init__(self, name='Test'):
 
         super().__init__(name)
 
-        self.nr_olig = 0  # Number of oligomer concentrations
+        self.nr_olig = 0  # Number of oligomer concentrations in data
         self.model = None # Oligomer model type
-        self.oligomeric = True # Flag for oligomer for plotting
+        self.oligomeric = True # Flag for oligomer or denaturant
 
     def set_model(self, model_name):
 
         """
-        Set thermodynamic model of oligomer used for the analysis.
-        Currently supported are 2 state models of monomeres, dimers, trimeres and tetrameres
+        Set subunit number of the oligomer used for the analysis.
+        Currently supported are two state models of monomers, dimers, trimers and tetramers
 
         Parameters
         ----------
@@ -102,7 +101,7 @@ class ThermalOligomer(Sample):
     def set_concentrations(self, concentrations=None):
 
         """
-        Set the oligomer concentrations for the sample 
+        Set the oligomeric concentrations for the sample
 
         Parameters
         ----------
@@ -187,6 +186,7 @@ class ThermalOligomer(Sample):
 
         self.oligomer_concentrations = np.array(self.oligomer_concentrations)
 
+        # Needed for compatibility
         self.denaturant_concentrations = self.oligomer_concentrations
 
         return None
@@ -195,7 +195,7 @@ class ThermalOligomer(Sample):
     def guess_Cp(self):
 
         """
-        Guess the Cp of the sample by the number of residues.
+        Guess the Cp of the assembled oligomer by the number of residues.
 
         Raises
         ------
@@ -207,14 +207,12 @@ class ThermalOligomer(Sample):
         The number of residues represent the total number of residues in the oligomer
 
         This method creates/updates attributes used later in fitting:
-        - Tms, dHs, slope_dh_tm, intercept_dh_tm, Cp0, Cp0 assigned to self.Cp0
+        - Cp0 assigned to self.Cp0
         """
 
         # If the number of residues is still zero, raise an error
         if self.n_residues == 0:
             raise ValueError('The number of residues is still zero. Please set n_residues before calling guess_Cp')
-
-        # Requires self.single_fit_done
 
         Cp0 = self.n_residues * 0.0148 - 0.1267
 
@@ -225,133 +223,6 @@ class ThermalOligomer(Sample):
 
         return None
 
-    def oligomer_number(self):
-        """
-        Get the number of subunits in the oligomer based on the model.
-
-        Returns
-        -------
-        int
-            The number of subunits (2 for 'Dimer', 3 for 'Trimer',
-            4 for 'Tetramer', 1 otherwise).
-        """
-        if self.model == 'Dimer':
-            return 2
-        elif self.model == 'Trimer':
-            return 3
-        elif self.model == 'Tetramer':
-            return 4
-        else:
-            return 1
-
-    def estimate_signal_baseline_params(
-            self,
-            signal_lst,
-            temp_lst,
-            native_baseline_type,
-            unfolded_baseline_type,
-            window_range_native=12,
-            window_range_unfolded=12):
-
-        """
-        Estimate the baseline parameters for the sample
-
-        Parameters
-        ---------
-        signal_lst : list of np.ndarray
-            List of signal arrays
-        temp_lst : list of np.ndarray
-            List of temperature arrays
-        window_range_native : float
-            Range of the temperature window to estimate the native state baseline
-        window_range_unfolded : float
-            Range of the temperature window to estimate the unfolded state baseline
-        native_baseline_type : str
-            options: 'constant', 'linear', 'quadratic', 'exponential'
-        unfolded_baseline_type : str
-            options: 'constant', 'linear', 'quadratic', 'exponential'
-
-        Returns
-        -------
-        tuple
-            Lists of estimated parameters (p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us).
-        """
-
-        p1Ns = []
-        p1Us = []
-        p2Ns = []
-        p2Us = []
-        p3Ns = []
-        p3Us = []
-
-        for s, t in zip(signal_lst, temp_lst):
-
-            signal_native = s[t < np.min(t) + window_range_native]
-            temp_native = t[t < np.min(t) + window_range_native]
-
-            # Shift temperature to be centered at Tref !!! defined in constants.py
-            temp_native = shift_temperature(temp_native)
-
-            signal_denat = s[t > np.max(t) - window_range_unfolded]
-            temp_denat = t[t > np.max(t) - window_range_unfolded]
-
-            # Shift temperature to be centered at Tref !!! defined in constants.py
-            temp_denat = shift_temperature(temp_denat)
-
-            # Correct signal for oligomeric influence
-            signal_denat = signal_denat / self.oligomer_number() if not self.normalise_to_global_max else signal_denat
-
-
-            if native_baseline_type == 'constant':
-                p1N = np.median(signal_native)
-                p1Ns.append(p1N)
-
-            if unfolded_baseline_type == 'constant':
-                p1U = np.median(signal_denat)
-                p1Us.append(p1U)
-
-            if native_baseline_type == 'linear':
-                p2N, p1N = fit_line_robust(temp_native, signal_native)
-
-                p2Ns.append(p2N)
-                p1Ns.append(p1N)
-
-            if unfolded_baseline_type == 'linear':
-                p2U, p1U = fit_line_robust(temp_denat, signal_denat)
-
-                p2Us.append(p2U)
-                p1Us.append(p1U)
-
-            if native_baseline_type == 'quadratic':
-                p3N, p2N, p1N = fit_quadratic_robust(temp_native, signal_native)
-
-                p3Ns.append(p3N)
-                p2Ns.append(p2N)
-                p1Ns.append(p1N)
-
-            if unfolded_baseline_type == 'quadratic':
-                p3U, p2U, p1U = fit_quadratic_robust(temp_denat, signal_denat)
-
-                p3Us.append(p3U)
-                p2Us.append(p2U)
-                p1Us.append(p1U)
-
-            if native_baseline_type == 'exponential':
-                p1N, p2N, p3N = fit_exponential_robust(temp_native, signal_native)
-
-                p3Ns.append(p3N)
-                p2Ns.append(p2N)
-                p1Ns.append(p1N)
-
-            if unfolded_baseline_type == 'exponential':
-                p1U, p2U, p3U = fit_exponential_robust(temp_denat, signal_denat)
-
-                p3Us.append(p3U)
-                p2Us.append(p2U)
-                p1Us.append(p1U)
-
-        return p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us
-
     def estimate_baseline_parameters(
             self,
             native_baseline_type,
@@ -360,7 +231,9 @@ class ThermalOligomer(Sample):
             window_range_unfolded=12):
 
         """
-        Estimate the baseline parameters for multiple signals
+        Estimate the baseline parameters for multiple signals of the oligomer. The native baseline represents the
+        curve for the assemble doligomer while the unfolded baseline represents the curve for the unfolded and
+        disassembled oligomer.
 
         Parameters
         ----------
@@ -387,33 +260,25 @@ class ThermalOligomer(Sample):
         self.third_param_Ns_per_signal = []
         self.third_param_Us_per_signal = []
 
-        # If oligomeric, we need to correct the signal for the concentration of the oligomer, if not already normalised
+        # If the sample isoligomeric, we need to correct the signal for the concentrations of the oligomer
         if self.oligomeric:
-            if self.normalise_to_global_max:
-
-                # normalised concentration difference for normalised signal
-                norm_conc = [x / max(self.oligomer_concentrations) for x in self.oligomer_concentrations]
-
-                oligomer_concentrations = np.repeat(norm_conc,
-                                                    np.array(self.signal_lst_multiple).shape[-1])
-                oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
-
-            else:
-                    oligomer_concentrations = np.repeat(self.oligomer_concentrations, np.array(self.signal_lst_multiple).shape[-1])
-                    oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
+            oligomer_concentrations = np.repeat(self.oligomer_concentrations,
+                                                np.array(self.signal_lst_multiple).shape[-1])
+            oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
 
         for i in range(len(self.signal_lst_multiple)):
 
             if self.oligomeric:
                 adjusted_signal_lst_multiple = list(np.array(self.signal_lst_multiple[i])/ np.array(oligomer_concentrations))
 
-            p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us = self.estimate_signal_baseline_params(
+            p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us = estimate_signal_baseline_params(
                 self.signal_lst_multiple[i] if not self.oligomeric else adjusted_signal_lst_multiple,
                 self.temp_lst_multiple[i],
                 native_baseline_type,
                 unfolded_baseline_type,
                 window_range_native,
-                window_range_unfolded
+                window_range_unfolded,
+                oligomer_number(self.model)
             )
 
             self.first_param_Ns_per_signal.append(p1Ns)
@@ -685,7 +550,6 @@ class ThermalOligomer(Sample):
             'baseline_native_fx' : self.baseline_N_fx,
             'baseline_unfolded_fx' : self.baseline_U_fx,
             'signal_fx' : signal_fx,
-            'normalise_to_global_max' : self.normalise_to_global_max,
         }
 
         fit_fx = fit_oligomer_unfolding_single_slopes
@@ -905,7 +769,6 @@ class ThermalOligomer(Sample):
             'baseline_native_fx': self.baseline_N_fx,
             'baseline_unfolded_fx': self.baseline_U_fx,
             'signal_fx' : signal_fx,
-            'normalise_to_global_max': self.normalise_to_global_max,
         }
 
         fit_fx = fit_oligomer_unfolding_shared_slopes_many_signals
@@ -1170,7 +1033,6 @@ class ThermalOligomer(Sample):
             'signal_fx' : signal_fx,
             'baseline_native_fx' : self.baseline_N_fx,
             'baseline_unfolded_fx' : self.baseline_U_fx,
-            'normalise_to_global_max': self.normalise_to_global_max,
             'fit_native_olig_slope' : True,
             'fit_unfolded_olig_slope' : True
         }
@@ -1370,7 +1232,7 @@ class ThermalOligomer(Sample):
 
                 signal_all = np.concatenate(signal_lst)
 
-        denat_all = np.concatenate([
+        oligomer_all = np.concatenate([
             np.full_like(temp_lst[i], self.oligomer_concentrations[i], dtype=np.float64)
             for i in range(len(temp_lst))
         ])
@@ -1384,7 +1246,7 @@ class ThermalOligomer(Sample):
         signal_df = pd.DataFrame({
             'Temperature': temp_all,
             'Signal': signal_all,
-            'Oligomer': denat_all,
+            'Oligomer': oligomer_all,
             'ID': id_all
         })
 
