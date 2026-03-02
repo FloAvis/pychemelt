@@ -653,7 +653,7 @@ def fit_oligomer_unfolding_single_slopes(
     list_of_signals : list of array-like
         Signal arrays for each dataset
     oligomer_concentrations : list
-        oligomer concentrations (one per dataset)
+        sample concentrations of the oligomeric complex (one per dataset)
     initial_parameters : array-like
         Initial guess for parameters
     low_bounds : array-like
@@ -705,8 +705,6 @@ def fit_oligomer_unfolding_single_slopes(
         high_bounds[0] = temperature_to_kelvin(high_bounds[0])
     else:
         tm_value = temperature_to_kelvin(tm_value)
-
-
 
     def unfolding(_, *params):
 
@@ -1016,7 +1014,7 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
     signal_ids : list of int
         Signal-type id for each dataset (0..n_signals-1)
     oligomer_concentrations : list
-        Oligomer concentrations for each dataset (flattened across signals)
+        sample concentrations of the oligomeric complex for each dataset (flattened across signals)
     initial_parameters : array-like
         Initial guess for the parameters
     low_bounds : array-like
@@ -1029,8 +1027,6 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
         function to calculate the baseline for the native state
     baseline_unfolded_fx : callable
         function to calculate the baseline for the unfolded state
-    list_of_oligomer_conc : list, optional
-        Oligomer concentrations per dataset
     cp_value, tm_value, dh_value : float or None, optional
         Optional fixed thermodynamic parameters
 
@@ -1081,8 +1077,8 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
             - Global melting temperature
             - Global enthalpy of unfolding
             - Global Cp0
-            - Single intercepts, folded
-            - Single intercepts, unfolded
+            - Shared intercept, folded
+            - Shared intercept, unfolded
             - Single slopes or pre-exp terms, folded
             - Single slopes or pre-exp terms, unfolded
             - Single quadratic or exponential coefficients, folded
@@ -1141,6 +1137,7 @@ def fit_oligomer_unfolding_shared_slopes_many_signals(
                 baseline_unfolded_fx,
                 Cp0
             )
+
 
         return predicted_all - all_signal
 
@@ -1446,7 +1443,7 @@ def fit_oligomer_unfolding_many_signals(
     signal_ids : list of int
         Signal-type id for each dataset (0..n_signals-1)
     oligomer_concentrations : list
-        oligomer concentrations for each dataset (flattened across signals)
+        sample concentrations of the oligomeric complex for each dataset (flattened across signals)
     initial_parameters : array-like
         Initial guess for the parameters
     low_bounds : array-like
@@ -1460,7 +1457,7 @@ def fit_oligomer_unfolding_many_signals(
     baseline_unfolded_fx : callable
         function to calculate the unfolded state baseline
     model_scale_factor : bool, optional
-        If True, include a per-denaturant concentration scale factor to account for intensity differences
+        If True, include a per-oligomeric concentration scale factor to account for intensity differences
     scale_factor_exclude_ids : list, optional
         IDs of scale factors to exclude / fix to 1
     cp_value : float or None, optional
@@ -1510,8 +1507,8 @@ def fit_oligomer_unfolding_many_signals(
             Temperature slope or term pre-exponential factor folded
             Temperature slope term or pre-exponential factor unfolded
 
-            Denaturant slope term folded
-            Denaturant slope term unfolded
+            Oligomer slope term folded
+            Oligomer slope term unfolded
 
             Quadratic coefficient or exponential coefficient folded
             Quadratic coefficient or exponential coefficient unfolded
@@ -1552,7 +1549,7 @@ def fit_oligomer_unfolding_many_signals(
         else:
             p3_Us = [0] * n_signals
 
-        # Denaturant slope parameters
+        # Oligomer slope parameters
         if baseline_native_params[0]:
 
             p1_Ns = args[id_param_init:id_param_init + n_signals]
@@ -1589,7 +1586,7 @@ def fit_oligomer_unfolding_many_signals(
             p4_Us = [0] * n_signals
 
         if model_scale_factor:
-            # One per denaturant concentration
+            # One per oligomer concentration
             factors = args[id_param_init:id_param_init + (nr_olig - len(scale_factor_exclude_ids))]
 
             for id_ex in scale_factor_exclude_ids:
@@ -1624,6 +1621,7 @@ def fit_oligomer_unfolding_many_signals(
                 Cp0
             )
 
+
             scale_factor = 1 if not model_scale_factor else factors[i]
 
             y = y * scale_factor
@@ -1633,11 +1631,11 @@ def fit_oligomer_unfolding_many_signals(
         return np.concatenate(signal, axis=0)
 
     global_fit_params, cov = curve_fit(
-        unfolding, 1, all_signal,
+        unfolding, 1.0, all_signal,
         p0=initial_parameters,
         bounds=(low_bounds, high_bounds))
 
-    predicted = unfolding(1, *global_fit_params)
+    predicted = unfolding(1.0, *global_fit_params)
 
     # Convert predict to list of lists
     predicted_lst = []
@@ -1663,7 +1661,9 @@ def evaluate_need_to_refit(
         check_dh=True,
         check_tm=True,
         fixed_cp=False,
-        threshold=0.05):
+        threshold=0.05,
+        fit_m0=True
+    ):
 
     """
     Check and expand parameter bounds when fitted parameters are too close to boundaries.
@@ -1686,6 +1686,8 @@ def evaluate_need_to_refit(
         Whether the Cp value is fixed
     threshold : float, optional
         Threshold to compare if the fitted parameters are too close to the boundaries
+    fit_m0 : bool, optional
+        Whether m0 (m-value) is fitted (not in oligomeric models)
 
     Returns
     -------
@@ -1746,16 +1748,20 @@ def evaluate_need_to_refit(
         
         id_next += 1
 
-    # Check the m-value boundary
-    m_diff = high_bounds[id_next] - global_fit_params[id_next]
-    # Expand the boundary if the m-value is too close to the boundary
-    if m_diff < 0.5:
-        high_bounds[id_next] = global_fit_params[id_next] + 2
-        p0[id_next] = global_fit_params[id_next] + 0.5
-        re_fit = True
+    if fit_m0:
+        # Check the m-value boundary
+        m_diff = high_bounds[id_next] - global_fit_params[id_next]
+        # Expand the boundary if the m-value is too close to the boundary
+        if m_diff < 0.5:
+            high_bounds[id_next] = global_fit_params[id_next] + 2
+            p0[id_next] = global_fit_params[id_next] + 0.5
+            re_fit = True
 
-    # Evaluate if m1 is fitted
-    id_start = id_next + 1
+        # Evaluate if m1 is fitted
+        id_start = id_next + 1
+    else:
+        id_start = id_next
+
 
     if fit_m1:
 
@@ -1812,7 +1818,8 @@ def evaluate_fitting_and_refit(
         kwargs,
         fit_fx,
         n = 3,
-        threshold=0.05):
+        threshold=0.05,
+        fit_m_value=True,):
 
     """
     Evaluate if the fitted parameters are too close to the fitting boundaries.
@@ -1850,6 +1857,8 @@ def evaluate_fitting_and_refit(
         number of times to re-fit
     threshold : float, optional
         Threshold to compare if the fitted parameters are too close to the boundaries
+    fit_m_value : bool, optional
+        Whether m0 (m-value) is fitted (not in oligomeric models)
 
     Returns
     -------
@@ -1880,6 +1889,7 @@ def evaluate_fitting_and_refit(
             check_tm=not limited_tm,
             fixed_cp=fixed_cp,
             threshold=threshold,
+            fit_m0=fit_m_value,
         )
 
         if re_fit:

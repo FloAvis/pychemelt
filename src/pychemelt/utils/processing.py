@@ -38,7 +38,8 @@ __all__ = [
     'subset_data',
     'get_colors_from_numeric_values',
     'combine_sequences',
-    'adjust_value_to_interval'
+    'adjust_value_to_interval',
+    'oligomer_number',
 ]
 
 def set_param_bounds(p0,param_names):
@@ -348,7 +349,8 @@ def estimate_signal_baseline_params(
     native_baseline_type,
     unfolded_baseline_type,
     window_range_native=12,
-    window_range_unfolded=12):
+    window_range_unfolded=12,
+    oligomer_number=1):
         
     """
     Estimate the baseline parameters for the sample
@@ -367,6 +369,8 @@ def estimate_signal_baseline_params(
         options: 'constant', 'linear', 'quadratic', 'exponential'
     unfolded_baseline_type : str
         options: 'constant', 'linear', 'quadratic', 'exponential'
+    oligomer_number : int
+        number of subunits in the oligomer
 
     Returns
     -------
@@ -394,6 +398,9 @@ def estimate_signal_baseline_params(
 
         # Shift temperature to be centered at Tref !!! defined in constants.py
         temp_denat = shift_temperature(temp_denat)
+
+        # Correct signal for oligomeric influence
+        signal_denat = signal_denat / oligomer_number #if not self.normalise_to_global_max else signal_denat
 
         if native_baseline_type == 'constant':
 
@@ -691,3 +698,23 @@ def combine_sequences(seq1, seq2):
         A list of tuples, where each tuple contains one element from seq1 and one from seq2.
     """
     return list(itertools.product(seq1, seq2))
+
+
+def oligomer_number(model):
+        """
+        Get the number of subunits in the oligomer based on the model.
+
+        Returns
+        -------
+        int
+            The number of subunits (2 for 'Dimer', 3 for 'Trimer',
+            4 for 'Tetramer', 1 otherwise).
+        """
+        if model == 'Dimer':
+            return 2
+        elif model == 'Trimer':
+            return 3
+        elif model == 'Tetramer':
+            return 4
+        else:
+            return 1

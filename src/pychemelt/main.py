@@ -592,6 +592,9 @@ class Sample:
 
         # convert the first param to Celsius
         self.global_fit_params[0] = temperature_to_celsius(self.global_fit_params[0])
+        self.low_bounds[0] = temperature_to_celsius(self.low_bounds[0])
+        self.high_bounds[0] = temperature_to_celsius(self.high_bounds[0])
+
 
         # Create a dataframe of the parameters
         self.params_df = pd.DataFrame({
