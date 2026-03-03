@@ -257,7 +257,7 @@ def first_derivative_savgol(x, y, window_length=5, polyorder=4):
         raise ValueError("polyorder must be less than window_length.")
 
     # Apply Savitzky-Golay filter for first derivative
-    dydx = savgol_filter(y, window_length=odd_n_data_points_window_len, polyorder=polyorder, deriv=1,mode="nearest")
+    dydx = savgol_filter(y, window_length=int(odd_n_data_points_window_len), polyorder=polyorder, deriv=1, delta=dx, mode="nearest")
 
     return dydx
 

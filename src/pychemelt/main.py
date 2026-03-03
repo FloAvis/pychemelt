@@ -339,11 +339,13 @@ class Sample:
         Notes
         -----
         Creates/updates attributes:
-        - temp_deriv_lst_multiple, deriv_lst_multiple : lists storing estimated derivatives and corresponding temps
+        - temp_deriv_lst_multiple, deriv_lst_multiple, deriv_lst_expanded : lists storing estimated derivatives and corresponding temps
+        - predicted_deriv_lst_multiple : list storing estimated derivatives of predicted values
         """
 
         self.temp_deriv_lst_multiple = []
         self.deriv_lst_multiple = []
+        self.deriv_lst_expanded = []
 
         for i in range(len(self.signal_lst_multiple)):
 
@@ -371,34 +373,46 @@ class Sample:
 
                 temp_deriv_lst.append(t)
                 deriv_lst.append(derivative)
+                self.deriv_lst_expanded.append(derivative)
 
             self.temp_deriv_lst_multiple.append(temp_deriv_lst)
             self.deriv_lst_multiple.append(deriv_lst)
-        
+
+        if self.max_points is not None:
+            self.deriv_lst_expanded = [subset_data(x, self.max_points) for x in self.deriv_lst_expanded]
+
+
         if hasattr(self, "predicted_lst_multiple"):
-            # Calculate derivative of fitted function
-            predicted_deriv_lst = []
 
-            for i in range(self.nr_signals):
-                signal_deriv = []
+            self.predicted_deriv_lst_multiple = []
 
-                for j in range(self.nr_den):
-                    # Get fitted values and temperature
-                    idx = i * self.nr_den + j
-                    x = self.temp_lst_expanded[idx]
-                    y_fit = self.predicted_lst_multiple[i][j]
+            for i in range(len(self.predicted_lst_multiple)):
 
-                    # Calculate derivative using Savitzky-Golay filter
-                    # window_length should be odd and >= 3
-                    window = 9
-                    deriv = first_derivative_savgol(x, y_fit, window_length)
+                temp_deriv_lst = []
+                predicted_deriv_lst = []
 
-                    signal_deriv.append(deriv)
+                for p, t in zip(self.predicted_lst_multiple[i], np.split(np.array(self.temp_lst_expanded), len(self.predicted_lst_multiple))[i]):
 
-                predicted_deriv_lst.append(signal_deriv)
+                    check = is_evenly_spaced(t)
 
-            # Store in the object for plotting
-            self.predicted_deriv_lst_multiple = predicted_deriv_lst
+                    if check:
+
+                        derivative = first_derivative_savgol(t, p, window_length)
+
+                    else:
+                        t_for_ip = np.arange(np.min(t), np.max(t), 0.1)
+
+                        # We interpolate the data to make it evenly spaced, every 0.1 degrees
+                        p = np.interp(t_for_ip, t, p)
+                        t = t_for_ip
+
+                        # We use the Savitzky-Golay filter to estimate the derivative
+                        derivative = first_derivative_savgol(t, p, window_length)
+
+                    temp_deriv_lst.append(t)
+                    predicted_deriv_lst.append(derivative)
+
+                self.predicted_deriv_lst_multiple.append(predicted_deriv_lst)
 
         return None
 
@@ -561,23 +575,15 @@ class Sample:
         self.signal_lst_expanded = []
         self.temp_lst_expanded = []
 
-        #Creating 
-        if not hasattr(self, "deriv_lst_multiple"):
-            self.estimate_derivative()
-
-        self.deriv_lst_expanded = []
-
         for i in range(len(self.signal_lst_multiple)):
             self.signal_lst_expanded += self.signal_lst_multiple[i]
             self.temp_lst_expanded += self.temp_lst_multiple[i]
-            self.deriv_lst_expanded += self.deriv_lst_multiple[i]
 
         # Create a reduced dataset for faster fitting
         self.signal_lst_expanded_subset = [subset_data(x, 60) for x in self.signal_lst_expanded]
         self.temp_lst_expanded_subset = [subset_data(x, 60) for x in self.temp_lst_expanded]
 
         if self.max_points is not None:
-
             self.signal_lst_expanded = [subset_data(x, self.max_points) for x in self.signal_lst_expanded]
             self.temp_lst_expanded = [subset_data(x, self.max_points) for x in self.temp_lst_expanded]
 
