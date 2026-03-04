@@ -134,6 +134,8 @@ def test_estimate_derivative_prediction_interpolation():
 
     pychem_sim.temp_lst_expanded = tmp
 
+    pychem_sim.fit_thermal_unfolding_global()
+
 
 def test_fit_thermal_unfolding_global_global():
 
