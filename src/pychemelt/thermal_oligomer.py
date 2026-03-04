@@ -848,6 +848,9 @@ class ThermalOligomer(Sample):
         x1 = 6
         x2 = 11
 
+        if not hasattr(self, "deriv_lst_multiple"):
+            self.estimate_derivative()
+
         for i in range(len(self.signal_lst_multiple)):
             tm_lst.append(guess_Tm_from_derivative(
                 self.temp_deriv_lst_multiple[i],
@@ -886,10 +889,14 @@ class ThermalOligomer(Sample):
 
         #print(len(argmin_x))
 
+        """
         self.bStart = np.array([y[idx] for idx, y in zip(argmin_x, self.signal_lst_multiple[0])])
         self.bEnd = np.array([y[idx] for idx, y in zip(argmax_x, self.signal_lst_multiple[0])])
+        """
 
-        self.intercept_intermediate = (self.bStart + self.bEnd) / 2
+        #self.intercept_intermediate = (self.bStart + self.bEnd) / 2
+
+        self.intercept_intermediate = (self.first_param_Ns_expanded + self.first_param_Us_expanded) / 2
 
         p0 = np.concatenate([p0, self.first_param_Ns_expanded, self.first_param_Us_expanded])
 
@@ -1033,6 +1040,7 @@ class ThermalOligomer(Sample):
         if num_rows > 4:
             step += 2
 
+        """
         # TODO: Figure out why this gridsearch destroys curve fitting
         if t1_init == 0 and t2_init == 0:
 
@@ -1088,7 +1096,7 @@ class ThermalOligomer(Sample):
             kwargs['initial_parameters'] = p0
             kwargs['low_bounds'] = low_bounds
             kwargs['high_bounds'] = high_bounds
-
+        """
         print(p0)
 
         # Do a quick prefit with a reduced data set

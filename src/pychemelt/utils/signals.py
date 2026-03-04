@@ -443,8 +443,8 @@ def unfolding_curve_trimer_monomeric_intermediate(
 
     dT = shift_temperature_K(T)
 
-    S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
-    S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
+    S_native = baseline_N_fx(dT, 0, 0, p2_N, p3_N, p4_N)
+    S_unfolded = baseline_U_fx(dT, 0, 0, p2_U, p3_U, p4_U)
 
     return C * ( (1 - fu - fi) * S_native + fi * bI * 3 + fu * S_unfolded * 3 )
 
@@ -459,7 +459,7 @@ def unfolding_curve_tetramer_monomeric_intermediate(
         Cp1=0, CpTh=0):
     """
     N4 ⇔ 4Ι ⇔ 4U Three-state unfolding with a monomeric intermediate
-    C = concentration of the trimer equivalent
+    C = concentration of the tetramermer equivalent
     """
 
     K1 = eq_constant_thermo(T, DH1, T1, Cp1)
