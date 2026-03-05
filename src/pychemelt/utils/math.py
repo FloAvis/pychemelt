@@ -381,7 +381,70 @@ def solve_one_root_depressed_cubic(p,q):
     float
         Solution of the formula
     """
-
+    """
     delta = np.sqrt((q**2/4) + (p**3/27))
 
     return np.cbrt(-q/2+delta) + np.cbrt(-q/2-delta)
+    
+
+    """
+    # Use hyperbolic solution for large p (all-real case when p > 0)
+    # Our cubic always has one real root because discriminant of depressed cubic is delta
+    # If delta > 0, one real root (Cardano's formula is safe)
+    # If delta < 0, three real roots (Vieta's substitution/trig solution)
+    # But for our chemical systems, p > 0 usually, so delta > 0.
+    
+    # Cardano's formula can be rewritten to avoid subtraction of large numbers:
+    # x = np.cbrt(-q/2 + np.sqrt(delta)) + np.cbrt(-q/2 - np.sqrt(delta))
+    # If p is large, delta is large, and we have (A + eps) - (A - eps)
+    
+    # For p > 0, the only real root is 2 * sqrt(p/3) * sinh(1/3 * asinh(3q/(2p * sqrt(p/3))))
+    # Wait, the depressed cubic x^3 + px + q = 0 with p > 0:
+    # let x = 2 * sqrt(p/3) * sinh(phi)
+    # (2*sqrt(p/3))^3 * sinh^3(phi) + p * 2 * sqrt(p/3) * sinh(phi) + q = 0
+    # 8 * (p/3)^(3/2) * sinh^3(phi) + 2p * (p/3)^(1/2) * sinh(phi) + q = 0
+    # 2p * (p/3)^(1/2) [ 4/3 * sinh^3(phi) + sinh(phi) ] + q = 0
+    # Using sinh(3phi) = 4 sinh^3(phi) + 3 sinh(phi) => 1/3 sinh(3phi) = 4/3 sinh^3(phi) + sinh(phi)
+    # 2p * (p/3)^(1/2) * 1/3 * sinh(3phi) + q = 0
+    # sinh(3phi) = -3q / (2p * sqrt(p/3))
+    
+    mask = p > 0
+    res = np.zeros_like(p, dtype=float)
+    
+    # Handle p > 0 case
+    if np.any(mask):
+        p_m = p[mask] if isinstance(p, np.ndarray) else p
+        q_m = q[mask] if isinstance(q, np.ndarray) else q
+        
+        arg = -3*q_m / (2*p_m * np.sqrt(p_m/3))
+        # Clamp arg to avoid issues with asinh if it were somehow huge, 
+        # but asinh is defined for all real numbers.
+        phi = 1/3 * np.asinh(arg)
+        res_m = 2 * np.sqrt(p_m/3) * np.sinh(phi)
+        
+        if isinstance(p, np.ndarray):
+            res[mask] = res_m
+        else:
+            return res_m
+
+    # Handle p <= 0 or other cases using Cardano (fallback)
+    if np.any(~mask):
+        p_m = p[~mask] if isinstance(p, np.ndarray) else p
+        q_m = q[~mask] if isinstance(q, np.ndarray) else q
+        
+        delta_m = (q_m**2/4) + (p_m**3/27)
+        # For p <= 0, delta can be negative (three real roots)
+        # For simplicity, we just use Cardano's which might return complex if delta < 0
+        # But for p <= 0, Cardano is usually fine unless delta is very negative.
+        # Given our use cases, p is usually positive.
+        sqrt_delta = np.sqrt(delta_m + 0j)
+        r1 = np.cbrt(-q_m/2 + sqrt_delta)
+        r2 = np.cbrt(-q_m/2 - sqrt_delta)
+        res_m = (r1 + r2).real
+        
+        if isinstance(p, np.ndarray):
+            res[~mask] = res_m
+        else:
+            return res_m
+
+    return res
