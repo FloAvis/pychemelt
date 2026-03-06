@@ -17,7 +17,9 @@ from .utils.files  import (
     load_mx3005p_txt,
     load_supr_dsf,
     load_csv_file,
-    load_aunty_xlsx
+    load_aunty_xlsx,
+    read_jasco_thermal_ramp,
+    read_jasco_thermal_ramp_format_2
 
 )
 
@@ -152,7 +154,9 @@ class Sample:
             'mx3005p': load_mx3005p_txt,
             'supr': load_supr_dsf,
             'csv': load_csv_file,
-            'aunty': load_aunty_xlsx
+            'aunty': load_aunty_xlsx,
+            'jasco_thermal_ramp': read_jasco_thermal_ramp,
+            'jasco_thermal_ramp_format_2': read_jasco_thermal_ramp_format_2
         }
 
         read_fx = read_fx_map.get(file_type)

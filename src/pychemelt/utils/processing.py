@@ -40,6 +40,9 @@ __all__ = [
     'combine_sequences',
     'adjust_value_to_interval',
     'oligomer_number',
+    'parse_number',
+    'are_all_strings_numeric',
+    'is_float'
 ]
 
 def set_param_bounds(p0,param_names):
@@ -718,3 +721,70 @@ def oligomer_number(model):
             return 4
         else:
             return 1
+
+def parse_number(s):
+    """
+    Parse a string as a float, handling:
+    - European decimal (comma)
+    - Optional thousands separators
+    - Standard decimal point
+
+    Parameters
+    ----------
+    s : str
+        The string to parse
+
+    Returns
+    -------
+    float        The parsed number
+
+    Raises
+    ------
+    ValueError    If the string cannot be parsed as a float
+
+    """
+    s = str(s).strip()
+
+    # Remove spaces
+    s = s.replace(" ", "")
+
+    # Handle European format with thousands separator
+    # e.g., '1.234,56' -> 1234.56
+    if re.match(r'^\d{1,3}(\.\d{3})*,\d+$', s):
+        s = s.replace('.', '').replace(',', '.')
+    # Handle standard format with comma decimal: '9,99'
+    elif ',' in s and '.' not in s:
+        s = s.replace(',', '.')
+
+    try:
+        return float(s)
+    except ValueError:
+        raise ValueError(f"Cannot convert '{s}' to float")
+
+def are_all_strings_numeric(lst):
+
+    """
+
+    Parameters
+    ----------
+    lst : list of str
+        List of strings to check
+
+    Returns
+    -------
+    bool
+        True if all strings in the list are numeric (can contain digits, '.', '-', ','), False otherwise
+
+    """
+
+    for item in lst:
+        if not all(char.isdigit() or char in [".", "-", ",","e"] for char in item):
+            return False
+    return True
+
+def is_float(element):
+    try:
+        parse_number(element)
+        return True
+    except ValueError:
+        return False

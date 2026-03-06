@@ -5,15 +5,12 @@ from pychemelt.utils.processing import (
     guess_Tm_from_derivative,
     get_colors_from_numeric_values,
     fit_local_thermal_unfolding_to_signal_lst,
-    adjust_value_to_interval
+    adjust_value_to_interval,
+    parse_number,
+    are_all_strings_numeric,
+    is_float
 )
 
-from pychemelt.utils.math import (
-    constant_baseline,
-    linear_baseline,
-    quadratic_baseline,
-    exponential_baseline
-)
 
 from pychemelt.utils.palette import VIRIDIS
 
@@ -64,3 +61,32 @@ def test_adjust_value_to_interval():
     assert adjust_value_to_interval(-1, 0, 100,0.5) == 0.5
 
     assert adjust_value_to_interval(110, 0, 100,0.5) == 99.5
+
+def test_parse_number():
+
+    assert parse_number('10') == 10
+
+    assert parse_number('10.5') == 10.5
+
+    assert parse_number('1e-3') == 0.001
+
+    with pytest.raises(ValueError):
+        parse_number('not_a_number')
+
+def test_are_all_strings_numeric():
+
+    assert are_all_strings_numeric(['10', '20', '30']) == True
+
+    assert are_all_strings_numeric(['10', '20.5', '1e-3']) == True
+
+    assert are_all_strings_numeric(['10', 'not_a_number', '30']) == False
+
+def test_is_float():
+
+    assert is_float('10') == True
+
+    assert is_float('10.5') == True
+
+    assert is_float('1e-3') == True
+
+    assert is_float('not_a_number') == False

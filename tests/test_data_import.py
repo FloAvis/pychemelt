@@ -18,7 +18,12 @@ from pychemelt.utils.files import (
     load_mx3005p_txt,
     load_supr_dsf,
     load_aunty_xlsx,
-    file_is_of_type_aunty
+    file_is_of_type_aunty,
+    read_jasco_thermal_ramp,
+    read_jasco_thermal_ramp_format_2,
+    file_is_jasco_thermal_ramp,
+    file_is_jasco_thermal_ramp_format_2
+
 )
 
 nDSF_file = "./test_files/nDSFdemoFile.xlsx"
@@ -35,6 +40,8 @@ csv_file_2 = "./test_files/melting-scan_format_2.csv"
 
 aunty_file = "./test_files/AUNTY_multi_channel.xlsx"
 
+jasco_file = "./test_files/jasco_thermal_ramp_example.csv"
+jasco_file_f2 = "./test_files/jasco_thermal_ramp_one_wavelength.txt"
 
 def test_get_sheet_names_of_xlsx():
     sheet_names = get_sheet_names_of_xlsx(nDSF_file)
@@ -226,3 +233,34 @@ def test_load_aunty_multi_channel():
 
     assert len(temp_data_dic['250.0 nm'][0]) == 31 # there are 31 temperature points
     assert len(signal_data_dic['250.0 nm'][-1]) == 31 # there are 31 temperature points
+
+def test_jasco():
+
+    assert file_is_jasco_thermal_ramp(jasco_file)
+    assert file_is_jasco_thermal_ramp_format_2(jasco_file_f2)
+
+    assert not file_is_jasco_thermal_ramp_format_2(jasco_file)
+    assert not file_is_jasco_thermal_ramp(jasco_file_f2)
+
+    signal_data_dic, temp_data_dic, conditions, signals = read_jasco_thermal_ramp(jasco_file)
+
+    assert signals[0] == '250.0 nm'
+    assert conditions[0] == "jasco_thermal_ramp_example.csv"
+
+    assert len(conditions) == 1
+
+    assert len(signal_data_dic['250.0 nm'][0]) == 5
+    assert len(temp_data_dic['250.0 nm'][0]) == 5
+
+    assert (signal_data_dic['250.0 nm'][0][0]) == -0.310564
+    assert (signal_data_dic['249.0 nm'][0][0]) == -0.180529
+
+    signal_data_dic, temp_data_dic, conditions, signals = read_jasco_thermal_ramp_format_2(jasco_file_f2)
+
+    assert signals[0] == '222.0 nm'
+    assert conditions[0] == "jasco_thermal_ramp_one_wavelength.txt"
+
+    assert len(conditions) == 1
+
+    assert len(signal_data_dic['222.0 nm'][0]) == 22
+    assert len(temp_data_dic['222.0 nm'][0]) == 22
