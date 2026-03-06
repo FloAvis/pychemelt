@@ -130,29 +130,23 @@ def fi_three_state_tetramer_monomeric_intermediate(K1,K2,Ct):
     '''
     Pt = Ct*4
 
-    A = 4*(Pt**3)/K1
-    D = 1+K2
-    E = -1
+    tol = 1e-10 # tolerance for the Newton-Raphson method
+    max_iter = 50
 
-    b = D/A
-    c = E/A
+    f = 1 / (K2 + 1)  # initial guess
 
-    P = -c
-    Q = -np.square(b)/8
+    for i in range(max_iter):
+        g = (4 * Pt ** 3 / K1) * f ** 4 + (K2 + 1) * f - 1
+        gp = (16 * Pt ** 3 / K1) * f ** 3 + (K2 + 1)
 
-    R = -Q/2 + np.sqrt(np.square(Q)/4+P**3/27)
+        f_new = f - g / gp
 
-    U = np.cbrt(R)
-    y = U-P/(3*U)
-    W = np.sqrt(2*y)
+        if np.mean(abs(f_new - f)) < tol:
+            return f_new
 
-    x4 = 0.5*(-W+np.sqrt(-(2*y-2*b/W)))
+        f = f_new
 
-    x4_sel = np.logical_and(np.greater(x4,0),np.less(x4,1.01))
-
-    fi = x4_sel*np.nan_to_num(x4,nan=0.0)
-
-    return fi
+    return f
 
 def fi_three_state_dimer_monomeric_intermediate(K1,K2,C):
     '''

@@ -439,14 +439,16 @@ def unfolding_curve_trimer_monomeric_intermediate(
     K2 = eq_constant_thermo(T, DH2, T2, (CpTh - Cp1) / 3)  # We should actually find how Cp2 depends on CpTh
 
     fi = fi_three_state_trimer_monomeric_intermediate(K1, K2, C)
-    fu = fi * K2
+
+    fn = 27 * C ** 2 * fi ** 3 / K1
+    fu = 1 - fi - fn
 
     dT = shift_temperature_K(T)
 
     S_native = baseline_N_fx(dT, 0, 0, p2_N, p3_N, p4_N)
     S_unfolded = baseline_U_fx(dT, 0, 0, p2_U, p3_U, p4_U)
 
-    return C * ((1 - fu - fi) * S_native + fi * bI * 3 + fu * S_unfolded * 3)
+    return C * (fn * S_native + fi * bI * 3 + fu * S_unfolded * 3)
 
 
 def unfolding_curve_tetramer_monomeric_intermediate(
@@ -466,14 +468,19 @@ def unfolding_curve_tetramer_monomeric_intermediate(
     K2 = eq_constant_thermo(T, DH2, T2, (CpTh - Cp1) / 4)
 
     fi = fi_three_state_tetramer_monomeric_intermediate(K1, K2, C)
-    fu = fi * K2
+
+    fn = (4 * (C * 4) ** 3 / K1) * fi ** 4
+
+    fu = 1 - fi - fn
 
     dT = shift_temperature_K(T)
 
+    print(bI)
+    print(fi.shape)
     S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
     S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
 
-    return C * ((1 - fu - fi) * S_native + fi * bI * 4 + fu * S_unfolded * 4)
+    return C * (fn * S_native + fi * bI * 4 + fu * S_unfolded * 4)
 
 
 def unfolding_curve_trimer_trimeric_intermediate(
