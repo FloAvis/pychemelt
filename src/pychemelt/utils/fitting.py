@@ -1509,8 +1509,6 @@ def fit_oligomer_unfolding_three_states_shared_slopes_many_signals(
         low_bounds[3] = dh2 - 50
         high_bounds[3] = dh2 + 50
 
-    #print(initial_parameters)
-
     # Vectorized residuals function for least_squares
     def residuals(params):
         """
@@ -1580,8 +1578,6 @@ def fit_oligomer_unfolding_three_states_shared_slopes_many_signals(
             )
 
         return predicted_all - all_signal
-
-    #print("Global Global")
 
     # Run least_squares fit
     res = least_squares(
@@ -1868,12 +1864,9 @@ def fit_oligomer_unfolding_many_signals(
         signal_fx,
         baseline_native_fx,
         baseline_unfolded_fx,
-        normalise_to_global_max,
         model_scale_factor=False,
         scale_factor_exclude_ids=[],
-        cp_value=None,
-        fit_native_olig_slope=True,
-        fit_unfolded_olig_slope=True):
+        cp_value=None,):
     """
     Fit thermal unfolding curves of oligomers for many signals (optimized variant).
 
@@ -1899,16 +1892,12 @@ def fit_oligomer_unfolding_many_signals(
         function to calculate the native state baseline
     baseline_unfolded_fx : callable
         function to calculate the unfolded state baseline
-    normalise_to_global_max : bool
-        indicator if data is normalised to global max
     model_scale_factor : bool, optional
         If True, include a per-oligomeric concentration scale factor to account for intensity differences
     scale_factor_exclude_ids : list, optional
         IDs of scale factors to exclude / fix to 1
     cp_value : float or None, optional
         If provided, Cp is fixed to this value and not fitted
-    fit_native_olig_slope, fit_unfolded_olig_slope : bool, optional
-        Whetever to fit the dependence of the slopes of the baselines
 
    Returns
     -------
@@ -1930,8 +1919,8 @@ def fit_oligomer_unfolding_many_signals(
         # Sort them in ascending order to avoid issues when inserting
         scale_factor_exclude_ids = sorted(scale_factor_exclude_ids)
 
-    baseline_native_params = [fit_native_olig_slope] + baseline_fx_name_to_req_params(baseline_native_fx)
-    baseline_unfolded_params = [fit_unfolded_olig_slope] + baseline_fx_name_to_req_params(baseline_unfolded_fx)
+    baseline_native_params = baseline_fx_name_to_req_params(baseline_native_fx)
+    baseline_unfolded_params = baseline_fx_name_to_req_params(baseline_unfolded_fx)
 
     initial_parameters[0] = temperature_to_kelvin(initial_parameters[0])
     low_bounds[0] = temperature_to_kelvin(low_bounds[0])
@@ -1939,10 +1928,7 @@ def fit_oligomer_unfolding_many_signals(
 
     list_of_temperatures = [temperature_to_kelvin(T) for T in list_of_temperatures]
 
-    # normalised concentration difference for normalised signal
-    norm_conc = [x / max(oligomer_concentrations) for x in oligomer_concentrations]
-
-    def unfolding(dummyVariable, *args):
+    def unfolding(dummyVariable, *params):
 
         """
         The parameters order is as follows:
@@ -1955,9 +1941,6 @@ def fit_oligomer_unfolding_many_signals(
             Temperature slope or term pre-exponential factor folded
             Temperature slope term or pre-exponential factor unfolded
 
-            Oligomer slope term folded
-            Oligomer slope term unfolded
-
             Quadratic coefficient or exponential coefficient folded
             Quadratic coefficient or exponential coefficient unfolded
 
@@ -1966,24 +1949,41 @@ def fit_oligomer_unfolding_many_signals(
         if cp_value is not None:
 
             Cp0 = cp_value
-            Tm, DHm = args[:2]  # Enthalpy of unfolding, Temperature of melting
-            id_param_init = 2
+            Tm, DHm = params[:2]  # Enthalpy of unfolding, Temperature of melting
+            id_param = 2
 
         else:
 
-            Tm, DHm, Cp0 = args[:3]  # Enthalpy of unfolding, Temperature of melting, Cp0
-            id_param_init = 3
+            Tm, DHm, Cp0 = params[:3]  # Enthalpy of unfolding, Temperature of melting, Cp0
+            id_param = 3
 
         # Intercept parameters
-        p2_Ns = args[id_param_init:id_param_init + n_signals]
-        p2_Us = args[id_param_init + n_signals:id_param_init + 2 * n_signals]
+        p1_Ns = params[id_param:id_param + n_signals]
+        p1_Us = params[id_param + n_signals:id_param + 2 * n_signals]
 
-        id_param_init = id_param_init + 2 * n_signals
+        id_param_init = id_param + 2 * n_signals
 
         # Temperature slope or pre-exponential parameters
+        if baseline_native_params[0]:
+
+            p2_Ns = params[id_param_init:id_param_init + n_signals]
+            id_param_init += n_signals
+
+        else:
+            p2_Ns = [0] * n_signals
+
+        if baseline_unfolded_params[0]:
+
+            p2_Us = params[id_param_init:id_param_init + n_signals]
+            id_param_init += n_signals
+
+        else:
+            p2_Us = [0] * n_signals
+
+        # Temperature-dependent quadratic or exponential coefficients
         if baseline_native_params[1]:
 
-            p3_Ns = args[id_param_init:id_param_init + n_signals]
+            p3_Ns = params[id_param_init:id_param_init + n_signals]
             id_param_init += n_signals
 
         else:
@@ -1991,51 +1991,15 @@ def fit_oligomer_unfolding_many_signals(
 
         if baseline_unfolded_params[1]:
 
-            p3_Us = args[id_param_init:id_param_init + n_signals]
+            p3_Us = params[id_param_init:id_param_init + n_signals]
             id_param_init += n_signals
 
         else:
             p3_Us = [0] * n_signals
 
-        # Oligomer slope parameters
-        if baseline_native_params[0]:
-
-            p1_Ns = args[id_param_init:id_param_init + n_signals]
-            id_param_init += n_signals
-
-        else:
-
-            p1_Ns = [0] * n_signals
-
-        if baseline_unfolded_params[0]:
-
-            p1_Us = args[id_param_init:id_param_init + n_signals]
-            id_param_init += n_signals
-
-        else:
-
-            p1_Us = [0] * n_signals
-
-        # Temperature-dependent quadratic or exponential coefficients
-        if baseline_native_params[2]:
-
-            p4_Ns = args[id_param_init:id_param_init + n_signals]
-            id_param_init += n_signals
-
-        else:
-            p4_Ns = [0] * n_signals
-
-        if baseline_unfolded_params[2]:
-
-            p4_Us = args[id_param_init:id_param_init + n_signals]
-            id_param_init += n_signals
-
-        else:
-            p4_Us = [0] * n_signals
-
         if model_scale_factor:
             # One per oligomer concentration
-            factors = args[id_param_init:id_param_init + (nr_olig - len(scale_factor_exclude_ids))]
+            factors = params[id_param_init:id_param_init + (nr_olig - len(scale_factor_exclude_ids))]
 
             for id_ex in scale_factor_exclude_ids:
                 factors = np.insert(factors, id_ex, 1)
@@ -2055,29 +2019,18 @@ def fit_oligomer_unfolding_many_signals(
             p2_U = p2_Us[signal_ids[i]]
             p3_N = p3_Ns[signal_ids[i]]
             p3_U = p3_Us[signal_ids[i]]
-            p4_N = p4_Ns[signal_ids[i]]
-            p4_U = p4_Us[signal_ids[i]]
 
             c = oligomer_concentrations[i]
 
-            if normalise_to_global_max:
-                y = norm_conc[i] * signal_fx(
-                    T, c, Tm, DHm,
-                    p1_N, p2_N, p3_N, p4_N,
-                    p1_U, p2_U, p3_U, p4_U,
-                    baseline_native_fx,
-                    baseline_unfolded_fx,
-                    Cp0
-                )
-            else:
-                y = c * signal_fx(
-                    T, c, Tm, DHm,
-                    p1_N, p2_N, p3_N, p4_N,
-                    p1_U, p2_U, p3_U, p4_U,
-                    baseline_native_fx,
-                    baseline_unfolded_fx,
-                    Cp0
-                )
+
+            y = signal_fx(
+                T, c, Tm, DHm,
+                0, p1_N, p2_N, p3_N,
+                0, p1_U, p2_U, p3_U,
+                baseline_native_fx,
+                baseline_unfolded_fx,
+                Cp0
+            )
 
             scale_factor = 1 if not model_scale_factor else factors[i]
 
@@ -2227,7 +2180,7 @@ def fit_oligomer_unfolding_three_states_many_signals(
         # Temperature slope or pre-exponential parameters
         if baseline_native_params[0]:
 
-            p2_Ns = args[id_param_init:id_param_init + n_signals]
+            p2_Ns = params[id_param_init:id_param_init + n_signals]
             id_param_init += n_signals
 
         else:
@@ -2322,6 +2275,7 @@ def fit_oligomer_unfolding_three_states_many_signals(
 
     # Convert the Tm to Celsius
     global_fit_params[0] = temperature_to_celsius(global_fit_params[0])
+    global_fit_params[2] = temperature_to_celsius(global_fit_params[2])
 
     return global_fit_params, cov, predicted_lst
 

@@ -388,8 +388,8 @@ def unfolding_curve_monomer_monomeric_intermediate(
 
     dT = shift_temperature_K(T)
 
-    S_native   = baseline_N_fx(dT,C,p1_N,p2_N,p3_N,p4_N)
-    S_unfolded = baseline_U_fx(dT,C,p1_U,p2_U,p3_U,p4_U)
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
     return C * (xN * S_native + xI * bI + xU * S_unfolded)
 
@@ -416,8 +416,8 @@ def unfolding_curve_dimer_monomeric_intermediate(
 
     dT = shift_temperature_K(T)
 
-    S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
-    S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
     return  C * ((1 - fu - fi) * S_native + fi * bI * 2 + fu * S_unfolded * 2)
 
@@ -445,8 +445,8 @@ def unfolding_curve_trimer_monomeric_intermediate(
 
     dT = shift_temperature_K(T)
 
-    S_native = baseline_N_fx(dT, 0, 0, p2_N, p3_N, p4_N)
-    S_unfolded = baseline_U_fx(dT, 0, 0, p2_U, p3_U, p4_U)
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
     return C * (fn * S_native + fi * bI * 3 + fu * S_unfolded * 3)
 
@@ -474,13 +474,9 @@ def unfolding_curve_tetramer_monomeric_intermediate(
     fu = 1 - fi - fn
 
     dT = shift_temperature_K(T)
-    """if type(bI) is int:
-        print(bI)
-    else:
-        print(bI.shape)
-    print(fi.shape)"""
-    S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
-    S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
+
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
     return C * (fn * S_native + fi * bI * 4 + fu * S_unfolded * 4)
 
@@ -506,8 +502,8 @@ def unfolding_curve_trimer_trimeric_intermediate(
 
     dT = shift_temperature_K(T)
 
-    S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
-    S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
     return C * ((1 - fu - fi) * S_native + fi * bI + fu * S_unfolded * 3)
 
@@ -534,8 +530,8 @@ def unfolding_curve_dimer_dimeric_intermediate(
 
     dT = shift_temperature_K(T)
 
-    S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
-    S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
+    S_native   = baseline_N_fx(dT,0,0,p2_N,p3_N,p4_N)
+    S_unfolded = baseline_U_fx(dT,0,0,p2_U,p3_U,p4_U)
 
     return C * ((1 - fu - fi) * S_native + fi * bI + fu * S_unfolded * 2)
 

@@ -859,9 +859,7 @@ class ThermalOligomer(Sample):
         Tm1 = np.average(tm_lst) - 10
         Tm2 = np.average(tm_lst) + 10
 
-        print(Tm1, Tm2)
-
-        p0 = [Tm1, 150, Tm2, 200]
+        p0 = [Tm1, 200, Tm2, 200]
 
         params_names = [
             'Tm1 (°C)',
@@ -1077,7 +1075,6 @@ class ThermalOligomer(Sample):
             kwargs['low_bounds'] = low_bounds
             kwargs['high_bounds'] = high_bounds
         """
-        print(p0)
 
         # Do a quick prefit with a reduced data set
         if self.pre_fit:
@@ -1573,38 +1570,15 @@ class ThermalOligomer(Sample):
         p1Ns_per_signal = re_arrange_params(p1Ns, self.nr_signals)
         p1Us_per_signal = re_arrange_params(p1Us, self.nr_signals)
 
-        m1s, b1s, m1s_low, b1s_low, m1s_high, b1s_high = [], [], [], [], [], []
-        m2s, b2s, m2s_low, b2s_low, m2s_high, b2s_high = [], [], [], [], [], []
+        p1Ns = np.mean(p1Ns_per_signal, axis=1)
+        p1Us = np.mean(p1Us_per_signal, axis=1)
 
-        for p1Ns, p1Us in zip(p1Ns_per_signal, p1Us_per_signal):
+        p1Ns_low_bounds = [p1N / 100 if p1N > 0 else 100 * p1N for p1N in p1Ns]
+        p1Us_low_bounds = [p1U / 100 if p1U > 0 else 100 * p1U for p1U in p1Us]
 
-            # Estimate the slope of bNs versus oligomer concentration
-            m1, b1 = fit_line_robust(self.oligomer_concentrations, p1Ns)
-            m1_low = m1 / 100 if m1 > 0 else 100 * m1
-            m1_high = 100 * m1 if m1 > 0 else m1 / 100
-            b1_low = b1 / 100 if b1 > 0 else 100 * b1
-            b1_high = 100 * b1 if b1 > 0 else b1 / 100
+        p1Ns_high_bounds = [p1N * 100 if p1N > 0 else 100 / p1N for p1N in p1Ns]
+        p1Us_high_bounds = [p1U * 100 if p1U > 0 else 100 / p1U for p1U in p1Us]
 
-            # Estimate the slope of bUs versus oligomer concentration
-            m2, b2 = fit_line_robust(self.oligomer_concentrations, p1Us)
-            m2_low = m2 / 100 if m2 > 0 else 100 * m2
-            m2_high = 100 * m2 if m2 > 0 else m2 / 100
-            b2_low = b2 / 100 if b2 > 0 else 100 * b2
-            b2_high = 100 * b2 if b2 > 0 else b2 / 100
-
-            m1s.append(m1)
-            b1s.append(b1)
-            m1s_low.append(m1_low)
-            b1s_low.append(b1_low)
-            m1s_high.append(m1_high)
-            b1s_high.append(b1_high)
-
-            m2s.append(m2)
-            b2s.append(b2)
-            m2s_low.append(m2_low)
-            b2s_low.append(b2_low)
-            m2s_high.append(m2_high)
-            b2s_high.append(b2_high)
 
         idx = param_init + 2 * n_datasets
 
@@ -1633,9 +1607,6 @@ class ThermalOligomer(Sample):
             idx += self.nr_signals
             params_names += [param_name + ' - ' + signal_name for signal_name in self.signal_names]
 
-        params_names += ['oligomer_slope_term_native - ' + signal_name for signal_name in self.signal_names]
-        params_names += ['oligomer_slope_term_unfolded - ' + signal_name for signal_name in self.signal_names]
-
         if self.native_baseline_type in ['quadratic', 'exponential']:
 
             param_name = 'exponential_coefficient_native' if self.native_baseline_type == 'exponential' else 'quadratic_term_native'
@@ -1658,9 +1629,9 @@ class ThermalOligomer(Sample):
 
             params_names += [param_name + ' - ' + signal_name for signal_name in self.signal_names]
 
-        p0 = np.concatenate([p0, b1s, b2s])
-        low_bounds = np.concatenate([low_bounds, b1s_low, b2s_low])
-        high_bounds = np.concatenate([high_bounds, b1s_high, b2s_high])
+        p0 = np.concatenate([p0, p1Ns, p1Us])
+        low_bounds = np.concatenate([low_bounds, p1Ns_low_bounds, p1Us_low_bounds])
+        high_bounds = np.concatenate([high_bounds, p1Ns_high_bounds, p1Us_high_bounds])
 
         if self.native_baseline_type in ['linear', 'quadratic','exponential']:
 
@@ -1674,10 +1645,6 @@ class ThermalOligomer(Sample):
             low_bounds = np.concatenate([low_bounds, low_bounds_kUs])
             high_bounds = np.concatenate([high_bounds, high_bounds_kUs])
 
-        p0 = np.concatenate([p0, m1s, m2s])
-        low_bounds = np.concatenate([low_bounds, m1s_low, m2s_low])
-        high_bounds = np.concatenate([high_bounds, m1s_high, m2s_high])
-
         if self.native_baseline_type in ['quadratic', 'exponential']:
 
             p0 = np.concatenate([p0, qNs])
@@ -1689,22 +1656,6 @@ class ThermalOligomer(Sample):
             p0 = np.concatenate([p0, qUs])
             low_bounds = np.concatenate([low_bounds, low_bounds_qUs])
             high_bounds = np.concatenate([high_bounds, high_bounds_qUs])
-
-        # Increase the bounds for c_N and c_U
-        # Find index in the param names
-        for signal_name in self.signal_names:
-
-            c_N_name = 'oligomer_slope_term_native - ' + signal_name
-            c_U_name = 'oligomer_slope_term_unfolded - ' + signal_name
-
-            c_N_idx = params_names.index(c_N_name)
-            c_U_idx = params_names.index(c_U_name)
-
-            low_bounds[c_N_idx] -= 5
-            high_bounds[c_N_idx] += 5
-
-            low_bounds[c_U_idx] -= 5
-            high_bounds[c_U_idx] += 5
 
         # If required, include a scale factor for each oligomer concentration
         if model_scale_factor:
@@ -1741,10 +1692,7 @@ class ThermalOligomer(Sample):
             'scale_factor_exclude_ids':scale_factor_exclude_ids,
             'signal_fx' : signal_fx,
             'baseline_native_fx' : self.baseline_N_fx,
-            'baseline_unfolded_fx' : self.baseline_U_fx,
-            'normalise_to_global_max': self.normalise_to_global_max,
-            'fit_native_olig_slope' : True,
-            'fit_unfolded_olig_slope' : True
+            'baseline_unfolded_fx' : self.baseline_U_fx
         }
 
         fit_fx = fit_oligomer_unfolding_many_signals
@@ -1771,8 +1719,8 @@ class ThermalOligomer(Sample):
             # plus Cp if fitted
             idx_start = 2 + (self.cp_value is None)
 
-            native_factor   = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_N_fx))
-            unfolded_factor = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_U_fx))
+            native_factor   = 1+np.sum(baseline_fx_name_to_req_params(self.baseline_N_fx))
+            unfolded_factor = 1+np.sum(baseline_fx_name_to_req_params(self.baseline_U_fx))
 
             # Add index according to the native baseline polynomial order
             idx_start += native_factor * self.nr_signals
@@ -1898,16 +1846,107 @@ class ThermalOligomer(Sample):
         if not self.global_global_fit_done:
             self.fit_thermal_unfolding_global_global()
 
+        param_init = 4
 
-        params_names = self.params_names
+        params_names = self.params_names[:param_init]
 
-        p0 = self.global_fit_params
-        low_bounds = self.low_bounds
-        high_bounds = self.high_bounds
+        p0 = self.global_fit_params[:param_init]
+        low_bounds = self.low_bounds[:param_init]
+        high_bounds = self.high_bounds[:param_init]
 
         n_datasets = self.nr_olig * self.nr_signals
 
+        p1Ns = self.global_fit_params[param_init:param_init + n_datasets]
+        p1Us = self.global_fit_params[param_init + n_datasets:param_init + 2 * n_datasets]
+        intermediate_baselines = self.global_fit_params[param_init + 2 * n_datasets:param_init + 3 * n_datasets]
 
+        p1Ns_per_signal = re_arrange_params(p1Ns, self.nr_signals)
+        p1Us_per_signal = re_arrange_params(p1Us, self.nr_signals)
+        intermediate_baselines_per_signal = re_arrange_params(intermediate_baselines, self.nr_signals)
+
+        p1Ns = np.mean(p1Ns_per_signal, axis=1)
+        p1Us = np.mean(p1Us_per_signal, axis=1)
+        intermediate_baselines = np.mean(intermediate_baselines_per_signal, axis=1)
+
+        p1Ns_low_bounds = [p1N / 100 if p1N > 0 else 100 * p1N for p1N in p1Ns]
+        p1Us_low_bounds = [p1U / 100 if p1U > 0 else 100 * p1U for p1U in p1Us]
+        intermediate_baselines_low_bounds = [intermediate_baseline / 100 if intermediate_baseline > 0 else 100 * intermediate_baseline for intermediate_baseline in intermediate_baselines]
+
+        p1Ns_high_bounds = [p1N * 100 if p1N > 0 else 100 / p1N for p1N in p1Ns]
+        p1Us_high_bounds = [p1U * 100 if p1U > 0 else 100 / p1U for p1U in p1Us]
+        intermediate_baselines_high_bounds = [
+            intermediate_baseline * 100 if intermediate_baseline > 0 else 100 / intermediate_baseline for
+            intermediate_baseline in intermediate_baselines]
+
+        idx = param_init + 3 * n_datasets
+
+        params_names += ['intercept_native - ' + signal_name for signal_name in self.signal_names]
+        params_names += ['intercept_unfolded - ' + signal_name for signal_name in self.signal_names]
+        params_names += ['intercept_intermediate - ' + signal_name for signal_name in self.signal_names]
+
+        if self.native_baseline_type in ['linear', 'quadratic', 'exponential']:
+            param_name = 'pre_exponential_factor_native' if self.native_baseline_type == 'exponential' else 'slope_term_native'
+
+            kNs = self.global_fit_params[idx:idx + self.nr_signals]
+            low_bounds_kNs = self.low_bounds[idx:idx + self.nr_signals]
+            high_bounds_kNs = self.high_bounds[idx:idx + self.nr_signals]
+
+            idx += self.nr_signals
+            params_names += [param_name + ' - ' + signal_name for signal_name in self.signal_names]
+
+        if self.unfolded_baseline_type in ['linear', 'quadratic', 'exponential']:
+            param_name = 'pre_exponential_factor_unfolded' if self.unfolded_baseline_type == 'exponential' else 'slope_term_unfolded'
+
+            kUs = self.global_fit_params[idx:idx + self.nr_signals]
+            low_bounds_kUs = self.low_bounds[idx:idx + self.nr_signals]
+            high_bounds_kUs = self.high_bounds[idx:idx + self.nr_signals]
+
+            idx += self.nr_signals
+            params_names += [param_name + ' - ' + signal_name for signal_name in self.signal_names]
+
+        if self.native_baseline_type in ['quadratic', 'exponential']:
+            param_name = 'exponential_coefficient_native' if self.native_baseline_type == 'exponential' else 'quadratic_term_native'
+
+            qNs = self.global_fit_params[idx:idx + self.nr_signals]
+            low_bounds_qNs = self.low_bounds[idx:idx + self.nr_signals]
+            high_bounds_qNs = self.high_bounds[idx:idx + self.nr_signals]
+            idx += self.nr_signals
+
+            params_names += [param_name + ' - ' + signal_name for signal_name in self.signal_names]
+
+        if self.unfolded_baseline_type in ['quadratic', 'exponential']:
+            param_name = 'exponential_coefficient_unfolded' if self.unfolded_baseline_type == 'exponential' else 'quadratic_term_unfolded'
+
+            qUs = self.global_fit_params[idx:idx + self.nr_signals]
+            low_bounds_qUs = self.low_bounds[idx:idx + self.nr_signals]
+            high_bounds_qUs = self.high_bounds[idx:idx + self.nr_signals]
+            idx += self.nr_signals
+
+            params_names += [param_name + ' - ' + signal_name for signal_name in self.signal_names]
+
+        p0 = np.concatenate([p0, p1Ns, p1Us, intermediate_baselines])
+        low_bounds = np.concatenate([low_bounds, p1Ns_low_bounds, p1Us_low_bounds, intermediate_baselines_low_bounds])
+        high_bounds = np.concatenate([high_bounds, p1Ns_high_bounds, p1Us_high_bounds, intermediate_baselines_high_bounds])
+
+        if self.native_baseline_type in ['linear', 'quadratic', 'exponential']:
+            p0 = np.concatenate([p0, kNs])
+            low_bounds = np.concatenate([low_bounds, low_bounds_kNs])
+            high_bounds = np.concatenate([high_bounds, high_bounds_kNs])
+
+        if self.unfolded_baseline_type in ['linear', 'quadratic', 'exponential']:
+            p0 = np.concatenate([p0, kUs])
+            low_bounds = np.concatenate([low_bounds, low_bounds_kUs])
+            high_bounds = np.concatenate([high_bounds, high_bounds_kUs])
+
+        if self.native_baseline_type in ['quadratic', 'exponential']:
+            p0 = np.concatenate([p0, qNs])
+            low_bounds = np.concatenate([low_bounds, low_bounds_qNs])
+            high_bounds = np.concatenate([high_bounds, high_bounds_qNs])
+
+        if self.unfolded_baseline_type in ['quadratic', 'exponential']:
+            p0 = np.concatenate([p0, qUs])
+            low_bounds = np.concatenate([low_bounds, low_bounds_qUs])
+            high_bounds = np.concatenate([high_bounds, high_bounds_qUs])
 
         # If required, include a scale factor for each oligomer concentration
         if model_scale_factor:
@@ -1968,8 +2007,8 @@ class ThermalOligomer(Sample):
             # 4 parameters corresponding to Tm, dH
             idx_start = 4
 
-            native_factor   = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_N_fx))
-            unfolded_factor = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_U_fx))
+            native_factor   = 1+np.sum(baseline_fx_name_to_req_params(self.baseline_N_fx))
+            unfolded_factor = 1+np.sum(baseline_fx_name_to_req_params(self.baseline_U_fx))
 
             # Add index according to the native baseline polynomial order
             idx_start += native_factor * self.nr_signals
