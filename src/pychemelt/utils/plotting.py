@@ -209,8 +209,8 @@ def plot_unfolding(
             # Reduced dataset if fittings were done
             xs     = pychemelt_sample.temp_lst_expanded[i*nr_den:(i+1)*nr_den]
             if plot_derivative:
-                ys = pychemelt_sample.deriv_lst_expanded[i*nr_den:(i+1)*nr_den]
                 ys_fit = pychemelt_sample.predicted_deriv_lst_multiple[i]
+                ys = pychemelt_sample.deriv_lst_expanded[i * nr_den:(i + 1) * nr_den]
             else:
                 ys_fit = pychemelt_sample.predicted_lst_multiple[i]
                 ys = pychemelt_sample.signal_lst_expanded[i*nr_den:(i+1)*nr_den]

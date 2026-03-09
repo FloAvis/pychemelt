@@ -123,6 +123,20 @@ def test_fit_thermal_unfolding_global():
 
     np.testing.assert_allclose(actual,expected,rtol=0.3)
 
+def test_estimate_derivative_prediction_interpolation():
+    tmp = pychem_sim.temp_lst_expanded.copy()
+
+    pychem_sim.temp_lst_expanded[0][0] = -100
+
+    pychem_sim.estimate_derivative()
+
+    assert len(pychem_sim.deriv_lst_multiple[0]) == 7
+
+    pychem_sim.temp_lst_expanded = tmp
+
+    pychem_sim.fit_thermal_unfolding_global()
+
+
 def test_fit_thermal_unfolding_global_global():
 
     pychem_sim.set_signal_id()

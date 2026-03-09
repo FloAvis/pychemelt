@@ -370,6 +370,9 @@ class ThermalOligomer(Sample):
         x1 = 6
         x2 = 11
 
+        if not hasattr(self, "deriv_lst_multiple"):
+            self.estimate_derivative()
+
         for i in range(len(self.signal_lst_multiple)):
             tm_lst.append(guess_Tm_from_derivative(
                 self.temp_deriv_lst_multiple[i],
