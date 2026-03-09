@@ -381,7 +381,6 @@ class Sample:
         if self.max_points is not None:
             self.deriv_lst_expanded = [subset_data(x, self.max_points) for x in self.deriv_lst_expanded]
 
-
         if hasattr(self, "predicted_lst_multiple"):
 
             self.predicted_deriv_lst_multiple = []
@@ -391,12 +390,12 @@ class Sample:
                 temp_deriv_lst = []
                 predicted_deriv_lst = []
 
-                for p, t in zip(self.predicted_lst_multiple[i], np.split(np.array(self.temp_lst_expanded), len(self.predicted_lst_multiple))[i]):
+                for p, t in zip(self.predicted_lst_multiple[i],
+                                np.split(np.array(self.temp_lst_expanded), len(self.predicted_lst_multiple))[i]):
 
                     check = is_evenly_spaced(t)
 
                     if check:
-
                         derivative = first_derivative_savgol(t, p, window_length)
 
                     else:
@@ -583,9 +582,11 @@ class Sample:
         self.signal_lst_expanded_subset = [subset_data(x, 60) for x in self.signal_lst_expanded]
         self.temp_lst_expanded_subset = [subset_data(x, 60) for x in self.temp_lst_expanded]
 
+
         if self.max_points is not None:
             self.signal_lst_expanded = [subset_data(x, self.max_points) for x in self.signal_lst_expanded]
             self.temp_lst_expanded = [subset_data(x, self.max_points) for x in self.temp_lst_expanded]
+
 
         return None
 

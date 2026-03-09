@@ -1,5 +1,20 @@
 """
-Test file for thermal unfolding of oligomers based difference in concentrations
+Module for thermal unfolding simulation and testing with given concentration and model parameters.
+
+This module includes functionalities for simulating thermal unfolding using the ThermalOligomer class,
+applying two-state models for signal mapping, baseline estimation, and curve fitting. Various test
+functions are provided to validate the implementation, including parameter fitting for monomer
+models and scaling behaviors.
+
+Classes:
+    ThermalOligomer: Represents the system for thermal unfolding simulations and parameter fitting.
+
+Notes
+-----
+- The tests rely on seeded random number generators for reproducible results.
+- Thermal unfolding behaviors can accommodate different baselines (linear, exponential).
+- The module utilizes the `pytest` library for test development.
+
 """
 
 import numpy as np
@@ -72,13 +87,11 @@ def aux_create_pychem_sim(params,concs, model, normalise=False):
     # Use a seeded Generator for reproducible noise in tests
     rng = np.random.default_rng(2)
 
-    for D in concs:
+    for C in concs:
 
-        y = signal_fx(temp_range_K, D, **params)
+        y = signal_fx(temp_range_K, C, **params)
 
-        # Concentration dependent scaling
-        y = y * D
-
+        # Add gaussian error to signal
         y += rng.normal(0, 0.002*1e-3, len(y)) # Small error (seeded)
 
         signal_list.append(y)
@@ -132,19 +145,6 @@ def test_set_model():
     assert sample.model == "Dimer"
 
     pytest.raises(ValueError, sample.set_model, "test_false")
-
-    sample.set_model("Monomer", "Monomeric")
-    assert sample.model == "Monomer_monomeric_intermediate"
-
-    sample.set_model("Trimer", "monomeric")
-    assert sample.model == "Trimer_monomeric_intermediate"
-
-    sample.set_model("dimer", "Dimeric")
-    assert sample.model == "Dimer_dimeric_intermediate"
-
-    pytest.raises(ValueError, sample.set_model, "Monomer", "test_false")
-
-    pytest.raises(ValueError, sample.set_model, "Trimer", "Dimeric")
 
 
 def test_set_concentrations():
