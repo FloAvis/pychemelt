@@ -127,6 +127,10 @@ class Sample:
 
         self.predicted = None # Flattened list of fitted signals
 
+        self.predicted_lst_multiple = None
+        self.predicted_lst_multiple_scaled = None
+        self.signal_lst_multiple_scaled = None
+
     def read_file(self, file):
 
         """
@@ -385,7 +389,7 @@ class Sample:
         if self.max_points is not None:
             self.deriv_lst_expanded = [subset_data(x, self.max_points) for x in self.deriv_lst_expanded]
 
-        if hasattr(self, "predicted_lst_multiple"):
+        if self.predicted_lst_multiple is not None:
             self.predicted_deriv_lst_multiple = []
 
             for i in range(len(self.predicted_lst_multiple)):
