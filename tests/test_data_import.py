@@ -22,7 +22,9 @@ from pychemelt.utils.files import (
     read_jasco_thermal_ramp,
     read_jasco_thermal_ramp_format_2,
     file_is_jasco_thermal_ramp,
-    file_is_jasco_thermal_ramp_format_2
+    file_is_jasco_thermal_ramp_format_2,
+    file_is_chirascan_thermal_ramp,
+    read_chirascan_thermal_ramp
 
 )
 
@@ -42,6 +44,8 @@ aunty_file = "./test_files/AUNTY_multi_channel.xlsx"
 
 jasco_file = "./test_files/jasco_thermal_ramp_example.csv"
 jasco_file_f2 = "./test_files/jasco_thermal_ramp_one_wavelength.txt"
+
+chirascan_file = "./test_files/chirascan_thermal_ramp.csv"
 
 def test_get_sheet_names_of_xlsx():
     sheet_names = get_sheet_names_of_xlsx(nDSF_file)
@@ -264,3 +268,19 @@ def test_jasco():
 
     assert len(signal_data_dic['222.0 nm'][0]) == 22
     assert len(temp_data_dic['222.0 nm'][0]) == 22
+
+def test_chirascan_thermal_ramp():
+
+    assert not file_is_chirascan_thermal_ramp(jasco_file)
+    assert file_is_chirascan_thermal_ramp(chirascan_file)
+
+    signal_data_dic, temp_data_dic, conditions, signals = read_chirascan_thermal_ramp(chirascan_file)
+
+    assert signals[0] == '280.0 nm'
+    assert conditions[0] == "chirascan_thermal_ramp.csv"
+
+    assert len(signal_data_dic['280.0 nm'][0]) == 17
+    assert len(temp_data_dic['280.0 nm'][0]) == 17
+
+    assert len(signals) == 86
+

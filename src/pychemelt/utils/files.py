@@ -1396,3 +1396,113 @@ def read_jasco_thermal_ramp_format_2(file):
     temp_data_dic   = {signals[0]: [temperatures]}
 
     return signal_data_dic, temp_data_dic, conditions, signals
+
+def file_is_chirascan_thermal_ramp(cd_file):
+
+    """
+    Find if a file is of type Chirascan thermal ramp.
+
+    Parameters
+    ----------
+    cd_file : str
+        Path to the file
+
+    Returns
+    -------
+    bool
+        True if the file is a Chirascan thermal ramp, False otherwise
+
+    """
+
+    words_to_find = ["circulardichroism", "wavelength", "temperature"]
+
+    with open(cd_file) as f:
+        ls = f.read().splitlines()[:100]
+        # Join the lines into a single string and convert to lowercase for easier searching
+        text = " ".join(ls).lower()
+
+        # Check if all the words are present in the text
+        if all(word in text for word in words_to_find):
+            return True
+
+    return False
+
+def read_chirascan_thermal_ramp(cd_file):
+
+    """
+    Read the CD data from a Chirascan file with a thermal ramp.
+
+    Parameters
+    ----------
+    cd_file : str
+        Path to the Chirascan file.
+
+    Returns
+    -------
+
+    """
+
+    # Open the file for reading
+    with open(cd_file) as f:
+        # Read all lines and split them into a list of lines
+        ls = f.read().splitlines()
+
+        # Find the row index where the numeric data starts (CD spectra)
+        for i, l in enumerate(ls):
+            # Check if the line contains "Wavelength"
+            if "wavelength" in l.lower():
+                # Assuming metadata starts two lines below the line containing "Wavelength"
+                # Get the third row (i+2) and split it by comma to count the number of columns
+                row2 = ls[i + 2].split(",")
+                # Check if the first element of row2 is numeric, which indicates the start of data
+                if row2[0].isnumeric():
+                    # n_cols indicates the number of columns in the data
+                    n_cols = len([x for x in row2 if x])
+                    break
+
+        # Initialize a list to store CD data, one list per row (wavelength)
+        cd_data = []
+        # Initialize an empty list to store wavelengths
+        wavelength = []
+
+        # Extract temperature values from the line after the "Wavelength" line
+        temperature = ls[i + 1].split(",")[1:]
+        temperature = [t for t in temperature if t]
+        # Convert temperature values to a numpy array
+        temperature = np.array(temperature).astype(float)
+
+        # Iterate through the lines containing CD data (starting from row i+2)
+        for i2, l in enumerate(ls[i + 2 :]):
+            # Split the line using comma as the delimiter and remove any empty elements
+            row = l.split(",")
+            row = [x for x in row if x]
+
+            # Check if the row has the correct number of columns (n_cols)
+            if len(row) != n_cols:
+                break
+
+            # Append the wavelength value to the list
+            wavelength.append(float(row[0]))
+
+            # Convert
+            signal_at_wavelength = np.array([parse_number(x) for x in row[1:]])
+
+            cd_data.append(signal_at_wavelength)
+
+        # Convert the list of wavelengths to a numpy array
+        wavelength_data = np.array([str(wl) + " nm" for wl in wavelength])
+
+        signal_data_dic ={}
+        temp_data_dic  = {}
+
+        for cd_signal,wl in zip(cd_data,wavelength_data):
+
+            signal_data_dic[wl] = [cd_signal]
+            temp_data_dic[wl] = [temperature]
+
+        # extract file basename
+        bname = os.path.basename(cd_file)
+
+        conditions = np.array([bname])
+
+    return signal_data_dic, temp_data_dic, conditions, wavelength_data
