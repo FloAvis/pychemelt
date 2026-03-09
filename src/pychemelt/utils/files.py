@@ -185,9 +185,6 @@ def detect_file_type(file):
     if file_extension == 'supr':
         return 'supr'
 
-    if file_extension == 'csv':
-        return 'csv'
-
     if file_extension in ["xlsx", "xls"]:
         # Get file type: DSF or nDSF
         sheet_names = get_sheet_names_of_xlsx(file)
@@ -203,6 +200,22 @@ def detect_file_type(file):
             return 'aunty'
         else:
             return 'prometheus'
+
+    if file_is_jasco_thermal_ramp(file):
+        return "jasco_thermal_ramp"
+
+    if file_is_jasco_thermal_ramp_format_2(file):
+        return "jasco_thermal_ramp_format_2"
+
+    if file_extension == 'csv':
+
+        if file_is_chirascan_thermal_ramp(file):
+
+            return "chirascan_thermal_ramp"
+
+        else:
+
+            return 'csv'
 
     with codecs.open(file, 'r', encoding='utf-8',errors='ignore') as rf:
         ls       = rf.read().splitlines()

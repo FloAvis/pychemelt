@@ -47,6 +47,8 @@ jasco_file_f2 = "./test_files/jasco_thermal_ramp_one_wavelength.txt"
 
 chirascan_file = "./test_files/chirascan_thermal_ramp.csv"
 
+csv_file_3 = "./test_files/two_cols.csv"
+
 def test_get_sheet_names_of_xlsx():
     sheet_names = get_sheet_names_of_xlsx(nDSF_file)
 
@@ -82,7 +84,12 @@ def test_detect_file_type():
     assert detect_file_type(panta_file) == 'panta'
     assert detect_file_type(nDSF_file) == 'prometheus'
     assert detect_file_type(aunty_file) == 'aunty'
-    assert detect_file_type('file.csv') == 'csv'
+
+    assert detect_file_type(jasco_file) == 'jasco_thermal_ramp'
+    assert detect_file_type(jasco_file_f2) == 'jasco_thermal_ramp_format_2'
+    assert detect_file_type(chirascan_file) == 'chirascan_thermal_ramp'
+
+    assert detect_file_type(csv_file_3) == 'csv'
 
 def test_error_on_unknown_file_type():
 

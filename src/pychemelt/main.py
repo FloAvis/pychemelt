@@ -19,7 +19,8 @@ from .utils.files  import (
     load_csv_file,
     load_aunty_xlsx,
     read_jasco_thermal_ramp,
-    read_jasco_thermal_ramp_format_2
+    read_jasco_thermal_ramp_format_2,
+    read_chirascan_thermal_ramp
 
 )
 
@@ -160,7 +161,8 @@ class Sample:
             'csv': load_csv_file,
             'aunty': load_aunty_xlsx,
             'jasco_thermal_ramp': read_jasco_thermal_ramp,
-            'jasco_thermal_ramp_format_2': read_jasco_thermal_ramp_format_2
+            'jasco_thermal_ramp_format_2': read_jasco_thermal_ramp_format_2,
+            'chirascan_thermal_ramp':read_chirascan_thermal_ramp
         }
 
         read_fx = read_fx_map.get(file_type)
