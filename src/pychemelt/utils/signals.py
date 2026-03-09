@@ -474,9 +474,11 @@ def unfolding_curve_tetramer_monomeric_intermediate(
     fu = 1 - fi - fn
 
     dT = shift_temperature_K(T)
-
-    print(bI)
-    print(fi.shape)
+    """if type(bI) is int:
+        print(bI)
+    else:
+        print(bI.shape)
+    print(fi.shape)"""
     S_native = baseline_N_fx(dT, C, p1_N, p2_N, p3_N, p4_N)
     S_unfolded = baseline_U_fx(dT, C, p1_U, p2_U, p3_U, p4_U)
 

@@ -45,6 +45,7 @@ from .utils.fitting import (
     fit_oligomer_unfolding_many_signals,
     fit_oligomer_unfolding_three_states_single_slopes,
     fit_oligomer_unfolding_three_states_shared_slopes_many_signals,
+    fit_oligomer_unfolding_three_states_many_signals,
     evaluate_fitting_and_refit,
     baseline_fx_name_to_req_params
 )
@@ -1769,6 +1770,203 @@ class ThermalOligomer(Sample):
             # 2 parameters corresponding to Tm, dH
             # plus Cp if fitted
             idx_start = 2 + (self.cp_value is None)
+
+            native_factor   = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_N_fx))
+            unfolded_factor = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_U_fx))
+
+            # Add index according to the native baseline polynomial order
+            idx_start += native_factor * self.nr_signals
+            # Add index according to the unfolded baseline polynomial order
+            idx_start += unfolded_factor * self.nr_signals
+
+            for _ in range(5):
+
+                # Sort in ascending order the IDs to exclude
+                scale_factor_exclude_ids = sorted(scale_factor_exclude_ids)
+
+                n_fixed_factors = len(scale_factor_exclude_ids)
+                n_fit_factors = self.nr_olig - n_fixed_factors
+
+                if n_fit_factors == 0:
+                    break
+
+                sf_params = global_fit_params[idx_start:(idx_start + n_fit_factors)]
+
+                idxs_to_remove = []
+                re_fit = False
+
+                # Add dummy variable where we need to skip the index
+                for id in scale_factor_exclude_ids:
+                    sf_params = np.insert(sf_params, id, np.nan)
+
+                for i, sf in enumerate(sf_params):
+
+                    if i in scale_factor_exclude_ids:
+                        continue
+
+                    if 0.995 <= sf <= 1.015:
+                        # Exclude the scale factor from the fit
+                        scale_factor_exclude_ids.append(i)
+                        re_fit = True
+
+                        j1 = np.sum(np.array(scale_factor_exclude_ids) < i)
+                        j2 = len(idxs_to_remove)
+
+                        idxs_to_remove.append(idx_start + i - j1 + j2)
+
+                if not re_fit:
+                    break
+
+                else:
+
+                    for idx in reversed(idxs_to_remove):
+
+                        global_fit_params = np.delete(global_fit_params, idx)
+                        low_bounds = np.delete(low_bounds, idx)
+                        high_bounds = np.delete(high_bounds, idx)
+
+                        del params_names[idx]
+
+                    kwargs['initial_parameters'] = global_fit_params
+                    kwargs['low_bounds'] = low_bounds
+                    kwargs['high_bounds'] = high_bounds
+                    kwargs['scale_factor_exclude_ids'] = scale_factor_exclude_ids
+
+                    global_fit_params, cov, predicted = fit_fx(**kwargs)
+
+        rel_errors = relative_errors(global_fit_params, cov)
+
+        self.params_names = params_names
+        self.p0 = p0
+        self.low_bounds = low_bounds
+        self.high_bounds = high_bounds
+        self.global_fit_params = global_fit_params
+        self.rel_errors = rel_errors
+
+        self.predicted_lst_multiple = re_arrange_predictions(
+            predicted, self.nr_signals, self.nr_olig)
+
+        self.create_params_df()
+        self.create_dg_df()
+
+        self.global_global_global_fit_done = True
+
+        # Obtained the scaled signal too
+        if model_scale_factor:
+
+            # signal scaled hos one sublist per selected signal type
+            signal_scaled = deepcopy(self.signal_lst_multiple)
+            predicted_scaled = deepcopy(self.predicted_lst_multiple)
+
+            for value, param in zip(self.global_fit_params, self.params_names):
+
+                if 'Scale factor' in param:
+
+                    id = int(param.split('(M). ID: ')[-1])
+
+                    for i in range(len(signal_scaled)):
+                        signal_scaled[i][id] /= value
+                        predicted_scaled[i][id] /= value
+
+            self.signal_lst_multiple_scaled = signal_scaled
+            self.predicted_lst_multiple_scaled = predicted_scaled
+
+        return None
+
+    def fit_thermal_unfolding_three_state_global_global_global(
+            self,
+            model_scale_factor=True):
+
+        """
+        Fit the thermal unfolding of the sample using the signal and temperature data
+        We fit all the curves at once, with global thermodynamic parameters, global slopes and global baselines
+        Must be run after fit_thermal_unfolding_global_global
+
+        Parameters
+        ----------
+        model_scale_factor : bool, optional
+            If True, model a scale factor for each oligomer concentration
+
+        Notes
+        -----
+        Updates many global fitting attributes and sets `global_global_global_fit_done` when complete. If
+        `model_scale_factor` is True the method also creates scaled signal attributes:
+        - signal_lst_multiple_scaled, predicted_lst_multiple_scaled
+        """
+
+        # Requires global global fit done
+        if not self.global_global_fit_done:
+            self.fit_thermal_unfolding_global_global()
+
+
+        params_names = self.params_names
+
+        p0 = self.global_fit_params
+        low_bounds = self.low_bounds
+        high_bounds = self.high_bounds
+
+        n_datasets = self.nr_olig * self.nr_signals
+
+
+
+        # If required, include a scale factor for each oligomer concentration
+        if model_scale_factor:
+            # The last oligomer concentration is fixed to 1, the rest are fitted
+            scale_factors = [1 for _ in range(self.nr_olig - 1)]
+            scale_factors_low = [0.5882 for _ in range(self.nr_olig - 1)]
+            scale_factors_high = [1.7 for _ in range(self.nr_olig - 1)]
+
+            p0 = np.concatenate([p0, scale_factors])
+            low_bounds = np.concatenate([low_bounds, scale_factors_low])
+            high_bounds = np.concatenate([high_bounds, scale_factors_high])
+
+            params_names += ['Scale factor - ' + str(d) + ' (M). ID: ' + str(i) for
+                             i, d in enumerate(self.oligomer_concentrations)]
+
+            params_names.pop()  # Remove the last one, as it is fixed to 1
+
+        scale_factor_exclude_ids = [self.nr_olig - 1] if model_scale_factor else []
+
+        signal_fx = map_three_state_model_to_signal_fx(self.model)
+
+        # Do a prefit with a reduced dataset
+        kwargs = {
+            'list_of_temperatures' : self.temp_lst_expanded_subset,
+            'list_of_signals' : self.signal_lst_expanded_subset,
+            'signal_ids' : self.signal_ids,
+            'oligomer_concentrations': self.oligomer_concentrations_expanded,
+            'initial_parameters': p0,
+            'low_bounds': low_bounds,
+            'high_bounds': high_bounds,
+            'model_scale_factor':model_scale_factor,
+            'scale_factor_exclude_ids':scale_factor_exclude_ids,
+            'signal_fx' : signal_fx,
+            'baseline_native_fx' : self.baseline_N_fx,
+            'baseline_unfolded_fx' : self.baseline_U_fx,
+        }
+
+        fit_fx = fit_oligomer_unfolding_three_states_many_signals
+
+        if self.pre_fit:
+
+            global_fit_params, cov, predicted = fit_fx(**kwargs)
+
+            # Assign the fitted parameters to the initial guess for the full dataset
+            p0 = global_fit_params
+
+            # End of prefit with reduced dataset
+
+        # Use the whole dataset
+        kwargs['list_of_signals'] = self.signal_lst_expanded
+        kwargs['list_of_temperatures'] = self.temp_lst_expanded
+
+        global_fit_params, cov, predicted = fit_fx(**kwargs)
+
+        # Remove scale factors that are not significant
+        if model_scale_factor:
+
+            # 4 parameters corresponding to Tm, dH
+            idx_start = 4
 
             native_factor   = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_N_fx))
             unfolded_factor = 2+np.sum(baseline_fx_name_to_req_params(self.baseline_U_fx))
