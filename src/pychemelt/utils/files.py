@@ -1260,7 +1260,7 @@ def read_jasco_thermal_ramp(file):
         # extract file basename
         bname = os.path.basename(file)
 
-        conditions = np.array([bname])
+        conditions = [bname]
 
     return signal_data_dic, temp_data_dic, conditions, wavelength_data
 
@@ -1403,7 +1403,7 @@ def read_jasco_thermal_ramp_format_2(file):
     # extract file basename
     bname = os.path.basename(file)
 
-    conditions = np.array([bname])
+    conditions = [bname]
 
     signal_data_dic = {signals[0]: [cd_data]}
     temp_data_dic   = {signals[0]: [temperatures]}
@@ -1516,6 +1516,6 @@ def read_chirascan_thermal_ramp(cd_file):
         # extract file basename
         bname = os.path.basename(cd_file)
 
-        conditions = np.array([bname])
+        conditions = [bname]
 
     return signal_data_dic, temp_data_dic, conditions, wavelength_data
