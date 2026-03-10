@@ -42,8 +42,34 @@ __all__ = [
     'oligomer_number',
     'parse_number',
     'are_all_strings_numeric',
-    'is_float'
+    'is_float',
+    'transform_to_list'
 ]
+
+def transform_to_list(element_or_list):
+
+    """
+
+    Parameters
+    ----------
+    element_or_list : bool, str, int, float, list or None
+        The input element or list to be transformed into a list.
+
+    Returns
+    -------
+    list or None
+        A list containing the input element if it is not already a list, or the input list itself if it is already a list. If the input is None, returns None.
+
+    """
+
+    if element_or_list is None or isinstance(element_or_list, list):
+        return element_or_list
+
+    if isinstance(element_or_list, (bool,str,int,float)):
+        return [element_or_list]
+
+    else:
+        raise ValueError(f"Expected a boolean, string, list or None, but got {type(element_or_list)}")
 
 def set_param_bounds(p0,param_names):
     """

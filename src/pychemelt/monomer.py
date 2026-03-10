@@ -25,7 +25,8 @@ from .utils.processing import (
     adjust_value_to_interval,
     re_arrange_params,
     re_arrange_predictions,
-    subset_data
+    subset_data,
+    transform_to_list
 )
 
 from .utils.fitting import (
@@ -96,6 +97,9 @@ class Monomer(Sample):
         - denaturant_concentrations_expanded : flattened numpy array matching expanded signals
         - boolean_lst, normalise_to_global_max, nr_den : control flags/values
         """
+
+        # If boolean_lst is a boolean, convert it to a list of one boolean
+        boolean_lst = transform_to_list(boolean_lst)
 
         if boolean_lst is None:
             self.signal_lst_multiple = self.signal_lst_pre_multiple

@@ -39,7 +39,7 @@ from .utils.processing import (
     guess_Tm_from_derivative,
     clean_conditions_labels,
     subset_signal_by_temperature,
-    estimate_signal_baseline_params
+    estimate_signal_baseline_params, transform_to_list
 )
 
 
@@ -234,8 +234,7 @@ class Sample:
         """
 
         # Convert to list if not isinstance(files, list):
-        if not isinstance(files, list):
-            files = [files]
+        files = transform_to_list(files)
 
         for file in files:
             read_status = self.read_file(file)
@@ -264,8 +263,7 @@ class Sample:
         """
 
         # Convert signal_names to list if it is a string
-        if isinstance(signal_names, str):
-            signal_names = [signal_names]
+        signal_names = transform_to_list(signal_names)
 
         signals = []
         temps = []

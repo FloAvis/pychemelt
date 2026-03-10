@@ -8,7 +8,8 @@ from pychemelt.utils.processing import (
     adjust_value_to_interval,
     parse_number,
     are_all_strings_numeric,
-    is_float
+    is_float,
+    transform_to_list
 )
 
 
@@ -90,3 +91,19 @@ def test_is_float():
     assert is_float('1e-3') == True
 
     assert is_float('not_a_number') == False
+
+def transform_to_list():
+
+    assert transform_to_list("hola") == ["hola"]
+
+    assert transform_to_list([1,2,3]) == [1,2,3]
+
+    assert transform_to_list('string') == ['string']
+
+    # none should be returned as none, not as a list with one element
+    assert transform_to_list(None) == None
+
+    # raise error if input is not string, list, float, int or None
+    with pytest.raises(ValueError):
+        transform_to_list({'key': 'value'})
+

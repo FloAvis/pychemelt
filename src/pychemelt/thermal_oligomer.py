@@ -33,7 +33,8 @@ from .utils.processing import (
     re_arrange_predictions,
     subset_data,
     estimate_signal_baseline_params,
-    oligomer_number
+    oligomer_number,
+    transform_to_list
 )
 
 from .utils.fitting import (
@@ -143,6 +144,9 @@ class ThermalOligomer(Sample):
         - oligomer_concentrations_expanded : flattened numpy array matching expanded signals
         - boolean_lst, normalise_to_global_max, nr_olig : control flags/values
         """
+
+        # If boolean_lst is a boolean, convert it to a list of one boolean
+        boolean_lst = transform_to_list(boolean_lst)
 
         if boolean_lst is None:
             self.signal_lst_multiple = self.signal_lst_pre_multiple
