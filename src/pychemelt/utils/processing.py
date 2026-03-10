@@ -52,17 +52,22 @@ def transform_to_list(element_or_list):
 
     Parameters
     ----------
-    element_or_list : bool, str, int, float, list or None
+    element_or_list : bool, str, int, float, list,  or numpy array
         The input element or list to be transformed into a list.
 
     Returns
     -------
     list or None
-        A list containing the input element if it is not already a list, or the input list itself if it is already a list. If the input is None, returns None.
+        A list containing the input element if it is not already a list, or the input itself if it is None, a numpy array, or a list.
+
+    Raises
+    ------
+    ValueError
+        If the input is not a boolean, string, integer, float, list, numpy array
 
     """
 
-    if element_or_list is None or isinstance(element_or_list, list):
+    if element_or_list is None or isinstance(element_or_list, list) or isinstance(element_or_list, np.ndarray):
         return element_or_list
 
     if isinstance(element_or_list, (bool,str,int,float)):

@@ -10,11 +10,11 @@ def test_load_data_jasco():
 
     assert len(sample.conditions) == 1
 
-    sample.set_denaturant_concentrations()
+    sample.set_denaturant_concentrations(5)
 
     sample.set_signal(sample.signals[0])
 
-    sample.select_conditions()
+    sample.select_conditions(True)
 
     assert sample.signal_lst_multiple is not None
 

@@ -70,6 +70,8 @@ class Monomer(Sample):
         if concentrations is None:
             concentrations = self.conditions
 
+        concentrations = transform_to_list(concentrations)
+
         self.denaturant_concentrations_pre = np.array(concentrations)
 
         return None
