@@ -747,7 +747,7 @@ def load_nanoDSF_xlsx(processed_dsf_file):
     # Change signal name if unfolding curve is present
     for sn in sheet_names:
         include_value = any(
-            [ps in sn and "deriv" not in sn.lower() and "fold" not in sn.lower() for ps in possible_signals])
+            [ps in sn and "deriv" not in sn.lower() for ps in possible_signals])
 
         include.append(include_value)
 
