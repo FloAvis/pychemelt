@@ -896,8 +896,8 @@ def fit_oligomer_unfolding_three_states_single_slopes(
         high_bounds[0] = temperature_to_kelvin(high_bounds[0])
     else:
         initial_parameters[0]= temperature_to_kelvin(t1)
-        low_bounds = initial_parameters[0] - 20
-        high_bounds = initial_parameters[0] + 20
+        low_bounds[0] = initial_parameters[0] - 20
+        high_bounds[0] = initial_parameters[0] + 20
 
     if not t2:
         initial_parameters[2] = temperature_to_kelvin(initial_parameters[2])
@@ -905,8 +905,8 @@ def fit_oligomer_unfolding_three_states_single_slopes(
         high_bounds[2] = temperature_to_kelvin(high_bounds[2])
     else:
         initial_parameters[2]= temperature_to_kelvin(t2)
-        low_bounds = initial_parameters[2] - 20
-        high_bounds = initial_parameters[2] + 20
+        low_bounds[2] = initial_parameters[2] - 20
+        high_bounds[2] = initial_parameters[2] + 20
 
     if dh1:
         initial_parameters[1] = dh1
@@ -1453,8 +1453,8 @@ def fit_oligomer_unfolding_three_states_shared_slopes_many_signals(
         high_bounds[0] = temperature_to_kelvin(high_bounds[0])
     else:
         initial_parameters[0]= temperature_to_kelvin(t1)
-        low_bounds = initial_parameters[0] - 20
-        high_bounds = initial_parameters[0] + 20
+        low_bounds[0] = np.max(initial_parameters[0] - 20, 271)
+        high_bounds[0] = initial_parameters[0] + 20
 
     if not t2:
         initial_parameters[2] = temperature_to_kelvin(initial_parameters[2])
@@ -1462,8 +1462,8 @@ def fit_oligomer_unfolding_three_states_shared_slopes_many_signals(
         high_bounds[2] = temperature_to_kelvin(high_bounds[2])
     else:
         initial_parameters[2]= temperature_to_kelvin(t2)
-        low_bounds = initial_parameters[2] - 20
-        high_bounds = initial_parameters[2] + 20
+        low_bounds[2] = np.max(initial_parameters[2] - 20, 271)
+        high_bounds[2] = initial_parameters[2] + 20
 
     if dh1:
         initial_parameters[1] = dh1
@@ -2038,7 +2038,7 @@ def fit_oligomer_unfolding_three_states_many_signals(
         baseline_native_fx,
         baseline_unfolded_fx,
         model_scale_factor=False,
-        scale_factor_exclude_ids=[],):
+        scale_factor_exclude_ids=[]):
     """
     Fit thermal unfolding curves of oligomers for many signals (optimized variant).
 
@@ -2223,6 +2223,12 @@ def fit_oligomer_unfolding_three_states_many_signals(
 
         return np.concatenate(signal, axis=0)
 
+    for i in range(len(low_bounds)):
+        if low_bounds[i] >= high_bounds[i]:
+            print(i)
+            print(low_bounds[i])
+            print(high_bounds[i])
+
     global_fit_params, cov = curve_fit(
         unfolding, 1.0, all_signal,
         p0=initial_parameters,
@@ -2397,6 +2403,166 @@ def evaluate_need_to_refit(
 
     return re_fit, p0, low_bounds, high_bounds
 
+
+def evaluate_need_to_refit_three_state(
+        global_fit_params,
+        high_bounds,
+        low_bounds,
+        p0,
+        check_dh=True,
+        check_tm=True,
+        threshold=0.05,
+):
+    """
+    Check and expand parameter bounds when fitted parameters are too close to boundaries.
+
+    Parameters
+    ----------
+    global_fit_params : array-like
+        Fitted parameters
+    high_bounds : array-like
+        Upper bounds
+    low_bounds : array-like
+        Lower bounds
+    p0 : array-like
+        Initial guess for parameters
+    check_dh, check_tm : bool, optional
+        Whether to check boundaries for DHms, and Tms respectively
+    threshold : float, optional
+        Threshold to compare if the fitted parameters are too close to the boundaries
+
+    Returns
+    -------
+    re_fit : bool
+        True if a refit is recommended after bounds expansion
+    p0 : array-like
+        Updated initial parameters
+    low_bounds : array-like
+        Updated lower bounds
+    high_bounds : array-like
+        Updated upper bounds
+    """
+
+    # We need to create copies of the arrays, otherwise they will be overwritten
+    global_fit_params = global_fit_params.copy()
+    p0 = p0.copy()
+    high_bounds = high_bounds.copy()
+    low_bounds = low_bounds.copy()
+
+    re_fit = False
+
+    # Check Tms
+
+    # Check Tm1 is valid
+    if global_fit_params[0] < 271:
+        low_bounds[0] = 300
+        p0[0] = 310
+        high_bounds[0] = 380
+        re_fit = True
+
+    # Check the Tm1 boundary - upper
+    tm_diff = high_bounds[0] - global_fit_params[0]
+
+    # Expand the boundary if the Tm is too close to the boundary
+    if tm_diff < 6 and check_tm:
+        high_bounds[0] = global_fit_params[0] + 12
+        p0[0] = global_fit_params[0] + 5
+        re_fit = True
+
+    # Check the Tm1 boundary - lower
+    tm_diff = global_fit_params[0] - low_bounds[0]
+
+    # Expand the boundary if the Tm is too close to the boundary
+    if tm_diff < 6 and check_tm:
+        low_bounds[0] = max(global_fit_params[0] - 12, 271)
+        p0[0] = global_fit_params[0] - 5
+        re_fit = True
+
+    # Check Tm2 is valid
+    if global_fit_params[0] < 271:
+        low_bounds[0] = 300
+        p0[0] = 310
+        high_bounds[0] = 380
+        re_fit = True
+
+    # Check the Tm2 boundary - upper
+    tm_diff = high_bounds[2] - global_fit_params[2]
+
+    # Expand the boundary if the Tm is too close to the boundary
+    if tm_diff < 6 and check_tm:
+        high_bounds[2] = global_fit_params[2] + 12
+        p0[2] = global_fit_params[2] + 5
+        re_fit = True
+
+    # Check the Tm2 boundary - lower
+    tm_diff = global_fit_params[2] - low_bounds[2]
+
+    # Expand the boundary if the Tm is too close to the boundary
+    if tm_diff < 6 and check_tm:
+        low_bounds[2] = max(global_fit_params[2] - 12, 271)
+        p0[2] = global_fit_params[2] - 5
+        re_fit = True
+
+    # Check Tm1 smaller than Tm2
+
+    if global_fit_params[0] > global_fit_params[2]:
+        mid_point = (global_fit_params[0] + global_fit_params[2]) / 2
+
+        p0[0] = mid_point - 10
+        high_bounds[0] = mid_point + 5
+        low_bounds[0] = p0[0] - 12
+
+        p0[2] = mid_point + 10
+        high_bounds[2] = p0[2] + 12
+        low_bounds[2] = mid_point - 5
+
+        re_fit = True
+
+    # Check DHs
+
+    # Check the Dh1 boundary
+    dh_diff = high_bounds[1] - global_fit_params[1]
+    # Expand the boundary if the Dh is too close to the boundary
+    if dh_diff < 20 and check_dh:
+        high_bounds[1] = global_fit_params[1] + 80
+        p0[1] = global_fit_params[1] + 50
+        re_fit = True
+
+    # Check the Dh2 boundary
+    dh_diff = high_bounds[3] - global_fit_params[3]
+    # Expand the boundary if the Dh is too close to the boundary
+    if dh_diff < 20 and check_dh:
+        high_bounds[3] = global_fit_params[3] + 80
+        p0[3] = global_fit_params[3] + 50
+        re_fit = True
+
+    id_start = 4
+
+
+    difference_to_upper = np.array([np.abs((a - b) / a) if a != np.inf and a != 0 else np.inf for a, b in
+                                    zip(high_bounds[id_start:], global_fit_params[id_start:])])
+    difference_to_lower = np.array([np.abs((a - b) / a) if b != -np.inf and a != 0 else np.inf for a, b in
+                                    zip(global_fit_params[id_start:], low_bounds[id_start:])])
+
+    # Evaluate all the other parameters
+    for i in (range(len(global_fit_params) - id_start)):
+
+        diff_to_high_i = difference_to_upper[i]
+        diff_to_low_i = difference_to_lower[i]
+
+        if diff_to_high_i < threshold:
+            value = high_bounds[i + id_start]
+
+            high_bounds[i + id_start] = value * 50 if value > 0 else value / 50
+            re_fit = True
+
+        if diff_to_low_i < threshold:
+            value = low_bounds[i + id_start]
+            low_bounds[i + id_start] = value * 50 if value < 0 else value / 50
+            re_fit = True
+
+    return re_fit, p0, low_bounds, high_bounds
+
 def evaluate_fitting_and_refit(
         global_fit_params,
         cov,
@@ -2413,7 +2579,8 @@ def evaluate_fitting_and_refit(
         fit_fx,
         n = 3,
         threshold=0.05,
-        fit_m_value=True,):
+        fit_m_value=True,
+        three_state_model=False,):
 
     """
     Evaluate if the fitted parameters are too close to the fitting boundaries.
@@ -2453,6 +2620,8 @@ def evaluate_fitting_and_refit(
         Threshold to compare if the fitted parameters are too close to the boundaries
     fit_m_value : bool, optional
         Whether m0 (m-value) is fitted (not in oligomeric models)
+    three_state_model : bool, optional
+        If a three state model is used different parameters are fitted
 
     Returns
     -------
@@ -2471,20 +2640,31 @@ def evaluate_fitting_and_refit(
     """
 
     for _ in range(n):
+        if three_state_model:
+            re_fit, p0_new, low_bounds_new, high_bounds_new = evaluate_need_to_refit_three_state(
+                global_fit_params,
+                high_bounds,
+                low_bounds,
+                p0,
+                check_dh=not limited_dh,
+                check_tm=not limited_tm,
+                threshold=threshold,
+            )
 
-        re_fit, p0_new, low_bounds_new, high_bounds_new = evaluate_need_to_refit(
-            global_fit_params,
-            high_bounds,
-            low_bounds,
-            p0,
-            fit_m1=fit_m_dep,
-            check_cp=not limited_cp,
-            check_dh=not limited_dh,
-            check_tm=not limited_tm,
-            fixed_cp=fixed_cp,
-            threshold=threshold,
-            fit_m0=fit_m_value,
-        )
+        else:
+            re_fit, p0_new, low_bounds_new, high_bounds_new = evaluate_need_to_refit(
+                global_fit_params,
+                high_bounds,
+                low_bounds,
+                p0,
+                fit_m1=fit_m_dep,
+                check_cp=not limited_cp,
+                check_dh=not limited_dh,
+                check_tm=not limited_tm,
+                fixed_cp=fixed_cp,
+                threshold=threshold,
+                fit_m0=fit_m_value,
+            )
 
         if re_fit:
 

@@ -781,9 +781,7 @@ def test_fit_monomer_unfolding_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline, 
-        'fit_native_olig_slope' : False,
-        'fit_unfolded_olig_slope' : False,
+        'baseline_unfolded_fx': constant_baseline,
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_many_signals(
@@ -866,9 +864,7 @@ def test_fit_dimer_unfolding_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline, 
-        'fit_native_olig_slope': False,
-        'fit_unfolded_olig_slope': False,
+        'baseline_unfolded_fx': constant_baseline,
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_many_signals(
@@ -951,9 +947,7 @@ def test_fit_trimer_unfolding_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline, 
-        'fit_native_olig_slope': False,
-        'fit_unfolded_olig_slope': False,
+        'baseline_unfolded_fx': constant_baseline,
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_many_signals(
@@ -1035,9 +1029,7 @@ def test_fit_tetramer_unfolding_many_signals_constant():
         'oligomer_concentrations': concs,
         'signal_fx': signal_fx,
         'baseline_native_fx': constant_baseline,
-        'baseline_unfolded_fx': constant_baseline, 
-        'fit_native_olig_slope': False,
-        'fit_unfolded_olig_slope': False,
+        'baseline_unfolded_fx': constant_baseline,
     }
 
     global_fit_params, cov, predicted_lst = fit_oligomer_unfolding_many_signals(

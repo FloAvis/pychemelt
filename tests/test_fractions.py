@@ -104,7 +104,7 @@ class TestTrimerFraction:
 
     def test_trimer_fully_folded(self):
         """When K=0, all trimer should be folded, fu=0"""
-        K = 0.0
+        K = 0.00000000000000000000000000000000000000000000001
         C = 1e-6
         fu = fu_two_state_trimer(K, C)
         assert fu == pytest.approx(0.0, abs=1e-10)

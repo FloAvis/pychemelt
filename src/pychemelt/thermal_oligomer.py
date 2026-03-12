@@ -5,7 +5,6 @@ The current model assumes the proteins' unfolding is reversible
 
 import pandas as pd
 import numpy as np
-from warnings import warn
 
 from itertools import chain
 from copy import deepcopy
@@ -20,7 +19,6 @@ from .utils.signals import (
 from .utils.math import (
     temperature_to_kelvin,
     relative_errors,
-    shift_temperature,
     constant_baseline,
     linear_baseline,
     quadratic_baseline,
@@ -39,7 +37,6 @@ from .utils.processing import (
 )
 
 from .utils.fitting import (
-    fit_line_robust,
     fit_oligomer_unfolding_single_slopes,
     fit_oligomer_unfolding_shared_slopes_many_signals,
     fit_oligomer_unfolding_many_signals,
@@ -296,19 +293,27 @@ class ThermalOligomer(Sample):
         self.third_param_Ns_per_signal = []
         self.third_param_Us_per_signal = []
 
-        # If the sample is oligomeric, we need to correct the signal for the concentrations of the oligomer
-        if self.oligomeric:
+        # If normalised signal baseline signal needs to be normalised relatively to concentration
+        if self.normalise_to_global_max:
+
+            # normalised concentration difference for normalised signal
+            norm_conc = [x / max(self.oligomer_concentrations) for x in self.oligomer_concentrations]
+
+            oligomer_concentrations = np.repeat(norm_conc,
+                                                np.array(self.signal_lst_multiple).shape[-1])
+            oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
+
+        else:
             oligomer_concentrations = np.repeat(self.oligomer_concentrations,
                                                 np.array(self.signal_lst_multiple).shape[-1])
             oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
 
         for i in range(len(self.signal_lst_multiple)):
 
-            if self.oligomeric:
-                adjusted_signal_lst_multiple = list(np.array(self.signal_lst_multiple[i])/ np.array(oligomer_concentrations))
+            adjusted_signal_lst_multiple = list(np.array(self.signal_lst_multiple[i])/ np.array(oligomer_concentrations))
 
             p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us = estimate_signal_baseline_params(
-                self.signal_lst_multiple[i] if not self.oligomeric else adjusted_signal_lst_multiple,
+                adjusted_signal_lst_multiple if not self.normalise_to_global_max else self.signal_lst_multiple[i],
                 self.temp_lst_multiple[i],
                 native_baseline_type,
                 unfolded_baseline_type,
@@ -316,6 +321,11 @@ class ThermalOligomer(Sample):
                 window_range_unfolded,
                 oligomer_number(self.model)
             )
+
+            if self.normalise_to_global_max:
+                p1Ns = np.array(p1Ns) / self.oligomer_concentrations
+                p1Us = np.array(p1Us) / self.oligomer_concentrations
+
 
             self.first_param_Ns_per_signal.append(p1Ns)
             self.first_param_Us_per_signal.append(p1Us)
@@ -626,24 +636,6 @@ class ThermalOligomer(Sample):
             fit_m_value=False,
         )
 
-
-        # If the fitting returns a large error it is recommended to turn off the CP0 value fitting
-        error = np.nansum((np.array(predicted) - np.array(self.signal_lst_expanded)) ** 2)
-        if self.normalise_to_global_max:
-            if error > 10000:
-                warn('The fitted signal deviates heavily from the experimental data in the global fit. '
-                     'Consider not fitting the CP0 value by setting "cp_value=0" in the fit_thermal_unfolding_global() function')
-        else:
-            flat = list(chain.from_iterable(chain.from_iterable(self.signal_lst_multiple)))
-            global_max = np.max(flat)  # Global maximum across all signals
-
-            error = error / global_max * 100 if not self.normalise_to_global_max else error
-
-            if error > 10:
-                warn('The fitted signal deviates heavily from the experimental data in the global fit. '
-                     'Consider not fitting the CP0 value by setting "cp_value=0" in the fit_thermal_unfolding_global() function')
-                
-              
         rel_errors = relative_errors(global_fit_params, cov)
 
         self.p0 = p0
@@ -677,16 +669,12 @@ class ThermalOligomer(Sample):
 
         Parameters
         ----------
-        cp_limits : list, optional
-            List of two values, the lower and upper bounds for the Cp value. If None, bounds set automatically
         dh_limits : list of lists, optional
             List of two lists with two values each, the lower and upper bounds for the dH values.
             If None, bounds set automatically
         tm_limits : list of lists, optional
             List of two lists with two values each, the lower and upper bounds for the Tm values.
             If None, bounds set automatically
-        cp_value : float, optional
-            If provided, the Cp value is fixed to this value, the bounds are ignored
 
         Notes
         -----
@@ -820,10 +808,10 @@ class ThermalOligomer(Sample):
 
         else:
 
-            tm1_lower = p0[0] - 12
+            tm1_lower = np.max([p0[0] - 12, 0])
             tm1_upper = np.max([self.user_max_temp + 20, p0[0] + 10])
 
-            tm2_lower = p0[2] - 12
+            tm2_lower = np.max([p0[2] - 12, 0])
             tm2_upper = np.max([self.user_max_temp + 20, p0[2] + 10])
 
         low_bounds[0] = tm1_lower
@@ -865,11 +853,11 @@ class ThermalOligomer(Sample):
         signal_fx = map_three_state_model_to_signal_fx(self.model)
 
         if t1_init != 0:
-            p0[0], low_bounds[0], high_bounds[0] = t1_init, t1_init - 15, t1_init + 15
-            p0[2], low_bounds[2] = t1_init + 5, t1_init - 15
+            p0[0], low_bounds[0], high_bounds[0] = t1_init, np.max([t1_init - 15, 0]), t1_init + 15
+            p0[2], low_bounds[2] = t1_init + 5, np.max([t1_init - 15, 0])
 
         if t2_init != 0:
-            p0[2], low_bounds[2], high_bounds[2] = t2_init, t2_init - 15, t2_init + 15
+            p0[2], low_bounds[2], high_bounds[2] = t2_init, np.max([t2_init - 15, 0]), t2_init + 15
 
         kwargs = {
             'oligomer_concentrations': self.oligomer_concentrations_expanded,
@@ -964,6 +952,8 @@ class ThermalOligomer(Sample):
         kwargs['list_of_temperatures'] = self.temp_lst_expanded
         kwargs['list_of_signals'] = self.signal_lst_expanded
 
+        global_fit_params, cov, predicted = fit_fx(**kwargs)
+
         global_fit_params, cov, predicted, p0, low_bounds, high_bounds = evaluate_fitting_and_refit(
             global_fit_params,
             cov,
@@ -978,6 +968,7 @@ class ThermalOligomer(Sample):
             self.fixed_cp,
             kwargs,
             fit_fx,
+            three_state_model=True,
         )
 
         rel_errors = relative_errors(global_fit_params, cov)
@@ -1380,6 +1371,7 @@ class ThermalOligomer(Sample):
             kwargs,
             fit_fx,
             fit_m_value=False,
+            three_state_model=True,
         )
 
         rel_errors = relative_errors(global_fit_params, cov)
@@ -1449,9 +1441,8 @@ class ThermalOligomer(Sample):
         p1Ns_low_bounds = [p1N / 100 if p1N > 0 else 100 * p1N for p1N in p1Ns]
         p1Us_low_bounds = [p1U / 100 if p1U > 0 else 100 * p1U for p1U in p1Us]
 
-        p1Ns_high_bounds = [p1N * 100 if p1N > 0 else 100 / p1N for p1N in p1Ns]
-        p1Us_high_bounds = [p1U * 100 if p1U > 0 else 100 / p1U for p1U in p1Us]
-
+        p1Ns_high_bounds = [p1N * 100 if p1N > 0 else p1N / 100 for p1N in p1Ns]
+        p1Us_high_bounds = [p1U * 100 if p1U > 0 else p1U / 100 for p1U in p1Us]
 
         idx = param_init + 2 * n_datasets
 
@@ -1582,7 +1573,6 @@ class ThermalOligomer(Sample):
         # Use the whole dataset
         kwargs['list_of_signals'] = self.signal_lst_expanded
         kwargs['list_of_temperatures'] = self.temp_lst_expanded
-
         global_fit_params, cov, predicted = fit_fx(**kwargs)
 
         # Remove scale factors that are not significant
@@ -1717,7 +1707,7 @@ class ThermalOligomer(Sample):
 
         # Requires global global fit done
         if not self.global_global_fit_done:
-            self.fit_thermal_unfolding_global_global()
+            self.fit_thermal_unfolding_three_state_global_global()
 
         param_init = 4
 
@@ -1745,10 +1735,10 @@ class ThermalOligomer(Sample):
         p1Us_low_bounds = [p1U / 100 if p1U > 0 else 100 * p1U for p1U in p1Us]
         intermediate_baselines_low_bounds = [intermediate_baseline / 100 if intermediate_baseline > 0 else 100 * intermediate_baseline for intermediate_baseline in intermediate_baselines]
 
-        p1Ns_high_bounds = [p1N * 100 if p1N > 0 else 100 / p1N for p1N in p1Ns]
-        p1Us_high_bounds = [p1U * 100 if p1U > 0 else 100 / p1U for p1U in p1Us]
+        p1Ns_high_bounds = [p1N * 100 if p1N > 0 else p1N / 100 for p1N in p1Ns]
+        p1Us_high_bounds = [p1U * 100 if p1U > 0 else p1U / 100 for p1U in p1Us]
         intermediate_baselines_high_bounds = [
-            intermediate_baseline * 100 if intermediate_baseline > 0 else 100 / intermediate_baseline for
+            intermediate_baseline * 100 if intermediate_baseline > 0 else intermediate_baseline / 100 for
             intermediate_baseline in intermediate_baselines]
 
         idx = param_init + 3 * n_datasets

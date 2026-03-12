@@ -146,6 +146,15 @@ def test_set_model():
 
     pytest.raises(ValueError, sample.set_model, "test_false")
 
+    sample.set_model("Monomer", "monomeric")
+    assert sample.model == "Monomer_monomeric_intermediate"
+
+    sample.set_model("dimer", "Dimeric")
+    assert sample.model == "Dimer_dimeric_intermediate"
+
+    pytest.raises(ValueError, sample.set_model, "Monomer", "test_fail")
+
+    pytest.raises(ValueError, sample.set_model, "Monomer", "dimeric")
 
 def test_set_concentrations():
 
@@ -217,9 +226,6 @@ def test_fit_thermal_unfolding_global_global_global_scaling():
 
     for i, C in enumerate(scale_concs):
         y = signal_fx(temp_range_K, C, **def_params)
-
-        # Concentration dependent scaling
-        y = y * C
 
         # Add gaussian error to simulated signal
         y += rng.normal(0, 0.02, len(y))
@@ -315,7 +321,7 @@ def test_fit_thermal_unfolding_global_global_global_monomer():
 
     monomer_sim.fit_thermal_unfolding_global_global_global(model_scale_factor=True)
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[[0, 1, 2, 3, 4, 5, 6, 9], 1], expected, rtol=0.2, atol=1.5)
+    np.testing.assert_allclose(monomer_sim.params_df.iloc[[0, 1, 2, 3, 4, 5, 6, 7], 1], expected, rtol=0.2, atol=1.5)
 
 # Testing Dimer model
 def_params['dHm'] = def_params['dHm'] + DHm_INCREASE
@@ -371,7 +377,7 @@ def test_fit_thermal_unfolding_global_global_global_dimer():
 
     dimer_sim.fit_thermal_unfolding_global_global_global(model_scale_factor=True)
 
-    np.testing.assert_allclose(dimer_sim.params_df.iloc[[0, 1, 2, 3, 4, 5, 6, 9], 1], expected, rtol=0.2, atol=1.5)
+    np.testing.assert_allclose(dimer_sim.params_df.iloc[[0, 1, 2, 3, 4, 5, 6, 7], 1], expected, rtol=0.2, atol=1.5)
 
 
 # Testing Trimer model
@@ -428,7 +434,7 @@ def test_fit_thermal_unfolding_global_global_global_trimer():
 
     trimer_sim.fit_thermal_unfolding_global_global_global(model_scale_factor=True)
 
-    np.testing.assert_allclose(trimer_sim.params_df.iloc[[0, 1, 2, 3, 4, 5, 6, 9], 1], expected, rtol=0.2, atol=1.5)
+    np.testing.assert_allclose(trimer_sim.params_df.iloc[[0, 1, 2, 3, 4, 5, 6, 7], 1], expected, rtol=0.2, atol=1.5)
 
 
 # Testing Tetramer model
@@ -485,7 +491,7 @@ def test_fit_thermal_unfolding_global_global_global_tetramer():
 
     tetramer_sim.fit_thermal_unfolding_global_global_global(model_scale_factor=True)
 
-    np.testing.assert_allclose(tetramer_sim.params_df.iloc[[0, 1, 2, 3, 4, 5, 6, 9], 1], expected, rtol=0.2, atol=1.5)
+    np.testing.assert_allclose(tetramer_sim.params_df.iloc[[0, 1, 2, 3, 4, 5, 6, 7], 1], expected, rtol=0.2, atol=1.5)
 
 # generating failing fit
 

@@ -129,6 +129,29 @@ def fi_three_state_tetramer_monomeric_intermediate(K1,K2,Ct):
     and the concentration of tetramer equivalent Ct, return the fraction of intermediate
     '''
     Pt = Ct*4
+    """
+    A = 4 * (Pt ** 3) / K1
+    D = 1 + K2
+    E = -1
+
+    b = D / A
+    c = E / A
+
+    P = -c
+    Q = -np.square(b) / 8
+
+    R = -Q / 2 + np.sqrt(np.square(Q) / 4 + P ** 3 / 27)
+
+    U = np.cbrt(R)
+    y = U - P / (3 * U)
+    W = np.sqrt(2 * y)
+
+    x4 = 0.5 * (-W + np.sqrt(-(2 * y - 2 * b / W)))
+
+    x4_sel = np.logical_and(np.logical_and(np.greater(x4, 0), np.less(x4, 1.01)), np.less(W, 1e10))
+
+    fi = x4_sel * np.nan_to_num(x4, nan=0.0)
+    """
 
     tol = 1e-10 # tolerance for the Newton-Raphson method
     max_iter = 50
@@ -144,9 +167,9 @@ def fi_three_state_tetramer_monomeric_intermediate(K1,K2,Ct):
         if np.mean(abs(f_new - f)) < tol:
             return f_new
 
-        f = f_new
+        fi = f_new
 
-    return f
+    return fi
 
 def fi_three_state_dimer_monomeric_intermediate(K1,K2,C):
     '''
