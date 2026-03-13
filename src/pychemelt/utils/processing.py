@@ -400,7 +400,7 @@ def estimate_signal_baseline_params(
         temp_denat = shift_temperature(temp_denat)
 
         # Correct signal for oligomeric influence
-        signal_denat = signal_denat / oligomer_number #if not self.normalise_to_global_max else signal_denat
+        signal_denat = signal_denat / oligomer_number
 
         if native_baseline_type == 'constant':
 
@@ -710,11 +710,11 @@ def oligomer_number(model):
             The number of subunits (2 for 'Dimer', 3 for 'Trimer',
             4 for 'Tetramer', 1 otherwise).
         """
-        if model == 'Dimer':
+        if model in ['Dimer', 'Dimer_monomeric_intermediate', 'Dimer_dimeric_intermediate']:
             return 2
-        elif model == 'Trimer':
+        elif model in ['Trimer','Trimer_monomeric_intermediate', 'Trimer_trimeric_intermediate']:
             return 3
-        elif model == 'Tetramer':
+        elif model in ['Tetramer', 'Tetramer_monomeric_intermediate']:
             return 4
         else:
             return 1

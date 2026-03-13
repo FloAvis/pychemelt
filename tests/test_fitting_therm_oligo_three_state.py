@@ -10,6 +10,7 @@ from pychemelt.utils.fitting import (
     fit_oligomer_unfolding_three_states_single_slopes,
     fit_oligomer_unfolding_three_states_shared_slopes_many_signals,
     fit_oligomer_unfolding_three_states_many_signals,
+    evaluate_need_to_refit_three_state
 )
 
 from pychemelt.utils.math import constant_baseline
@@ -1464,3 +1465,57 @@ def test_fit_trimer_trimeric_unfolding_three_states_many_signals_constant():
     expected = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2]
 
     np.testing.assert_allclose(global_fit_params[:4], expected, rtol=0.1, atol=0)
+
+def test_refit_three_state_model_constant():
+
+    p0 = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [
+        INTERCEPT_I] * len(concs)
+    low_bounds = [TEMP_START, DHm_VAL_1 - 100, TEMP_START, DHm_VAL_2 - 100] + [1e-5] * (3 * len(concs))
+    high_bounds = [TEMP_STOP, DHm_VAL_1 + 100, TEMP_STOP, DHm_VAL_2 + 100] + [1e3] * (3 * len(concs))
+
+    global_fit_params = p0.copy()
+
+    global_fit_params[0] = -5
+    global_fit_params[2] = -5
+
+    low_bounds[1] = DHm_VAL_1 - 5
+    high_bounds[1] = DHm_VAL_1 + 5
+
+    low_bounds[3] = DHm_VAL_2 - 5
+    high_bounds[3] = DHm_VAL_2 + 5
+
+    re_fit, _, _, _ = evaluate_need_to_refit_three_state(
+        global_fit_params,
+        high_bounds,
+        low_bounds,
+        p0,
+        check_dh=True,
+        check_tm=True,
+    )
+
+    assert re_fit == True
+
+    low_bounds = [TEMP_START, DHm_VAL_1 - 100, TEMP_START, DHm_VAL_2 - 100] + [1e-5] * (3 * len(concs))
+    high_bounds = [TEMP_STOP, DHm_VAL_1 + 100, TEMP_STOP, DHm_VAL_2 + 100] + [1e3] * (3 * len(concs))
+
+    global_fit_params = p0.copy()
+
+    global_fit_params[0] = 80
+    global_fit_params[2] = 60
+
+    low_bounds[0] = 80 - 5
+    high_bounds[0] = 80 + 5
+
+    low_bounds[2] = 60 - 5
+    high_bounds[2] = 60 + 5
+
+    re_fit, _, _, _ = evaluate_need_to_refit_three_state(
+        global_fit_params,
+        high_bounds,
+        low_bounds,
+        p0,
+        check_dh=True,
+        check_tm=True,
+    )
+
+    assert re_fit == True

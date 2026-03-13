@@ -1453,7 +1453,7 @@ def fit_oligomer_unfolding_three_states_shared_slopes_many_signals(
         high_bounds[0] = temperature_to_kelvin(high_bounds[0])
     else:
         initial_parameters[0]= temperature_to_kelvin(t1)
-        low_bounds[0] = np.max(initial_parameters[0] - 20, 271)
+        low_bounds[0] = np.max([initial_parameters[0] - 20, 271])
         high_bounds[0] = initial_parameters[0] + 20
 
     if not t2:
@@ -1462,7 +1462,7 @@ def fit_oligomer_unfolding_three_states_shared_slopes_many_signals(
         high_bounds[2] = temperature_to_kelvin(high_bounds[2])
     else:
         initial_parameters[2]= temperature_to_kelvin(t2)
-        low_bounds[2] = np.max(initial_parameters[2] - 20, 271)
+        low_bounds[2] = np.max([initial_parameters[2] - 20, 271])
         high_bounds[2] = initial_parameters[2] + 20
 
     if dh1:
@@ -2223,11 +2223,6 @@ def fit_oligomer_unfolding_three_states_many_signals(
 
         return np.concatenate(signal, axis=0)
 
-    for i in range(len(low_bounds)):
-        if low_bounds[i] >= high_bounds[i]:
-            print(i)
-            print(low_bounds[i])
-            print(high_bounds[i])
 
     global_fit_params, cov = curve_fit(
         unfolding, 1.0, all_signal,
@@ -2414,7 +2409,7 @@ def evaluate_need_to_refit_three_state(
         threshold=0.05,
 ):
     """
-    Check and expand parameter bounds when fitted parameters are too close to boundaries.
+    Check and expand parameter bounds when fitted parameters are too close to boundaries or if T1 is smaller than T2
 
     Parameters
     ----------
@@ -2454,10 +2449,10 @@ def evaluate_need_to_refit_three_state(
     # Check Tms
 
     # Check Tm1 is valid
-    if global_fit_params[0] < 271:
-        low_bounds[0] = 300
-        p0[0] = 310
-        high_bounds[0] = 380
+    if global_fit_params[0] < 0:
+        low_bounds[0] = 20
+        p0[0] = 30
+        high_bounds[0] = 90
         re_fit = True
 
     # Check the Tm1 boundary - upper
@@ -2479,10 +2474,10 @@ def evaluate_need_to_refit_three_state(
         re_fit = True
 
     # Check Tm2 is valid
-    if global_fit_params[0] < 271:
-        low_bounds[0] = 300
-        p0[0] = 310
-        high_bounds[0] = 380
+    if global_fit_params[2] < 0:
+        low_bounds[2] = 20
+        p0[2] = 30
+        high_bounds[2] = 380
         re_fit = True
 
     # Check the Tm2 boundary - upper

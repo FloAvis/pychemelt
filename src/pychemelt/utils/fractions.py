@@ -128,8 +128,9 @@ def fi_three_state_tetramer_monomeric_intermediate(K1,K2,Ct):
     Given the equilibrium constant K1, of N4 <-> 4I, K2, of I <-> U,
     and the concentration of tetramer equivalent Ct, return the fraction of intermediate
     '''
+
     Pt = Ct*4
-    """
+
     A = 4 * (Pt ** 3) / K1
     D = 1 + K2
     E = -1
@@ -151,23 +152,6 @@ def fi_three_state_tetramer_monomeric_intermediate(K1,K2,Ct):
     x4_sel = np.logical_and(np.logical_and(np.greater(x4, 0), np.less(x4, 1.01)), np.less(W, 1e10))
 
     fi = x4_sel * np.nan_to_num(x4, nan=0.0)
-    """
-
-    tol = 1e-10 # tolerance for the Newton-Raphson method
-    max_iter = 50
-
-    f = 1 / (K2 + 1)  # initial guess
-
-    for i in range(max_iter):
-        g = (4 * Pt ** 3 / K1) * f ** 4 + (K2 + 1) * f - 1
-        gp = (16 * Pt ** 3 / K1) * f ** 3 + (K2 + 1)
-
-        f_new = f - g / gp
-
-        if np.mean(abs(f_new - f)) < tol:
-            return f_new
-
-        fi = f_new
 
     return fi
 

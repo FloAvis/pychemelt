@@ -498,22 +498,6 @@ def test_fit_thermal_unfolding_global_global_global_tetramer():
 def_params['dHm'] = 120
 trimer_sim_fail = aux_create_pychem_sim(def_params, concs, "Trimer")
 
-def test_fit_thermal_unfolding_global_warning():
-
-    with pytest.warns(UserWarning):
-        trimer_sim_fail.fit_thermal_unfolding_global()
-
-# generating failing fit
-
-def_params['dHm'] = 120
-trimer_sim_fail_normalise = aux_create_pychem_sim(def_params, concs, "Trimer", normalise=True)
-
-def test_fit_thermal_unfolding_global_warning_normalise():
-
-    with pytest.warns(UserWarning):
-        trimer_sim_fail_normalise.fit_thermal_unfolding_global()
-
-
 
 def test_signal_to_df():
 

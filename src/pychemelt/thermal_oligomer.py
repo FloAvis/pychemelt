@@ -700,28 +700,12 @@ class ThermalOligomer(Sample):
         self.limited_cp = False
 
 
-        # Get Guess of Tm:
-
-        tm_lst = []
-
-        x1 = 6
-        x2 = 11
-
         if not hasattr(self, "deriv_lst_multiple"):
             self.estimate_derivative()
 
-        for i in range(len(self.signal_lst_multiple)):
-            tm_lst.append(guess_Tm_from_derivative(
-                self.temp_deriv_lst_multiple[i],
-                self.deriv_lst_multiple[i],
-                x1,
-                x2
-            ))
 
-        Tm1 = np.average(tm_lst) - 10
-        Tm2 = np.average(tm_lst) + 10
-
-        p0 = [Tm1, 200, Tm2, 200]
+        # Parameters for T1, dH1, T2, dH2 will be added later via gridsearch
+        p0 = [0, 250, 0, 250]
 
         params_names = [
             'Tm1 (°C)',
@@ -808,11 +792,11 @@ class ThermalOligomer(Sample):
 
         else:
 
-            tm1_lower = np.max([p0[0] - 12, 0])
-            tm1_upper = np.max([self.user_max_temp + 20, p0[0] + 10])
+            tm1_lower = 15
+            tm1_upper = self.user_max_temp + 20
 
-            tm2_lower = np.max([p0[2] - 12, 0])
-            tm2_upper = np.max([self.user_max_temp + 20, p0[2] + 10])
+            tm2_lower = 15
+            tm2_upper = self.user_max_temp + 20
 
         low_bounds[0] = tm1_lower
         high_bounds[0] = tm1_upper
@@ -853,11 +837,10 @@ class ThermalOligomer(Sample):
         signal_fx = map_three_state_model_to_signal_fx(self.model)
 
         if t1_init != 0:
-            p0[0], low_bounds[0], high_bounds[0] = t1_init, np.max([t1_init - 15, 0]), t1_init + 15
-            p0[2], low_bounds[2] = t1_init + 5, np.max([t1_init - 15, 0])
+            p0[0], low_bounds[0], high_bounds[0] = t1_init, np.max([t1_init - 20, 0]), t1_init + 20
 
         if t2_init != 0:
-            p0[2], low_bounds[2], high_bounds[2] = t2_init, np.max([t2_init - 15, 0]), t2_init + 15
+            p0[2], low_bounds[2], high_bounds[2] = t2_init, np.max([t2_init - 20, 0]), t2_init + 20
 
         kwargs = {
             'oligomer_concentrations': self.oligomer_concentrations_expanded,
@@ -880,27 +863,28 @@ class ThermalOligomer(Sample):
         if num_rows > 4:
             step += 2
 
-        """
-        # TODO: Figure out why this gridsearch destroys curve fitting
-        if t1_init == 0 and t2_init == 0:
+        if t1_init == 0 or t2_init == 0:
 
-            test_T1s = np.arange(np.max([self.global_min_temp + 10, 20]), self.global_max_temp - 25, step)
-            test_T2s = np.arange(np.max([self.global_min_temp + 10, 20]) + step, self.global_max_temp + 5, step)
+            if self.limited_tm:
+                test_T1s = np.arange(np.max([tm1_lower, 20]), tm1_upper, step)
+                test_T2s = np.arange(np.max([tm2_lower, 20]) + step, tm2_upper, step)
 
-            if 'trimer' in self.model:
-                test_T1s = test_T1s + 10
-                test_T2s = test_T1s + 10
+            else:
+                test_T1s = np.arange(np.max([self.global_min_temp + 10, 20]), self.global_max_temp - 25, step)
+                test_T2s = np.arange(np.max([self.global_min_temp + 10, 20]) + step, self.global_max_temp + 5, step)
 
-            #print(test_T1s)
-            #print(test_T2s)
+            if t1_init != 0:
+                test_T1s = np.array([t1_init])
+            elif t2_init != 0:
+                test_T2s = np.array([t2_init])
 
             combinations = [(t1, t2) for t1 in test_T1s for t2 in test_T2s]
             combinations = [(t1, t2) for t1, t2 in combinations if t1 < t2]
 
-            #print(step)
-            #print(combinations)
-
             df = pd.DataFrame(combinations, columns=['t1', 't2'])
+
+            df_tm = pd.DataFrame(np.zeros_like(combinations), columns=['t1', 't2'])
+            df_dh = pd.DataFrame(np.zeros_like(combinations), columns=['dh1', 'dh2'])
 
             rss_all = []
 
@@ -919,16 +903,24 @@ class ThermalOligomer(Sample):
                     print(f"Warning: {e}")
                     continue
 
-                #print(np.array(pred).shape)
-                #print(np.array(self.signal_lst_expanded_subset).shape)
+                #using the fitted parameters as a base for fitting
+                df_tm.iloc[index, 0] = fit_params[0]
+                df_tm.iloc[index, 1] = fit_params[2]
+
+                df_dh.iloc[index, 0] = fit_params[1]
+                df_dh.iloc[index, 1] = fit_params[3]
+
 
                 rss = np.nansum((np.array(pred) - np.array(self.signal_lst_expanded_subset)) ** 2)
                 rss_all.append(rss)
 
             idx = np.argmin(rss_all)
 
-            t1_init, t2_init = df['t1'][idx], df['t2'][idx]
+            t1_init, t2_init = df_tm['t1'][idx], df_tm['t2'][idx]
             p0[0], p0[2] = t1_init, t2_init
+
+            dh1_init, dh2_init = df_dh['dh1'][idx], df_dh['dh2'][idx]
+            p0[1], p0[3] = dh1_init, dh2_init
 
             low_bounds[0], low_bounds[2] = t1_init - 30, t2_init - 30
             high_bounds[0], high_bounds[2] = t1_init + 30, t2_init + 30
@@ -936,16 +928,8 @@ class ThermalOligomer(Sample):
             kwargs['initial_parameters'] = p0
             kwargs['low_bounds'] = low_bounds
             kwargs['high_bounds'] = high_bounds
-        """
-
-        # Do a quick prefit with a reduced data set
-        if self.pre_fit:
-            kwargs['list_of_temperatures'] = self.temp_lst_expanded_subset
-            kwargs['list_of_signals'] = self.signal_lst_expanded_subset
-
-            global_fit_params, cov, predicted = fit_fx(**kwargs)
-
-            p0 = global_fit_params
+            kwargs['t1'] = None
+            kwargs['t2'] = None
 
 
         # Now use the whole dataset

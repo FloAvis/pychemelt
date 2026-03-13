@@ -470,13 +470,11 @@ def unfolding_curve_tetramer_monomeric_intermediate(
 
     fi = fi_three_state_tetramer_monomeric_intermediate(K1, K2, C)
 
-    #fn = (4 * (C * 4) ** 3 / K1) * fi ** 4
+    fn_pre = (4 * (C * 4) ** 3 / K1) * fi ** 4
 
-    x5 = (4 * (C * 4) ** 3 / K1) * fi ** 4
+    fn_filter = np.logical_not(np.greater(K1, 1e-30))
 
-    x5_sel = np.logical_not(np.greater(K1, 1e-30))
-
-    fn = np.where(x5_sel, 1.0, x5)
+    fn = np.where(fn_filter, 1.0, fn_pre)
 
     fu = 1 - fi - fn
 

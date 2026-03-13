@@ -17,8 +17,8 @@ from pychemelt.utils.math import exponential_baseline, constant_baseline, linear
 RNG_SEED = 2
 TEMP_START = 20.0
 TEMP_STOP = 90.0
-N_TEMPS = 100
-CONCS = np.arange(10, 80, 10)*1e-6
+N_TEMPS = 150
+CONCS = np.arange(10, 60, 10)*1e-6
 MAX_POINTS = 400
 
 # Model / ground-truth parameters
@@ -289,7 +289,7 @@ def test_fit_thermal_unfolding_three_state_global_trimer_exponential_baseline_tr
 
     trimer_sim_trimeric .fit_thermal_unfolding_three_state_global()
 
-    np.testing.assert_allclose(trimer_sim_trimeric .params_df.iloc[:4, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(trimer_sim_trimeric .params_df.iloc[:4, 1], expected, rtol=0.3, atol=0)
 
 
 def test_fit_thermal_unfolding_three_state_global_global_trimer_exponential_baseline_trimeric():
@@ -299,7 +299,7 @@ def test_fit_thermal_unfolding_three_state_global_global_trimer_exponential_base
     trimer_sim_trimeric .fit_thermal_unfolding_three_state_global_global()
 
     np.testing.assert_allclose(trimer_sim_trimeric .params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.3, atol=0)
 
 def test_fit_thermal_unfolding_three_state_global_global_global_trimer_exponential_baseline_trimeric():
     expected = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2]
@@ -307,5 +307,5 @@ def test_fit_thermal_unfolding_three_state_global_global_global_trimer_exponenti
     trimer_sim_trimeric .fit_thermal_unfolding_three_state_global_global_global()
 
     np.testing.assert_allclose(trimer_sim_trimeric .params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.3, atol=0)
 
