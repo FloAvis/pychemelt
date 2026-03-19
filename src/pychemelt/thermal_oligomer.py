@@ -206,7 +206,8 @@ class ThermalOligomer(Sample):
 
         self.nr_olig = len(self.oligomer_concentrations)
 
-        # For compatibility:
+        # For compatibility with the plotting functions, we need to have the "nr_den" variable which is functionally the
+        # same as "nr_olig":
         self.nr_den = self.nr_olig
 
         # Expand the number of oligomer concentrations to match the number of signals
@@ -660,7 +661,8 @@ class ThermalOligomer(Sample):
             t1_init=0,
             t2_init=0,
             dh_limits=None,
-            tm_limits=None):
+            tm_limits=None,
+            CpTh=0,):
 
         """
         Fit the thermal unfolding of the sample using the signal and temperature data on a three state model
@@ -691,10 +693,8 @@ class ThermalOligomer(Sample):
         # Single intercepts folded, Single slopes folded,
         # Single intercepts unfolded, Single slopes unfolded
 
-        # For compatibility
-        self.cp_value = None
-        self.cp_limits = None
-
+        # For compatibility with the check refitting function the values concerning the cp for two state fitting
+        # has to be false
         self.fixed_cp = False
 
         self.limited_cp = False
@@ -849,7 +849,8 @@ class ThermalOligomer(Sample):
             'high_bounds': high_bounds,
             'baseline_native_fx': self.baseline_N_fx,
             'baseline_unfolded_fx': self.baseline_U_fx,
-            'signal_fx': signal_fx
+            'signal_fx': signal_fx,
+            'CpTh': CpTh,
         }
 
         fit_fx = fit_oligomer_unfolding_three_states_single_slopes

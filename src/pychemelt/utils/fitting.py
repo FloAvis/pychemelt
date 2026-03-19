@@ -834,6 +834,8 @@ def fit_oligomer_unfolding_three_states_single_slopes(
         t2=None,
         dh1=None,
         dh2=None,
+        Cp1=None,
+        CpTh=None,
 ):
     """
     Vectorized and optimized version of global thermal unfolding fitting. of oligomers
