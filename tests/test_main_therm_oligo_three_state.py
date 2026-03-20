@@ -423,7 +423,7 @@ def test_fit_thermal_unfolding_three_state_global_global_global_dimer_dimeric():
     np.testing.assert_allclose(dimer_sim_dimeric.params_df.iloc[:10, 1], expected, rtol=0.2, atol=1.5)
 
 
-# Testing Trimer_monomeric model
+# Testing Trimer_trimeric model
 
 trimer_sim_trimeric = aux_create_pychem_sim(def_params, concs, "Trimer", "trimeric")
 

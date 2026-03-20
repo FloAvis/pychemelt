@@ -662,7 +662,7 @@ class ThermalOligomer(Sample):
             t2_init=0,
             dh_limits=None,
             tm_limits=None,
-            CpTh=0,):
+            CpTh=None,):
 
         """
         Fit the thermal unfolding of the sample using the signal and temperature data on a three state model
@@ -671,12 +671,17 @@ class ThermalOligomer(Sample):
 
         Parameters
         ----------
+        t1_init, t2_init : float, optional
+            initial user given values of the melting temperatures of the three states, t1_init: Native to intermediate, t2_init: intermediate to unfolded
         dh_limits : list of lists, optional
             List of two lists with two values each, the lower and upper bounds for the dH values.
             If None, bounds set automatically
         tm_limits : list of lists, optional
             List of two lists with two values each, the lower and upper bounds for the Tm values.
             If None, bounds set automatically
+        CpTh : float, optional
+            Given estimate of the Total Cp of the system. If given, the Cp value of the transition from native to intermediate will be fitted as Cp1. If not given,
+            the system assumes a total Cp of 0
 
         Notes
         -----
@@ -690,28 +695,31 @@ class ThermalOligomer(Sample):
         # Initial parameters have to be in order:
         # Global melting temperature 1, Global enthalpy of unfolding 1,
         # Global melting temperature 2, Global enthalpy of unfolding 2,
+        # Optionally Cp1
         # Single intercepts folded, Single slopes folded,
         # Single intercepts unfolded, Single slopes unfolded
-
-        # For compatibility with the check refitting function the values concerning the cp for two state fitting
-        # has to be false
-        self.fixed_cp = False
-
-        self.limited_cp = False
 
 
         if not hasattr(self, "deriv_lst_multiple"):
             self.estimate_derivative()
 
+        if CpTh is not None:
+            if CpTh <= 0.1:
+                raise ValueError('CpTh must be large enough for fitting. If you do not wish to fit the Cp values, omit this parameter.')
 
-        # Parameters for T1, dH1, T2, dH2 will be added later via gridsearch
-        p0 = [0, 250, 0, 250]
+            # Parameters for T1, T2, will be added later via gridsearch
+            p0 = [0, 250, 0, 250, self.Cp0]
+
+        else:
+            p0 = [0, 250, 0, 250, 0]
+
 
         params_names = [
             'Tm1 (°C)',
             'ΔH1 (kcal/mol)',
             'Tm2 (°C)',
-            'ΔH2 (kcal/mol)']
+            'ΔH2 (kcal/mol)',
+            'Cp1 (kcal/mol/°C)']
 
         self.first_param_Ns_expanded = np.concatenate(self.first_param_Ns_per_signal, axis=0)
         self.first_param_Us_expanded = np.concatenate(self.first_param_Us_per_signal, axis=0)
@@ -782,7 +790,7 @@ class ThermalOligomer(Sample):
         low_bounds = (p0.copy())
         high_bounds = (p0.copy())
 
-        low_bounds[4:], high_bounds[4:] = set_param_bounds(p0[4:], params_names[4:])
+        low_bounds[5:], high_bounds[5:] = set_param_bounds(p0[5:], params_names[5:])
 
         self.limited_tm = tm_limits is not None
 
@@ -830,6 +838,29 @@ class ThermalOligomer(Sample):
         low_bounds[3] = dh2_lower
         high_bounds[3] = dh2_upper
 
+        self.cp_value = CpTh
+        self.fixed_cp = CpTh is not None
+
+
+        if not self.fixed_cp:
+
+            # Remove the Cp from p0, low_bounds and high_bounds
+            # Remove Cp0 from the parameter names
+            p0 = np.delete(p0, 4)
+            low_bounds = np.delete(low_bounds, 4)
+            high_bounds = np.delete(high_bounds, 4)
+            params_names.pop(4)
+
+        else:
+
+            cp_lower, cp_upper = 0.1, CpTh
+
+            low_bounds[4] = cp_lower
+            high_bounds[4] = cp_upper
+
+            # Verify that the Cp initial guess is within the user-defined limits
+            p0[4] = adjust_value_to_interval(p0[4], cp_lower, cp_upper, 0.5)
+
 
         # Populate the expanded signal and temperature lists
         self.expand_multiple_signal()
@@ -850,7 +881,7 @@ class ThermalOligomer(Sample):
             'baseline_native_fx': self.baseline_N_fx,
             'baseline_unfolded_fx': self.baseline_U_fx,
             'signal_fx': signal_fx,
-            'CpTh': CpTh,
+            'CpTh_value': CpTh,
         }
 
         fit_fx = fit_oligomer_unfolding_three_states_single_slopes
@@ -947,12 +978,13 @@ class ThermalOligomer(Sample):
             low_bounds,
             p0,
             False,
-            self.limited_cp,
+            False,
             self.limited_dh,
             self.limited_tm,
             self.fixed_cp,
             kwargs,
             fit_fx,
+            fit_m_value=False,
             three_state_model=True,
         )
 
@@ -1197,6 +1229,9 @@ class ThermalOligomer(Sample):
 
         param_init = 4
 
+        if self.fixed_cp:
+            param_init += 1
+
         p0 = self.global_fit_params[:param_init]
         low_bounds = self.low_bounds[:param_init]
         high_bounds = self.high_bounds[:param_init]
@@ -1324,6 +1359,7 @@ class ThermalOligomer(Sample):
             'baseline_native_fx': self.baseline_N_fx,
             'baseline_unfolded_fx': self.baseline_U_fx,
             'signal_fx' : signal_fx,
+            'CpTh_value' : self.cp_value,
         }
 
         fit_fx = fit_oligomer_unfolding_three_states_shared_slopes_many_signals
@@ -1349,7 +1385,7 @@ class ThermalOligomer(Sample):
             low_bounds,
             p0,
             False,
-            self.limited_cp,
+            False,
             self.limited_dh,
             self.limited_tm,
             self.fixed_cp,
@@ -1674,7 +1710,7 @@ class ThermalOligomer(Sample):
             model_scale_factor=True):
 
         """
-        Fit the thermal unfolding of the sample using the signal and temperature data
+        Fit the thermal unfolding of the sample using the signal and temperature data for models assuming three states
         We fit all the curves at once, with global thermodynamic parameters, global slopes and global baselines
         Must be run after fit_thermal_unfolding_global_global
 
@@ -1695,6 +1731,10 @@ class ThermalOligomer(Sample):
             self.fit_thermal_unfolding_three_state_global_global()
 
         param_init = 4
+
+        if self.fixed_cp:
+            param_init += 1
+
 
         params_names = self.params_names[:param_init]
 
@@ -1830,6 +1870,7 @@ class ThermalOligomer(Sample):
             'signal_fx' : signal_fx,
             'baseline_native_fx' : self.baseline_N_fx,
             'baseline_unfolded_fx' : self.baseline_U_fx,
+            'CpTh_value' : self.cp_value,
         }
 
         fit_fx = fit_oligomer_unfolding_three_states_many_signals
@@ -1854,6 +1895,10 @@ class ThermalOligomer(Sample):
 
             # 4 parameters corresponding to Tm, dH
             idx_start = 4
+
+            # Additional parameter if CpTh is given
+            if self.fixed_cp:
+                idx_start += 1
 
             native_factor   = 1+np.sum(baseline_fx_name_to_req_params(self.baseline_N_fx))
             unfolded_factor = 1+np.sum(baseline_fx_name_to_req_params(self.baseline_U_fx))

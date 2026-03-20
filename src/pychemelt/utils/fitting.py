@@ -834,8 +834,7 @@ def fit_oligomer_unfolding_three_states_single_slopes(
         t2=None,
         dh1=None,
         dh2=None,
-        Cp1=None,
-        CpTh=None,
+        CpTh_value=None,
 ):
     """
     Vectorized and optimized version of global thermal unfolding fitting. of oligomers
@@ -864,6 +863,8 @@ def fit_oligomer_unfolding_three_states_single_slopes(
         Values for the unfolding temperatures one and two
     dh1, dh2 : float, optional
         Values for the unfolding enthalpy one and two
+    CpTh_value : float, optional
+        Value for the total Cp of the system, enabling fitting of Cp1
 
     Returns
     -------
@@ -958,6 +959,14 @@ def fit_oligomer_unfolding_three_states_single_slopes(
         Tm1, DHm1, Tm2, DHm2 = params[:4]
         i = 4
 
+        # Handling Cp values
+        if CpTh_value is not None:
+            Cp1 = params[i]
+            CpTh = CpTh_value
+            i += 1
+        else:
+            Cp1 = 0.0
+            CpTh = 0.0
 
         # ---- Dataset-specific parameters ----
         p1N = np.repeat(params[i:i + n_datasets], lengths)
@@ -1001,7 +1010,7 @@ def fit_oligomer_unfolding_three_states_single_slopes(
                 baseline_native_fx,
                 baseline_unfolded_fx,
                 bI,
-                0,0,
+                Cp1,CpTh,
             )
 
 
@@ -1391,6 +1400,7 @@ def fit_oligomer_unfolding_three_states_shared_slopes_many_signals(
     t2=None,
     dh1=None,
     dh2=None,
+    CpTh_value=None,
 ):
     """
     Vectorized fitting of oligomer thermal unfolding curves for multiple signal types
@@ -1422,6 +1432,8 @@ def fit_oligomer_unfolding_three_states_shared_slopes_many_signals(
         Values for the unfolding temperatures one and two
     dh1, dh2 : float, optional
         Values for the unfolding enthalpy one and two
+    CpTh_value : float, optional
+        Value for the total Cp of the system, enabling fitting of Cp1
 
     Returns
     -------
@@ -1510,6 +1522,15 @@ def fit_oligomer_unfolding_three_states_shared_slopes_many_signals(
         Tm1, DHm1, Tm2, DHm2 = params[:4]
         id_param = 4
 
+        # Handling Cp values
+        if CpTh_value is not None:
+            Cp1 = params[id_param]
+            CpTh = CpTh_value
+            id_param += 1
+        else:
+            Cp1 = 0.0
+            CpTh = 0.0
+
         intercepts_folded = params[id_param:id_param + n_datasets]
         intercepts_unfolded = params[id_param + n_datasets:id_param + n_datasets * 2]
         intercepts_intermediates = params[id_param + 2 * n_datasets:id_param + n_datasets * 3]
@@ -1542,7 +1563,7 @@ def fit_oligomer_unfolding_three_states_shared_slopes_many_signals(
                 baseline_native_fx,
                 baseline_unfolded_fx,
                 intercepts_intermediates[i],
-                0,0,
+                Cp1, CpTh,
             )
 
         return predicted_all - all_signal
@@ -2039,6 +2060,7 @@ def fit_oligomer_unfolding_three_states_many_signals(
         signal_fx,
         baseline_native_fx,
         baseline_unfolded_fx,
+        CpTh_value=None,
         model_scale_factor=False,
         scale_factor_exclude_ids=[]):
     """
@@ -2066,6 +2088,8 @@ def fit_oligomer_unfolding_three_states_many_signals(
         function to calculate the native state baseline
     baseline_unfolded_fx : callable
         function to calculate the unfolded state baseline
+    CpTh_value : float, optional
+        Value for the total Cp of the system, enabling fitting of Cp1
     model_scale_factor : bool, optional
         If True, include a per-oligomeric concentration scale factor to account for intensity differences
     scale_factor_exclude_ids : list, optional
@@ -2118,6 +2142,7 @@ def fit_oligomer_unfolding_three_states_many_signals(
             - Global enthalpy of unfolding for the first transition
             - Global melting temperature for the second transition
             - Global enthalpy of unfolding for the second transition
+            - Optional global Cp1 value
             - Single intercepts, folded
             - Single intercepts, unfolded
             - Single intercepts, intermediate
@@ -2137,6 +2162,15 @@ def fit_oligomer_unfolding_three_states_many_signals(
         Tm1, DHm1, Tm2, DHm2 = params[:4]
 
         id_param = 4
+
+        # Handling Cp prediction
+        if CpTh_value is not None:
+            Cp1 = params[id_param]
+            CpTh = CpTh_value
+            id_param += 1
+        else:
+            Cp1 = 0.0
+            CpTh = 0.0
 
         # Intercept parameters
         p1_Ns = params[id_param:id_param + n_signals]
@@ -2214,7 +2248,7 @@ def fit_oligomer_unfolding_three_states_many_signals(
                 baseline_native_fx,
                 baseline_unfolded_fx,
                 intercepts_intermediate,
-                0,0,
+                Cp1,CpTh,
             )
 
             scale_factor = 1 if not model_scale_factor else factors[i]
@@ -2408,6 +2442,7 @@ def evaluate_need_to_refit_three_state(
         p0,
         check_dh=True,
         check_tm=True,
+        given_cp=False,
         threshold=0.05,
 ):
     """
@@ -2425,6 +2460,9 @@ def evaluate_need_to_refit_three_state(
         Initial guess for parameters
     check_dh, check_tm : bool, optional
         Whether to check boundaries for DHms, and Tms respectively
+    given_cp : bool, optional
+        If a CpTh value is given the refitting structure needs to be adjusted. Currently there is no refitting when CpTh
+        is given
     threshold : float, optional
         Threshold to compare if the fitted parameters are too close to the boundaries
 
@@ -2535,6 +2573,9 @@ def evaluate_need_to_refit_three_state(
 
     id_start = 4
 
+    # Adjust data for Cp1
+    if given_cp:
+        id_start += 1
 
     difference_to_upper = np.array([np.abs((a - b) / a) if a != np.inf and a != 0 else np.inf for a, b in
                                     zip(high_bounds[id_start:], global_fit_params[id_start:])])
@@ -2645,6 +2686,7 @@ def evaluate_fitting_and_refit(
                 p0,
                 check_dh=not limited_dh,
                 check_tm=not limited_tm,
+                given_cp=fixed_cp,
                 threshold=threshold,
             )
 
