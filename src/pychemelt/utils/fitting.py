@@ -183,7 +183,7 @@ def fit_exponential_robust(x,y):
 
     low_bounds = [0, 0]
 
-    high_bounds = [1e6, 1e6]
+    high_bounds = [1e7, 1e7]
 
     for alpha in alpha_seq:
 

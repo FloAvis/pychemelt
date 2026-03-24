@@ -280,7 +280,7 @@ def two_state_thermal_unfold_curve_trimer(
 
     Notes
     -----
-    C is the total concentration (M) of the protein in dimer equivalent.
+    C is the total concentration (M) of the protein in trimer equivalent.
 
     """
 
@@ -336,7 +336,7 @@ def two_state_thermal_unfold_curve_tetramer(
 
     Notes
     -----
-    C is the total concentration (M) of the protein in dimer equivalent.
+    C is the total concentration (M) of the protein in tetramer equivalent.
 
     """
 

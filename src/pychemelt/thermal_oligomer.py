@@ -18,6 +18,7 @@ from .utils.signals import (
 
 from .utils.math import (
     temperature_to_kelvin,
+    temperature_to_celsius,
     relative_errors,
     constant_baseline,
     linear_baseline,
@@ -294,27 +295,16 @@ class ThermalOligomer(Sample):
         self.third_param_Ns_per_signal = []
         self.third_param_Us_per_signal = []
 
-        # If normalised signal baseline signal needs to be normalised relatively to concentration
-        if self.normalise_to_global_max:
-
-            # normalised concentration difference for normalised signal
-            norm_conc = [x / max(self.oligomer_concentrations) for x in self.oligomer_concentrations]
-
-            oligomer_concentrations = np.repeat(norm_conc,
-                                                np.array(self.signal_lst_multiple).shape[-1])
-            oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
-
-        else:
-            oligomer_concentrations = np.repeat(self.oligomer_concentrations,
-                                                np.array(self.signal_lst_multiple).shape[-1])
-            oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
+        oligomer_concentrations = np.repeat(self.oligomer_concentrations,
+                                            np.array(self.signal_lst_multiple).shape[-1])
+        oligomer_concentrations = np.split(oligomer_concentrations, len(self.oligomer_concentrations))
 
         for i in range(len(self.signal_lst_multiple)):
 
             adjusted_signal_lst_multiple = list(np.array(self.signal_lst_multiple[i])/ np.array(oligomer_concentrations))
 
             p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us = estimate_signal_baseline_params(
-                adjusted_signal_lst_multiple if not self.normalise_to_global_max else self.signal_lst_multiple[i],
+                adjusted_signal_lst_multiple,
                 self.temp_lst_multiple[i],
                 native_baseline_type,
                 unfolded_baseline_type,
@@ -322,10 +312,6 @@ class ThermalOligomer(Sample):
                 window_range_unfolded,
                 oligomer_number(self.model)
             )
-
-            if self.normalise_to_global_max:
-                p1Ns = np.array(p1Ns) / self.oligomer_concentrations
-                p1Us = np.array(p1Us) / self.oligomer_concentrations
 
 
             self.first_param_Ns_per_signal.append(p1Ns)
@@ -1002,7 +988,7 @@ class ThermalOligomer(Sample):
 
         self.params_names = params_names
 
-        self.create_params_df()
+        self.create_params_df_three_state()
         self.create_dg_df()
 
         return None
@@ -1408,7 +1394,7 @@ class ThermalOligomer(Sample):
 
         self.params_names = params_names
 
-        self.create_params_df()
+        self.create_params_df_three_state()
         self.create_dg_df()
 
         self.global_global_fit_done = True
@@ -1975,7 +1961,7 @@ class ThermalOligomer(Sample):
         self.predicted_lst_multiple = re_arrange_predictions(
             predicted, self.nr_signals, self.nr_olig)
 
-        self.create_params_df()
+        self.create_params_df_three_state()
         self.create_dg_df()
 
         self.global_global_global_fit_done = True
@@ -2090,3 +2076,28 @@ class ThermalOligomer(Sample):
         })
 
         return signal_df
+
+    def create_params_df_three_state(self):
+        """
+        Create a dataframe of the parameters
+        """
+
+        # convert the first param to Celsius
+        self.global_fit_params[0] = temperature_to_celsius(self.global_fit_params[0])
+        self.low_bounds[0] = temperature_to_celsius(self.low_bounds[0])
+        self.high_bounds[0] = temperature_to_celsius(self.high_bounds[0])
+
+        self.global_fit_params[2] = temperature_to_celsius(self.global_fit_params[2])
+        self.low_bounds[2] = temperature_to_celsius(self.low_bounds[2])
+        self.high_bounds[2] = temperature_to_celsius(self.high_bounds[2])
+
+        # Create a dataframe of the parameters
+        self.params_df = pd.DataFrame({
+            'Parameter': self.params_names,
+            'Value': self.global_fit_params,
+            'Relative error (%)': self.rel_errors,
+            'Fitting low Bound': self.low_bounds,
+            'Fitting high Bound': self.high_bounds
+        })
+
+        return None

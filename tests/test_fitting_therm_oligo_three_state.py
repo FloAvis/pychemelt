@@ -1470,6 +1470,9 @@ def test_refit_three_state_model_constant():
 
     p0 = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2] + [INTERCEPT_N] * len(concs) + [INTERCEPT_U] * len(concs) + [
         INTERCEPT_I] * len(concs)
+
+    # Test refitting of three state model Tm1 and Tm2 overlapping and DH1 adn DH2 too close
+
     low_bounds = [TEMP_START, DHm_VAL_1 - 100, TEMP_START, DHm_VAL_2 - 100] + [1e-5] * (3 * len(concs))
     high_bounds = [TEMP_STOP, DHm_VAL_1 + 100, TEMP_STOP, DHm_VAL_2 + 100] + [1e3] * (3 * len(concs))
 
@@ -1495,6 +1498,8 @@ def test_refit_three_state_model_constant():
 
     assert re_fit == True
 
+    # Test refitting of three state model Tm1 and Tm2 too close
+
     low_bounds = [TEMP_START, DHm_VAL_1 - 100, TEMP_START, DHm_VAL_2 - 100] + [1e-5] * (3 * len(concs))
     high_bounds = [TEMP_STOP, DHm_VAL_1 + 100, TEMP_STOP, DHm_VAL_2 + 100] + [1e3] * (3 * len(concs))
 
@@ -1508,6 +1513,27 @@ def test_refit_three_state_model_constant():
 
     low_bounds[2] = 60 - 5
     high_bounds[2] = 60 + 5
+
+    re_fit, _, _, _ = evaluate_need_to_refit_three_state(
+        global_fit_params,
+        high_bounds,
+        low_bounds,
+        p0,
+        check_dh=True,
+        check_tm=True,
+    )
+
+    assert re_fit == True
+
+    # Test refitting of three state model baseline parameter too close
+
+    low_bounds = [TEMP_START, DHm_VAL_1 - 100, TEMP_START, DHm_VAL_2 - 100] + [1e-5] * (3 * len(concs))
+    high_bounds = [TEMP_STOP, DHm_VAL_1 + 100, TEMP_STOP, DHm_VAL_2 + 100] + [1e3] * (3 * len(concs))
+
+    global_fit_params = p0.copy()
+
+    low_bounds[4] = INTERCEPT_N - 1
+    high_bounds[4] = INTERCEPT_N + 1
 
     re_fit, _, _, _ = evaluate_need_to_refit_three_state(
         global_fit_params,
