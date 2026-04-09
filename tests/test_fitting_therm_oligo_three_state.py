@@ -63,8 +63,8 @@ def_params = {
     'p4_U': ALPHA_U_VAL,
     'baseline_N_fx':constant_baseline,
     'baseline_U_fx':constant_baseline,
-    "Cp1": 0,
-    'CpTh': 0,
+    "Cp1": 0.5,
+    'CpTh': 1.0,
 }
 
 concs = CONCS

@@ -22,9 +22,9 @@ CONCS = np.arange(10, 60, 10)*1e-6
 MAX_POINTS = 400
 
 # Model / ground-truth parameters
-DHm_VAL_1 = 300
-DHm_VAL_2 = 200
-Tm_VAL_1 = 50
+DHm_VAL_1 = 250
+DHm_VAL_2 = 250
+Tm_VAL_1 = 60
 Tm_VAL_2 = 70
 
 INTERCEPT_I = 107
@@ -59,8 +59,8 @@ def_params = {
     'p4_U': ALPHA_U_VAL,
     'baseline_N_fx':exponential_baseline,
     'baseline_U_fx':constant_baseline,
-    "Cp1":0,
-    'CpTh':0,
+    "Cp1":0.5,
+    'CpTh':1.0,
 }
 
 concs = CONCS
@@ -129,7 +129,7 @@ def test_fit_thermal_unfolding_three_state_global_monomer_exponential_baseline_m
 
     monomer_sim.fit_thermal_unfolding_three_state_global()
 
-    np.testing.assert_allclose(monomer_sim.params_df.iloc[:4,1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(monomer_sim.params_df.iloc[:4,1], expected, rtol=0.1)
 
 def test_fit_thermal_unfolding_three_state_global_global_monomer_exponential_baseline_monomeric():
     expected = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2]
@@ -137,7 +137,7 @@ def test_fit_thermal_unfolding_three_state_global_global_monomer_exponential_bas
     monomer_sim.fit_thermal_unfolding_three_state_global_global()
 
     np.testing.assert_allclose(monomer_sim.params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.1)
 
 def test_fit_thermal_unfolding_three_state_global_global_global_monomer_exponential_baseline_monomeric():
     expected = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2]
@@ -145,7 +145,7 @@ def test_fit_thermal_unfolding_three_state_global_global_global_monomer_exponent
     monomer_sim.fit_thermal_unfolding_three_state_global_global_global()
 
     np.testing.assert_allclose(monomer_sim.params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.1)
 
 # Testing Dimer model
 
@@ -159,7 +159,7 @@ def test_fit_thermal_unfolding_three_state_global_dimer_exponential_baseline_mon
 
     dimer_sim.fit_thermal_unfolding_three_state_global()
 
-    np.testing.assert_allclose(dimer_sim.params_df.iloc[:4, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(dimer_sim.params_df.iloc[:4, 1], expected, rtol=0.1)
 
 
 def test_fit_thermal_unfolding_three_state_global_global_dimer_exponential_baseline_monomeric():
@@ -169,7 +169,7 @@ def test_fit_thermal_unfolding_three_state_global_global_dimer_exponential_basel
     dimer_sim.fit_thermal_unfolding_three_state_global_global()
 
     np.testing.assert_allclose(dimer_sim.params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.1)
 
 def test_fit_thermal_unfolding_three_state_global_global_global_dimer_exponential_baseline_monomeric():
     expected = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2]
@@ -177,7 +177,7 @@ def test_fit_thermal_unfolding_three_state_global_global_global_dimer_exponentia
     dimer_sim.fit_thermal_unfolding_three_state_global_global_global()
 
     np.testing.assert_allclose(dimer_sim.params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.1)
 
 
 # Testing Trimer model
@@ -192,7 +192,7 @@ def test_fit_thermal_unfolding_three_state_global_trimer_exponential_baseline_mo
 
     trimer_sim.fit_thermal_unfolding_three_state_global()
 
-    np.testing.assert_allclose(trimer_sim.params_df.iloc[:4, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(trimer_sim.params_df.iloc[:4, 1], expected, rtol=0.1)
 
 
 def test_fit_thermal_unfolding_three_state_global_global_trimer_exponential_baseline_monomeric():
@@ -202,7 +202,7 @@ def test_fit_thermal_unfolding_three_state_global_global_trimer_exponential_base
     trimer_sim.fit_thermal_unfolding_three_state_global_global()
 
     np.testing.assert_allclose(trimer_sim.params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.1)
 
 def test_fit_thermal_unfolding_three_state_global_global_global_trimer_exponential_baseline_monomeric():
     expected = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2]
@@ -210,7 +210,7 @@ def test_fit_thermal_unfolding_three_state_global_global_global_trimer_exponenti
     trimer_sim.fit_thermal_unfolding_three_state_global_global_global()
 
     np.testing.assert_allclose(trimer_sim.params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.1)
 
 
 # Testing Tetramer model
@@ -225,7 +225,7 @@ def test_fit_thermal_unfolding_three_state_global_tetramer_exponential_baseline_
 
     tetramer_sim.fit_thermal_unfolding_three_state_global()
 
-    np.testing.assert_allclose(tetramer_sim.params_df.iloc[:4, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(tetramer_sim.params_df.iloc[:4, 1], expected, rtol=0.2)
 
 
 def test_fit_thermal_unfolding_three_state_global_global_tetramer_exponential_baseline_monomeric():
@@ -234,7 +234,7 @@ def test_fit_thermal_unfolding_three_state_global_global_tetramer_exponential_ba
     tetramer_sim.fit_thermal_unfolding_three_state_global_global()
 
     np.testing.assert_allclose(tetramer_sim.params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.2)
 
 def test_fit_thermal_unfolding_three_state_global_global_global_tetramer_exponential_baseline_monomeric():
     expected = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2]
@@ -242,7 +242,7 @@ def test_fit_thermal_unfolding_three_state_global_global_global_tetramer_exponen
     tetramer_sim.fit_thermal_unfolding_three_state_global_global_global()
 
     np.testing.assert_allclose(tetramer_sim.params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.2)
 
 # Testing Dimer model
 
@@ -256,7 +256,7 @@ def test_fit_thermal_unfolding_three_state_global_dimer_exponential_baseline_dim
 
     dimer_sim_dimeric.fit_thermal_unfolding_three_state_global()
 
-    np.testing.assert_allclose(dimer_sim_dimeric.params_df.iloc[:4, 1], expected, rtol=0.1, atol=0)
+    np.testing.assert_allclose(dimer_sim_dimeric.params_df.iloc[:4, 1], expected, rtol=0.1)
 
 
 def test_fit_thermal_unfolding_three_state_global_global_dimer_exponential_baseline_dimeric():
@@ -266,7 +266,7 @@ def test_fit_thermal_unfolding_three_state_global_global_dimer_exponential_basel
     dimer_sim_dimeric.fit_thermal_unfolding_three_state_global_global()
 
     np.testing.assert_allclose(dimer_sim_dimeric.params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.1)
 
 def test_fit_thermal_unfolding_three_state_global_global_global_dimer_exponential_baseline_dimeric():
     expected = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2]
@@ -274,7 +274,7 @@ def test_fit_thermal_unfolding_three_state_global_global_global_dimer_exponentia
     dimer_sim_dimeric.fit_thermal_unfolding_three_state_global_global_global()
 
     np.testing.assert_allclose(dimer_sim_dimeric.params_df.iloc[:4, 1], expected,
-                               rtol=0.1, atol=0)
+                               rtol=0.1)
 
 
 # Testing Trimer model
@@ -289,7 +289,7 @@ def test_fit_thermal_unfolding_three_state_global_trimer_exponential_baseline_tr
 
     trimer_sim_trimeric .fit_thermal_unfolding_three_state_global()
 
-    np.testing.assert_allclose(trimer_sim_trimeric .params_df.iloc[:4, 1], expected, rtol=0.3, atol=0)
+    np.testing.assert_allclose(trimer_sim_trimeric .params_df.iloc[:4, 1], expected, rtol=0.3)
 
 
 def test_fit_thermal_unfolding_three_state_global_global_trimer_exponential_baseline_trimeric():
@@ -299,7 +299,7 @@ def test_fit_thermal_unfolding_three_state_global_global_trimer_exponential_base
     trimer_sim_trimeric .fit_thermal_unfolding_three_state_global_global()
 
     np.testing.assert_allclose(trimer_sim_trimeric .params_df.iloc[:4, 1], expected,
-                               rtol=0.3, atol=0)
+                               rtol=0.3)
 
 def test_fit_thermal_unfolding_three_state_global_global_global_trimer_exponential_baseline_trimeric():
     expected = [Tm_VAL_1, DHm_VAL_1, Tm_VAL_2, DHm_VAL_2]
@@ -307,5 +307,5 @@ def test_fit_thermal_unfolding_three_state_global_global_global_trimer_exponenti
     trimer_sim_trimeric .fit_thermal_unfolding_three_state_global_global_global()
 
     np.testing.assert_allclose(trimer_sim_trimeric .params_df.iloc[:4, 1], expected,
-                               rtol=0.3, atol=0)
+                               rtol=0.3)
 

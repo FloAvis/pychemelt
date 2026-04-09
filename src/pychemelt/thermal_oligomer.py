@@ -901,8 +901,8 @@ class ThermalOligomer(Sample):
 
             df = pd.DataFrame(combinations, columns=['t1', 't2'])
 
-            df_tm = pd.DataFrame(np.zeros_like(combinations), columns=['t1', 't2'])
-            df_dh = pd.DataFrame(np.zeros_like(combinations), columns=['dh1', 'dh2'])
+            df_tm = pd.DataFrame(np.zeros_like(combinations), columns=['t1', 't2'], dtype=float)
+            df_dh = pd.DataFrame(np.zeros_like(combinations), columns=['dh1', 'dh2'], dtype=float)
 
             rss_all = []
 
