@@ -99,7 +99,7 @@ def aux_create_pychem_sim(params,concs, model):
 
     pychem_sim.set_signal(['Fluo'])
 
-    pychem_sim.select_conditions(normalise_to_global_max=False)
+    pychem_sim.select_conditions()
     pychem_sim.expand_multiple_signal()
 
 

@@ -80,7 +80,7 @@ def_params = {
 
 concs = CONCS
 
-def aux_create_pychem_sim(params,concs, model, intermediate, normalise=False):
+def aux_create_pychem_sim(params,concs, model, intermediate):
 
     signal_fx = map_three_state_model_to_signal_fx(model + "_" + intermediate + "_intermediate")
 
@@ -120,7 +120,7 @@ def aux_create_pychem_sim(params,concs, model, intermediate, normalise=False):
 
     pychem_sim.set_signal('Fluo')
 
-    pychem_sim.select_conditions(normalise_to_global_max=normalise)
+    pychem_sim.select_conditions()
     pychem_sim.expand_multiple_signal()
 
 
@@ -137,7 +137,7 @@ def aux_create_pychem_sim(params,concs, model, intermediate, normalise=False):
 # Using concentrations close to each other in order to trigger non-scaling
 scale_concs = [0.999999999999999, 1.00000000000000000001]
 
-pychem_sim_scaling = aux_create_pychem_sim(def_params, scale_concs, "Monomer", "monomeric", normalise=True)
+pychem_sim_scaling = aux_create_pychem_sim(def_params, scale_concs, "Monomer", "monomeric")
 
 
 def test_fit_thermal_unfolding_three_state_global_global_global_scaling():
@@ -152,7 +152,7 @@ def test_fit_thermal_unfolding_three_state_global_global_global_scaling():
 # Using concentrations close to each other in order to trigger non-scaling
 conc = np.array([10])*1e-6
 
-pychem_sim_one_conc = aux_create_pychem_sim(def_params, conc, "Monomer", "monomeric", normalise=True)
+pychem_sim_one_conc = aux_create_pychem_sim(def_params, conc, "Monomer", "monomeric")
 
 
 def test_fit_thermal_unfolding_three_state_global_global_global_scaling_one_conc():

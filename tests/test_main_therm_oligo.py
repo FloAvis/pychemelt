@@ -73,7 +73,7 @@ def_params = {
 
 concs = CONCS
 
-def aux_create_pychem_sim(params,concs, model, normalise=False):
+def aux_create_pychem_sim(params,concs, model):
 
     signal_fx = map_two_state_model_to_signal_fx(model)
 
@@ -113,7 +113,7 @@ def aux_create_pychem_sim(params,concs, model, normalise=False):
 
     pychem_sim.set_signal(['Fluo'])
 
-    pychem_sim.select_conditions(normalise_to_global_max=normalise)
+    pychem_sim.select_conditions()
     pychem_sim.expand_multiple_signal()
 
 
@@ -166,25 +166,14 @@ def test_set_concentrations():
 def test_select_conditions():
     sample.set_signal(['350nm'])
 
-    # Select without scaling
     sample.select_conditions(
-        [False for _ in range(24)] + [True for _ in range(8)] + [False for _ in range(16)],
-        normalise_to_global_max=False
+        [False for _ in range(24)] + [True for _ in range(8)] + [False for _ in range(16)]
     )
 
     assert len(sample.signal_lst_multiple) == 1
     assert len(sample.signal_lst_multiple[0]) == 8
     assert np.max(sample.signal_lst_multiple[0]) != 1.0
 
-    # Select with scaling
-    sample.select_conditions(
-        [False for _ in range(24)] + [True for _ in range(8)] + [False for _ in range(16)],
-        normalise_to_global_max=True
-    )
-
-    assert len(sample.signal_lst_multiple) == 1
-    assert len(sample.signal_lst_multiple[0]) == 8
-    assert np.max(sample.signal_lst_multiple[0]) == 100
 
 def test_guess_Cp():
 
@@ -251,7 +240,7 @@ def test_fit_thermal_unfolding_global_global_global_scaling():
 
     pychem_sim.set_signal('Simulated signal')
 
-    pychem_sim.select_conditions(normalise_to_global_max=True)
+    pychem_sim.select_conditions()
     pychem_sim.expand_multiple_signal()
 
     pychem_sim.estimate_baseline_parameters(

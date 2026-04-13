@@ -133,7 +133,6 @@ class ThermalOligomer(Sample):
         return None
 
     def set_concentrations(self, concentrations=None):
-
         """
         Set the oligomeric concentrations for the sample
 
@@ -156,8 +155,7 @@ class ThermalOligomer(Sample):
 
     def select_conditions(
             self,
-            boolean_lst=None,
-            normalise_to_global_max=True):
+            boolean_lst=None):
 
         """
         For each signal, select the conditions to be used for the analysis
@@ -166,8 +164,6 @@ class ThermalOligomer(Sample):
         ----------
         boolean_lst : list of bool, optional
             List of booleans selecting which conditions to keep. If None, keep all.
-        normalise_to_global_max : bool, optional
-            If True, normalise the signal to the global maximum - per signal type
 
         Notes
         -----
@@ -175,7 +171,7 @@ class ThermalOligomer(Sample):
         - signal_lst_multiple, temp_lst_multiple : lists of lists with selected data
         - oligomer_concentrations : list of selected oligomer concentrations
         - oligomer_concentrations_expanded : flattened numpy array matching expanded signals
-        - boolean_lst, normalise_to_global_max, nr_olig : control flags/values
+        - boolean_lst, nr_olig : control flags/values
         """
 
         if boolean_lst is None:
@@ -195,16 +191,6 @@ class ThermalOligomer(Sample):
             self.oligomer_concentrations = [x for i, x in enumerate(self.oligomer_concentrations_pre) if
                                               boolean_lst[i]]
 
-        if normalise_to_global_max:
-
-            flat = list(chain.from_iterable(chain.from_iterable(self.signal_lst_multiple)))
-            global_max = np.max(flat)  # Global maximum across all signals
-
-            self.data_global_max = global_max
-
-            for i in range(len(self.signal_lst_multiple)):
-                self.signal_lst_multiple[i] = [x / global_max * 100 for x in self.signal_lst_multiple[i]]
-
         self.nr_olig = len(self.oligomer_concentrations)
 
         # For compatibility with the plotting functions, we need to have the "nr_den" variable which is functionally the
@@ -217,7 +203,6 @@ class ThermalOligomer(Sample):
         self.oligomer_concentrations_expanded = np.concatenate(oligomer_concentrations, axis=0)
 
         self.boolean_lst = boolean_lst
-        self.normalise_to_global_max = normalise_to_global_max
 
         self.oligomer_concentrations = np.array(self.oligomer_concentrations)
 

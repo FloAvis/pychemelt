@@ -76,7 +76,8 @@ def_params = {
 concs = CONCS
 
 
-def aux_create_pychem_sim(params, concs, model, intermediate, normalise=False):
+def aux_create_pychem_sim(params, concs, model, intermediate):
+
     signal_fx = map_three_state_model_to_signal_fx(model + "_" + intermediate + "_intermediate")
 
     # Calculate signal range for proper y-axis scaling
@@ -114,7 +115,7 @@ def aux_create_pychem_sim(params, concs, model, intermediate, normalise=False):
 
     pychem_sim.set_signal('Fluo')
 
-    pychem_sim.select_conditions(normalise_to_global_max=normalise)
+    pychem_sim.select_conditions()
     pychem_sim.expand_multiple_signal()
 
     pychem_sim.estimate_baseline_parameters(
