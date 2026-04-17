@@ -11,14 +11,35 @@ from .processing import (
     combine_sequences
 )
 
+from .math import (
+    temperature_to_kelvin,
+)
+
 __all__ = [
     "PlotConfig",
     "AxisConfig",
     "LayoutConfig",
     "LegendConfig",
     "config_fig",
-    "plot_unfolding"
+    "plot_unfolding",
+    "plot_baselines"
 ]
+
+def model_baselines(x, a, b, c=None, kind=None):
+    """
+    Encoding functions for baseline fitting
+    """
+    if kind == "constant":
+        return a * np.ones_like(x)
+    if kind == "linear":
+        return a + x * b
+    elif kind == "quadratic":
+        return a + b * x + c * (x ** 2)
+    elif kind == "exponential":
+        return a + b * np.exp(-c * x)
+    else:
+        raise ValueError("Unknown model type")
+
 
 @dataclass
 class PlotConfig:
@@ -351,6 +372,363 @@ def plot_unfolding(
             ),
             showlegend=False,
             hoverinfo='skip'
+        ),
+        row=1, col=1
+    )
+
+    def is_subplot_title(x):
+        return x.text in ["Simulated Signal"]
+
+    fig.update_annotations(
+        selector=is_subplot_title,
+        patch=dict(font=dict(size=plot_config.font_size + 10))
+    )
+
+    fig = config_fig(
+        fig,
+        plot_config.width,
+        plot_config.height,
+        plot_config.type
+    )
+
+    return fig
+
+def plot_baselines(
+        pychemelt_sample,
+        plot_config: PlotConfig = None,
+        axis_config: AxisConfig = None,
+        layout_config: LayoutConfig = None,
+        legend_config: LegendConfig = None):
+
+    """
+    Plot the fitted native and unfolded baseline curves on the data
+
+    Parameters
+    ----------
+
+    pychemelt_sample:
+        pychemelt.Sample object
+    plot_config : PlotConfig, optional
+        Configuration for the overall plot
+    axis_config : AxisConfig, optional
+        Configuration for the axes
+    layout_config : LayoutConfig, optional
+        Configuration for the layout
+    legend_config : LegendConfig, optional
+        configuration for the legend
+
+    """
+
+    if not hasattr(pychemelt_sample, "native_baseline_type"):
+        raise ValueError("Baselines not fitted yet. Run estimate_baseline_parameters() first.")
+
+    # Set defaults for configuration objects
+    plot_config = plot_config or PlotConfig()
+    axis_config = axis_config or AxisConfig()
+    layout_config = layout_config or LayoutConfig()
+    legend_config = legend_config or LegendConfig()
+
+
+    # Extract the minimum and maximum denaturation concentration
+    concs = pychemelt_sample.denaturant_concentrations
+
+    # Adjusting scale depending on highest concentration
+    scale = "M"
+
+    if np.max(concs) < 1e-1:
+        concs = concs * 1e3
+        scale = "mM"
+    if np.max(concs) < 1e-1:
+        concs = concs * 1e3
+        scale = "μM"
+
+    min_conc = np.min(concs)
+    max_conc = np.max(concs)
+
+    colors = get_colors_from_numeric_values(concs, min_conc, max_conc)
+
+    nrows  = pychemelt_sample.nr_signals
+
+    subplot_titles = [[title + ' - Native Baseline' , title + ' - Unfolded Baseline'] for title in pychemelt_sample.signal_names]
+
+    subplot_titles = np.array(subplot_titles).flatten()
+
+    fig = make_subplots(
+        rows=nrows,
+        cols=2,
+        shared_xaxes=True,
+        shared_yaxes=False,
+        vertical_spacing=layout_config.vertical_spacing,
+        subplot_titles=subplot_titles)
+
+    subplot_idx = 1
+
+    for i in range(nrows):
+
+
+
+        row = subplot_idx
+
+        # Full dataset if no fittings were done
+        xs = pychemelt_sample.temp_lst_multiple[i]
+        ys = pychemelt_sample.signal_lst_multiple[i]
+
+
+        # Setting the correct temperature frame for the modeling
+        temperature_K = temperature_to_kelvin(np.array(xs))
+        temperature_K_ref = temperature_K - 298
+
+
+        # Getting the fitting windows
+        fitting_window_end_native = np.array(xs).min() +  pychemelt_sample.window_range_native
+        fitting_window_start_unfolded = np.array(xs).max() - pychemelt_sample.window_range_unfolded
+
+        #Getting the fitted parameters
+
+        if pychemelt_sample.oligomeric:
+            a_native = pychemelt_sample.first_param_Ns_per_signal[i] * pychemelt_sample.oligomer_concentrations
+            b_native = pychemelt_sample.second_param_Ns_per_signal[i] * pychemelt_sample.oligomer_concentrations
+        else:
+            a_native = pychemelt_sample.first_param_Ns_per_signal[i]
+            b_native = pychemelt_sample.second_param_Ns_per_signal[i]
+
+        c_native = pychemelt_sample.third_param_Ns_per_signal[i]
+
+        if pychemelt_sample.oligomeric:
+            a_unfolded = pychemelt_sample.first_param_Us_per_signal[i] * pychemelt_sample.oligomer_concentrations
+            b_unfolded = pychemelt_sample.second_param_Us_per_signal[i] * pychemelt_sample.oligomer_concentrations
+        else:
+            a_unfolded = pychemelt_sample.first_param_Us_per_signal[i]
+            b_unfolded = pychemelt_sample.second_param_Us_per_signal[i]
+
+        c_unfolded = pychemelt_sample.third_param_Us_per_signal[i]
+
+
+        #Modeling the baselines
+        ys_native = model_baselines(temperature_K_ref, np.array(a_native)[:,None], np.array(b_native)[:,None], np.array(c_native)[:,None], kind=pychemelt_sample.native_baseline_type)
+        ys_unfolded = model_baselines(temperature_K_ref, np.array(a_unfolded)[:,None], np.array(b_unfolded)[:,None], np.array(c_unfolded)[:,None], kind=pychemelt_sample.unfolded_baseline_type)
+
+
+        for j,conc in enumerate(concs):
+
+            color = colors[j]
+
+            x = xs[j]
+            y = ys[j]
+
+            # native baseline
+
+            #data
+            fig.add_trace(
+                go.Scatter(
+                    x=x, y=y, mode='markers',
+                    marker=dict(size=plot_config.marker_size, color=color),
+                    name=f'{conc:.2f} {scale}',
+                    showlegend=False
+                ),
+                row=row, col=1
+            )
+
+            # Baseline
+            ys_native_j = ys_native[j]
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x, y=ys_native_j, mode='lines',
+                    line=dict(color='black', width=plot_config.line_width),
+                    showlegend=False,
+                    hoverinfo='skip',
+                    hovertemplate=None
+                ),
+                row=row, col=1
+            )
+
+            # Fitting window
+            fig.add_vline(
+                x=fitting_window_end_native,
+                line_width=plot_config.line_width,
+                line_dash="dash",
+                line_color="red",
+                row=row, col=1
+            )
+
+            fig.add_vline(
+                x=np.array(xs).min(),
+                line_width=plot_config.line_width,
+                line_dash="dash",
+                line_color="red",
+                row=row, col=1
+            )
+
+            # unfolded baseline
+
+            #data
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x, y=y, mode='markers',
+                    marker=dict(size=plot_config.marker_size, color=color),
+                    name=f'{conc:.2f} {scale}',
+                    showlegend=False
+                ),
+                row=row, col=2
+            )
+
+            # Fitted baseline
+            ys_unfolded_j = ys_unfolded[j]
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x, y=ys_unfolded_j, mode='lines',
+                    line=dict(color='black', width=plot_config.line_width),
+                    showlegend=False,
+                    hoverinfo='skip',
+                    hovertemplate=None
+                ),
+                row=row, col=2
+            )
+
+            #Fitting window
+
+            fig.add_vline(
+                x=fitting_window_start_unfolded,
+                line_width=plot_config.line_width,
+                line_dash="dash",
+                line_color="red",
+                row=row, col=2
+            )
+
+            fig.add_vline(
+                x=np.array(xs).max(),
+                line_width=plot_config.line_width,
+                line_dash="dash",
+                line_color="red",
+                row=row, col=2
+            )
+
+        subplot_idx += 1
+
+    # Update subplot layout with white background and axis styling
+    fig.update_layout(
+        font_family="Roboto",
+        font_color="black",
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        legend=dict(font=dict(size=plot_config.font_size - 1))
+    )
+
+    subplot_idx = 1
+
+    for i in range(nrows):
+
+        row = subplot_idx
+
+        # Set the x-axis title only for the last row
+        title_text_x = 'Temperature (°C)' if row == nrows else ''
+
+        for col in range(1, 3):
+            # Set the y-axis title only for the first column
+
+            title_text_y = 'Signal' if col == 1 else ''
+
+            fig.update_xaxes(
+                title_text=title_text_x,
+                showgrid=axis_config.showgrid_x,
+                gridwidth=axis_config.gridwidth,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=axis_config.linewidth,
+                linecolor='black',
+                zeroline=False,
+                tickcolor='black',
+                ticks="outside",
+                tickwidth=axis_config.tickwidth,
+                ticklen=axis_config.ticklen,
+                title_font_size=plot_config.font_size,
+                tickfont_size=plot_config.font_size,
+                col = col,
+                row = row
+            )
+
+            fig.update_yaxes(
+                title_text=title_text_y,
+                showgrid=axis_config.showgrid_y,
+                gridwidth=axis_config.gridwidth,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=axis_config.linewidth,
+                linecolor='black',
+                zeroline=False,
+                tickcolor='black',
+                ticks="outside",
+                tickwidth=axis_config.tickwidth,
+                ticklen=axis_config.ticklen,
+                title_font_size=plot_config.font_size,
+                tickfont_size=plot_config.font_size,
+                nticks = axis_config.n_y_axis_ticks,
+                col=col,
+                row=row
+            )
+
+
+
+        subplot_idx += 1
+
+    # Build colorbar dict using legend_config values (orientation and x/y position)
+    # Choose sensible anchors depending on orientation
+    _xanchor = 'center' if legend_config.color_bar_orientation == 'h' else 'left'
+    _yanchor = 'top'    if legend_config.color_bar_orientation == 'h' else 'middle'
+
+    colorbar_dict = dict(
+        title=f'[Protein] ({scale})' if pychemelt_sample.oligomeric else f'[Denaturant] ({scale})',
+        tickvals=[min_conc, 0.5*(min_conc + max_conc), max_conc],
+        ticktext=[f"{min_conc:.2g}", f"{(min_conc + max_conc) * 0.5:.2g}", f"{max_conc:.2g}"],
+        len=legend_config.color_bar_length,
+        outlinewidth=1,
+        ticks='outside',
+        tickfont=dict(size=plot_config.font_size - 1),
+        orientation=legend_config.color_bar_orientation,
+        x=legend_config.color_bar_x_pos,
+        y=legend_config.color_bar_y_pos,
+        xanchor=_xanchor,
+        yanchor=_yanchor
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=[None], y=[None], mode='markers',
+            marker=dict(
+                colorscale='Viridis',
+                cmin=min_conc,
+                cmax=max_conc,
+                colorbar=colorbar_dict
+            ),
+            showlegend=False,
+            hoverinfo='skip'
+        ),
+        row=1, col=1
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            line=dict(color="red", width=plot_config.line_width, dash="dash"),
+            name="Fitting window boundaries",
+            showlegend=True
+        ),
+        row=1, col=1
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            line=dict(color="black", width=plot_config.line_width),
+            name="Fitted Baselines",
+            showlegend=True
         ),
         row=1, col=1
     )

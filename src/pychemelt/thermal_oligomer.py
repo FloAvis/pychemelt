@@ -313,6 +313,9 @@ class ThermalOligomer(Sample):
             'exponential': exponential_baseline
         }
 
+        self.window_range_native = window_range_native
+        self.window_range_unfolded = window_range_unfolded
+
         self.baseline_N_fx = baseline_fx_dic[native_baseline_type]
         self.baseline_U_fx = baseline_fx_dic[unfolded_baseline_type]
 

@@ -23,7 +23,8 @@ from .utils.signals import (
 )
 
 from .utils.plotting import (
-    plot_unfolding
+    plot_unfolding,
+    plot_baselines,
 )
 
 
