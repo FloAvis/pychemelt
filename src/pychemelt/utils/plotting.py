@@ -8,11 +8,12 @@ from plotly.subplots import make_subplots
 
 from .processing import (
     get_colors_from_numeric_values,
-    combine_sequences
+    combine_sequences,
+    oligomer_number
 )
 
 from .math import (
-    temperature_to_kelvin,
+    shift_temperature,
 )
 
 __all__ = [
@@ -29,16 +30,17 @@ def model_baselines(x, a, b, c=None, kind=None):
     """
     Encoding functions for baseline fitting
     """
+
     if kind == "constant":
         return a * np.ones_like(x)
     if kind == "linear":
         return a + x * b
     elif kind == "quadratic":
-        return a + b * x + c * (x ** 2)
-    elif kind == "exponential":
-        return a + b * np.exp(-c * x)
+        return a + b * x + c * np.square(x)
     else:
-        raise ValueError("Unknown model type")
+        return a + b * np.exp(-c * x)
+
+
 
 
 @dataclass
@@ -376,12 +378,11 @@ def plot_unfolding(
         row=1, col=1
     )
 
-    def is_subplot_title(x):
-        return x.text in ["Simulated Signal"]
+    subplot_title_set = set(subplot_titles)
 
     fig.update_annotations(
-        selector=is_subplot_title,
-        patch=dict(font=dict(size=plot_config.font_size + 10))
+        selector=lambda ann: ann.text in subplot_title_set,
+        patch=dict(font=dict(size=plot_config.font_size * 1.2))
     )
 
     fig = config_fig(
@@ -475,39 +476,46 @@ def plot_baselines(
 
 
         # Setting the correct temperature frame for the modeling
-        temperature_K = temperature_to_kelvin(np.array(xs))
-        temperature_K_ref = temperature_K - 298
+        temperature_K_ref = shift_temperature(np.array(xs))
 
 
         # Getting the fitting windows
         fitting_window_end_native = np.array(xs).min() +  pychemelt_sample.window_range_native
         fitting_window_start_unfolded = np.array(xs).max() - pychemelt_sample.window_range_unfolded
 
-        #Getting the fitted parameters
+        #Getting the fitted parameters and adjusting them
 
         if pychemelt_sample.oligomeric:
             a_native = pychemelt_sample.first_param_Ns_per_signal[i] * pychemelt_sample.oligomer_concentrations
-            b_native = pychemelt_sample.second_param_Ns_per_signal[i] * pychemelt_sample.oligomer_concentrations
+            b_native = pychemelt_sample.second_param_Ns_per_signal[i] * pychemelt_sample.oligomer_concentrations if pychemelt_sample.native_baseline_type in ['linear', 'quadratic', 'exponential'] else []
+            c_native = pychemelt_sample.third_param_Ns_per_signal[
+                           i] * pychemelt_sample.denaturant_concentrations if pychemelt_sample.native_baseline_type == 'quadratic' else \
+            pychemelt_sample.third_param_Ns_per_signal[i]
         else:
             a_native = pychemelt_sample.first_param_Ns_per_signal[i]
             b_native = pychemelt_sample.second_param_Ns_per_signal[i]
+            c_native = pychemelt_sample.third_param_Ns_per_signal[i]
 
-        c_native = pychemelt_sample.third_param_Ns_per_signal[i]
 
         if pychemelt_sample.oligomeric:
             a_unfolded = pychemelt_sample.first_param_Us_per_signal[i] * pychemelt_sample.oligomer_concentrations
-            b_unfolded = pychemelt_sample.second_param_Us_per_signal[i] * pychemelt_sample.oligomer_concentrations
+            b_unfolded = pychemelt_sample.second_param_Us_per_signal[i] * pychemelt_sample.oligomer_concentrations if pychemelt_sample.unfolded_baseline_type in ['linear', 'quadratic', 'exponential'] else []
+            c_unfolded = pychemelt_sample.third_param_Us_per_signal[
+                             i] * pychemelt_sample.oligomer_concentrations if pychemelt_sample.unfolded_baseline_type == 'quadratic' else \
+            pychemelt_sample.third_param_Us_per_signal[i]
+
         else:
             a_unfolded = pychemelt_sample.first_param_Us_per_signal[i]
             b_unfolded = pychemelt_sample.second_param_Us_per_signal[i]
-
-        c_unfolded = pychemelt_sample.third_param_Us_per_signal[i]
-
+            c_unfolded = pychemelt_sample.third_param_Us_per_signal[i]
 
         #Modeling the baselines
         ys_native = model_baselines(temperature_K_ref, np.array(a_native)[:,None], np.array(b_native)[:,None], np.array(c_native)[:,None], kind=pychemelt_sample.native_baseline_type)
         ys_unfolded = model_baselines(temperature_K_ref, np.array(a_unfolded)[:,None], np.array(b_unfolded)[:,None], np.array(c_unfolded)[:,None], kind=pychemelt_sample.unfolded_baseline_type)
 
+        # Correction for number of subunits
+        if pychemelt_sample.oligomeric:
+            ys_unfolded = ys_unfolded * oligomer_number(pychemelt_sample.model)
 
         for j,conc in enumerate(concs):
 
@@ -733,12 +741,11 @@ def plot_baselines(
         row=1, col=1
     )
 
-    def is_subplot_title(x):
-        return x.text in ["Simulated Signal"]
+    subplot_title_set = set(subplot_titles)
 
     fig.update_annotations(
-        selector=is_subplot_title,
-        patch=dict(font=dict(size=plot_config.font_size + 10))
+        selector=lambda ann: ann.text in subplot_title_set,
+        patch=dict(font=dict(size=plot_config.font_size * 1.2))
     )
 
     fig = config_fig(

@@ -1,6 +1,7 @@
 import plotly.graph_objs as go
+import pytest
 
-from pychemelt.utils.plotting import plot_unfolding
+from pychemelt.utils.plotting import plot_unfolding, plot_baselines
 from pychemelt import Monomer as Sample
 
 def test_plot_unfolding():
@@ -46,3 +47,35 @@ def test_plot_unfolding():
     assert fig is not None
     assert isinstance(fig, go.Figure)
 
+def test_plot_baselines():
+    sample = Sample()
+
+    sample.read_multiple_files('./test_files/nDSFdemoFile.xlsx')
+    sample.set_denaturant_concentrations()
+    sample.set_signal(['350nm', '330nm'])
+
+    sample.select_conditions([True for _ in range(8)] + [False for _ in range(48 - 8)])
+
+    sample.expand_multiple_signal()
+
+    pytest.raises(ValueError, plot_baselines, sample)
+
+    sample.estimate_baseline_parameters(
+        native_baseline_type='constant',
+        unfolded_baseline_type='quadratic'
+    )
+
+    fig = plot_baselines(sample)
+
+    assert fig is not None
+    assert isinstance(fig, go.Figure)
+
+    sample.estimate_baseline_parameters(
+        native_baseline_type='linear',
+        unfolded_baseline_type='exponential'
+    )
+
+    fig = plot_baselines(sample)
+
+    assert fig is not None
+    assert isinstance(fig, go.Figure)

@@ -98,6 +98,7 @@ def aux_create_pychem_sim(params,concs, model):
     pychem_sim.guess_Cp()
 
     return pychem_sim
+
 def test_plot_unfolding_concentrations():
 
     # Test mM concentrations
@@ -116,6 +117,28 @@ def test_plot_unfolding_concentrations():
     pychem_sim = aux_create_pychem_sim(def_params,concs, model="Monomer")
 
     fig = pychem.plot_unfolding(pychem_sim)
+
+    assert fig is not None
+    assert isinstance(fig, go.Figure)
+
+def test_plot_ubaselines_concentrations():
+
+    # Test mM concentrations
+    concs = np.arange(10, 100, 10)*1e-3
+
+    pychem_sim = aux_create_pychem_sim(def_params,concs, model="Monomer")
+
+    fig = pychem.plot_baselines(pychem_sim)
+
+    assert fig is not None
+    assert isinstance(fig, go.Figure)
+
+    # Test μM concentrations
+    concs = np.arange(10, 100, 10)*1e-6
+
+    pychem_sim = aux_create_pychem_sim(def_params,concs, model="Monomer")
+
+    fig = pychem.plot_baselines(pychem_sim)
 
     assert fig is not None
     assert isinstance(fig, go.Figure)

@@ -286,10 +286,11 @@ class ThermalOligomer(Sample):
 
         for i in range(len(self.signal_lst_multiple)):
 
-            adjusted_signal_lst_multiple = list(np.array(self.signal_lst_multiple[i])/ np.array(oligomer_concentrations))
+            self.adjusted_signal_lst_multiple = list(np.array(self.signal_lst_multiple[i])/ np.array(oligomer_concentrations))
+
 
             p1Ns, p1Us, p2Ns, p2Us, p3Ns, p3Us = estimate_signal_baseline_params(
-                adjusted_signal_lst_multiple,
+                self.adjusted_signal_lst_multiple,
                 self.temp_lst_multiple[i],
                 native_baseline_type,
                 unfolded_baseline_type,
@@ -297,7 +298,6 @@ class ThermalOligomer(Sample):
                 window_range_unfolded,
                 oligomer_number(self.model)
             )
-
 
             self.first_param_Ns_per_signal.append(p1Ns)
             self.first_param_Us_per_signal.append(p1Us)
