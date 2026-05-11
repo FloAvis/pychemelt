@@ -17,7 +17,10 @@ from .utils.files  import (
     load_mx3005p_txt,
     load_supr_dsf,
     load_csv_file,
-    load_aunty_xlsx
+    load_aunty_xlsx,
+    read_jasco_thermal_ramp,
+    read_jasco_thermal_ramp_format_2,
+    read_chirascan_thermal_ramp
 
 )
 
@@ -36,7 +39,7 @@ from .utils.processing import (
     guess_Tm_from_derivative,
     clean_conditions_labels,
     subset_signal_by_temperature,
-    estimate_signal_baseline_params
+    estimate_signal_baseline_params, transform_to_list
 )
 
 
@@ -125,6 +128,10 @@ class Sample:
 
         self.predicted = None # Flattened list of fitted signals
 
+        self.predicted_lst_multiple = None
+        self.predicted_lst_multiple_scaled = None
+        self.signal_lst_multiple_scaled = None
+
     def read_file(self, file):
 
         """
@@ -152,7 +159,10 @@ class Sample:
             'mx3005p': load_mx3005p_txt,
             'supr': load_supr_dsf,
             'csv': load_csv_file,
-            'aunty': load_aunty_xlsx
+            'aunty': load_aunty_xlsx,
+            'jasco_thermal_ramp': read_jasco_thermal_ramp,
+            'jasco_thermal_ramp_format_2': read_jasco_thermal_ramp_format_2,
+            'chirascan_thermal_ramp':read_chirascan_thermal_ramp
         }
 
         read_fx = read_fx_map.get(file_type)
@@ -224,8 +234,7 @@ class Sample:
         """
 
         # Convert to list if not isinstance(files, list):
-        if not isinstance(files, list):
-            files = [files]
+        files = transform_to_list(files)
 
         for file in files:
             read_status = self.read_file(file)
@@ -254,8 +263,7 @@ class Sample:
         """
 
         # Convert signal_names to list if it is a string
-        if isinstance(signal_names, str):
-            signal_names = [signal_names]
+        signal_names = transform_to_list(signal_names)
 
         signals = []
         temps = []
@@ -381,8 +389,7 @@ class Sample:
         if self.max_points is not None:
             self.deriv_lst_expanded = [subset_data(x, self.max_points) for x in self.deriv_lst_expanded]
 
-        if hasattr(self, "predicted_lst_multiple"):
-
+        if self.predicted_lst_multiple is not None:
             self.predicted_deriv_lst_multiple = []
 
             for i in range(len(self.predicted_lst_multiple)):

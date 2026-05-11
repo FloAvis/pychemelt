@@ -9,6 +9,7 @@ from pychemelt import Monomer as Sample
 
 sample = Sample()
 
+
 def test_load_data():
     sample.read_multiple_files('./test_files/nDSFdemoFile.xlsx')
 
@@ -119,3 +120,5 @@ def test_read_same_format_data():
     sample.read_multiple_files('./test_files/nDSFdemoFile.xlsx')
 
     assert len(sample.conditions) == 48 * 2
+
+

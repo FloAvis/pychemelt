@@ -40,7 +40,41 @@ __all__ = [
     'combine_sequences',
     'adjust_value_to_interval',
     'oligomer_number',
+    'parse_number',
+    'are_all_strings_numeric',
+    'is_float',
+    'transform_to_list'
 ]
+
+def transform_to_list(element_or_list):
+
+    """
+
+    Parameters
+    ----------
+    element_or_list : bool, str, int, float, list,  or numpy array
+        The input element or list to be transformed into a list.
+
+    Returns
+    -------
+    list or None
+        A list containing the input element if it is not already a list, or the input itself if it is None, a numpy array, or a list.
+
+    Raises
+    ------
+    ValueError
+        If the input is not a boolean, string, integer, float, list, numpy array
+
+    """
+
+    if element_or_list is None or isinstance(element_or_list, list) or isinstance(element_or_list, np.ndarray):
+        return element_or_list
+
+    if isinstance(element_or_list, (bool,str,int,float)):
+        return [element_or_list]
+
+    else:
+        raise ValueError(f"Expected a boolean, string, list or None, but got {type(element_or_list)}")
 
 def set_param_bounds(p0,param_names):
     """
@@ -718,3 +752,70 @@ def oligomer_number(model):
             return 4
         else:
             return 1
+
+def parse_number(s):
+    """
+    Parse a string as a float, handling:
+    - European decimal (comma)
+    - Optional thousands separators
+    - Standard decimal point
+
+    Parameters
+    ----------
+    s : str
+        The string to parse
+
+    Returns
+    -------
+    float        The parsed number
+
+    Raises
+    ------
+    ValueError    If the string cannot be parsed as a float
+
+    """
+    s = str(s).strip()
+
+    # Remove spaces
+    s = s.replace(" ", "")
+
+    # Handle European format with thousands separator
+    # e.g., '1.234,56' -> 1234.56
+    if re.match(r'^\d{1,3}(\.\d{3})*,\d+$', s):
+        s = s.replace('.', '').replace(',', '.')
+    # Handle standard format with comma decimal: '9,99'
+    elif ',' in s and '.' not in s:
+        s = s.replace(',', '.')
+
+    try:
+        return float(s)
+    except ValueError:
+        raise ValueError(f"Cannot convert '{s}' to float")
+
+def are_all_strings_numeric(lst):
+
+    """
+
+    Parameters
+    ----------
+    lst : list of str
+        List of strings to check
+
+    Returns
+    -------
+    bool
+        True if all strings in the list are numeric (can contain digits, '.', '-', ','), False otherwise
+
+    """
+
+    for item in lst:
+        if not all(char.isdigit() or char in [".", "-", ",","e"] for char in item):
+            return False
+    return True
+
+def is_float(element):
+    try:
+        parse_number(element)
+        return True
+    except ValueError:
+        return False
